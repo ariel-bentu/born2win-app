@@ -96,14 +96,11 @@ export async function requestWebPushToken() {
     });
 }
 
-export async function sendTestNotification(uid: string) {
-    const testNotification = httpsCallable(functions, 'testNotification');
-    console.log("Send test notification", uid)
-    const payload = {
-        displayName: uid
-    };
-
-    return testNotification(payload);
+export async function sendTestNotification() {
+    const testNotification = httpsCallable(functions, 'TestNotification');
+    console.log("Send test notification")
+    
+    return testNotification();
 }
 
 export function updateLoginInfo(volunteerId: string) {

@@ -1,12 +1,14 @@
 export interface NotificationUpdatePayload {
     notificationOn?: boolean;
-    tokenInfo: {
-        token:string;
-        isSafari: boolean;
-        createdAt: string;
-    }
+    tokenInfo: TokenInfo;
 }
 
+export interface TokenInfo {
+    token: string;
+    isSafari: boolean;
+    createdAt: string;
+    lastMessageDate?:string;
+}
 
 export interface UpdateUserLoginPayload {
     volunteerID: string;

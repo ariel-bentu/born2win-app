@@ -19,12 +19,12 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-scripts": "5.0.1",
-    "typescript": "^4.9.5",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build-sw": "webpack --config webpack.sw.config.js",
+    "build": "npm run build-sw && react-scripts build",
     "deploy": "firebase deploy --only hosting",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
@@ -48,6 +48,11 @@
     ]
   },
   "devDependencies": {
-    "@types/clientjs": "^0.2.2"
+    "@types/clientjs": "^0.2.2",
+    "copy-webpack-plugin": "^12.0.2",
+    "path": "^0.12.7",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.5.4",
+    "webpack-cli": "^5.1.4"
   }
 }

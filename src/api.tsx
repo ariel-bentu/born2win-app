@@ -19,7 +19,7 @@ import {
 import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
-import { NotificationUpdatePayload, UpdateUserLoginPayload } from "./types";
+import { Collections, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDC7Yz2zm6DB7WgQHZ_HDojIHzkHwXU4hk",
@@ -64,6 +64,25 @@ export function init(onAuth: NextOrObserver<User>) {
         });
 }
 
+export function getUserInfo(uid: string, volunteerId: string): Promise<UserInfo> {
+    let docRef = doc(db, Collections.Users, volunteerId);
+    return getDoc(docRef).then(doc => {
+        const data = doc.data();
+        if (!doc.exists || !data) {
+            console.log(doc)
+            throw new Error("חשבונך מחכה לאישור - יש לפנות למנהל המערכת");
+        }
+        return ({
+            notificationToken: data.notificationTokens?.find((tokenInfo: TokenInfo) => tokenInfo.uid === uid),
+            firstName: data.firstName,
+            lastName: data.lastName,
+            notificationOn: data.notificationOn === true,
+        });
+    })
+        .catch((err) => {
+            throw new Error("חשבונך אינו פעיל - יש לפנות למנהל המערכת")
+        });
+}
 
 
 export async function getFCMToken() {
@@ -99,15 +118,18 @@ export async function requestWebPushToken() {
 export async function sendTestNotification() {
     const testNotification = httpsCallable(functions, 'TestNotification');
     console.log("Send test notification")
-    
+
     return testNotification();
 }
 
-export function updateLoginInfo(volunteerId: string) {
+export function updateLoginInfo(volunteerId: string | undefined, fingerprint:string):any {
     const updateLoginInfoFunc = httpsCallable(functions, 'UpdateUserLogin');
-    const uulp = { volunteerID: volunteerId } as UpdateUserLoginPayload;
+    const uulp = { fingerprint } as UpdateUserLoginPayload;
+    if (volunteerId && fingerprint.length > 0) {
+        uulp.volunteerID = volunteerId;
+    }
 
-    return updateLoginInfoFunc(uulp);
+    return updateLoginInfoFunc(uulp).then(res=>res.data);
 }
 
 export async function updateUserNotification(notificationOn: boolean | undefined, token: string, isSafari: boolean) {

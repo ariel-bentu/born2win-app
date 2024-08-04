@@ -4,7 +4,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { setGlobalOptions, logger } from "firebase-functions/v2";
 
 // Dependencies for the addMessage function.
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore, FieldValue, QueryDocumentSnapshot, DocumentSnapshot } from "firebase-admin/firestore";
 // const sanitizer = require("./sanitizer");
 // import { initializeApp } from "firebase-admin";
 import admin = require("firebase-admin");
@@ -23,9 +23,7 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 const JERUSALEM = "Asia/Jerusalem";
 
-const USERS_COLLECTION = "users";
-
-import { NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload } from "../../src/types";
+import { Collections, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload } from "../../src/types";
 const db = getFirestore();
 
 /**
@@ -34,13 +32,52 @@ const db = getFirestore();
  * {
  *   firstName: string,
  *   lastName: string,
- *   uid: [] string,
- *   loginInfo: [{uid:string, createdAt: string}],
+ *   uid: [] string, # for search by uid
+ *   fingerpring: [] string # for search by fingerprint
+ *   loginInfo: [{uid:string, fingerprint:string, createdAt: string}],
  *   notificationTokens: [{token:string, isSafari:boolean, createdAt:string}]
  * }
  */
 
-exports.UpdateUserLogin = onCall({ cors: true }, request => {
+function findUserByUID(uid: string): Promise<QueryDocumentSnapshot | null> {
+    return db.collection(Collections.Users).where("uid", "array-contains", uid).get().then(res => {
+        if (res.empty) {
+            // no matching users
+            return null;
+        }
+        if (res.docs.length > 1) {
+            // not expect - too many results
+            return null;
+        }
+        return res.docs[0];
+    });
+}
+
+function findUserByFingerprint(fingerprint: string, since: string): Promise<QueryDocumentSnapshot | null> {
+    return db.collection(Collections.Users).where("fingerprint", "array-contains", fingerprint).get().then(res => {
+        if (res.empty) {
+            // no matching users
+            return null;
+        }
+        if (res.docs.length > 1) {
+            // take the newest - todo
+            console.log("Warnning multiple matches to fingerpring", fingerprint, since);
+            return res.docs[0];
+        }
+        return res.docs[0];
+    });
+}
+
+function getUserByID(id: string): Promise<DocumentSnapshot | null> {
+    return db.collection(Collections.Users).doc(id).get().then(doc => {
+        if (doc.exists) {
+            return doc;
+        }
+        return null;
+    });
+}
+
+exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError("unauthenticated", "Request had invalid credentials.");
     }
@@ -49,20 +86,34 @@ exports.UpdateUserLogin = onCall({ cors: true }, request => {
         throw new HttpsError("unauthenticated", "Request is missing uid.");
     }
     const uulp = request.data as UpdateUserLoginPayload;
+    const now = dayjs().utc().tz(JERUSALEM);
+    let doc;
+    if (uulp.volunteerID) {
+        doc = await getUserByID(uulp.volunteerID);
+    } else {
+        const since = now.subtract(3, "day");
+        doc = await findUserByFingerprint(uulp.fingerprint, since.format("YYYY-MM-DD"));
+    }
 
     // todo - add OTP
-    return db.collection(USERS_COLLECTION).doc(uulp.volunteerID).get().then(doc => {
-        if (doc.exists) {
-            const now = dayjs().utc().tz(JERUSALEM).format("YYYY-MM-DD HH:mm:ss");
-
+    if (doc) {
+        if (uulp.volunteerID) {
             doc.ref.update({
                 uid: FieldValue.arrayUnion(uid),
-                loginInfo: FieldValue.arrayUnion({ uid, createdAt: now }),
+                fingerprint: FieldValue.arrayUnion(uulp.fingerprint),
+                loginInfo: FieldValue.arrayUnion({ uid, createdAt: now.format("YYYY-MM-DD HH:mm:ss"), fingerprint: uulp.fingerprint }),
             });
         } else {
-            throw new HttpsError("not-found", "Volunteer ID not found");
+            doc.ref.update({
+                uid: FieldValue.arrayUnion(uid),
+                loginInfo: FieldValue.arrayUnion({ uid, createdAt: now.format("YYYY-MM-DD HH:mm:ss"), fingerprint: uulp.fingerprint }),
+            });
         }
-    });
+        // return the volunteerID
+        return doc.id;
+    } else {
+        throw new HttpsError("not-found", uulp.volunteerID ? "Volunteer ID not found" : "Fingerprint not found");
+    }
 });
 
 exports.UpdateNotification = onCall({ cors: true }, request => {
@@ -76,29 +127,37 @@ exports.UpdateNotification = onCall({ cors: true }, request => {
     const unp = request.data as NotificationUpdatePayload;
 
 
-    return db.collection(USERS_COLLECTION).where("uid", "array-contains", uid).get().then(res => {
-        if (res.empty) {
-            // no matching users
-            return;
-        }
-        if (res.docs.length > 1) {
-            // not expect - too many results
-            return;
-        }
-        const doc = res.docs[0];
+    return findUserByUID(uid).then(doc => {
+        if (doc) {
+            let dirty = false;
 
-        const update: any = {};
-        if (unp.notificationOn !== undefined) {
-            update.notificationOn = unp.notificationOn;
-        }
+            const update: any = {};
+            if (unp.notificationOn !== undefined) {
+                update.notificationOn = unp.notificationOn;
+                dirty = true;
+            }
 
-        if (unp.tokenInfo !== undefined) {
-            if (doc.data().notificationTokens === undefined || !doc.data().notificationTokens.find((nt: any) => nt.token === unp.tokenInfo.token)) {
-                update.notificationTokens = FieldValue.arrayUnion(unp.tokenInfo);
+            if (unp.tokenInfo !== undefined) {
+                if (doc.data().notificationTokens === undefined || doc.data().notificationTokens.length === 0) {
+                    update.notificationTokens = [{ ...unp.tokenInfo, uid }];
+                    dirty = true;
+                } else {
+                    let currNotificationTokens = doc.data().notificationTokens;
+                    if (currNotificationTokens.find((nt: TokenInfo) => nt.uid === uid && nt.token === unp.tokenInfo.token)) {
+                        // this token already exists for this uid - do nothing
+                    } else {
+                        currNotificationTokens = currNotificationTokens.filter((nt: TokenInfo) => nt.uid !== uid);
+                        currNotificationTokens.push({ ...unp.tokenInfo, uid });
+                        update.notificationTokens = currNotificationTokens;
+                        dirty = true;
+                    }
+                }
+            }
+            if (dirty) {
+                return doc.ref.update(update);
             }
         }
-
-        return doc.ref.update(update);
+        return;
     });
 });
 
@@ -111,24 +170,18 @@ exports.TestNotification = onCall({ cors: true }, request => {
         throw new HttpsError("unauthenticated", "Request is missing uid.");
     }
 
-    return db.collection(USERS_COLLECTION).where("uid", "array-contains", uid).get().then(res => {
-        if (res.empty) {
-            // no matching users
-            return;
-        }
-        if (res.docs.length > 1) {
-            // not expect - too many results
-            return;
-        }
-        const doc = res.docs[0];
-        return getWebTokens([doc.id]).then(devices => {
-            const displayName = doc.data().firstName + " " + doc.data().lastName;
-            logger.info("Test notification for: ", doc.id, displayName, "tokens: ", devices);
+    return findUserByUID(uid).then(doc => {
+        if (doc) {
+            return getWebTokens([doc.id]).then(devices => {
+                const displayName = doc.data().firstName + " " + doc.data().lastName;
+                logger.info("Test notification for: ", doc.id, displayName, "tokens: ", devices);
 
-            return sendNotification("Born2Win", "הודעת בדיקה ל:\n" + displayName, {
-                navigateTo: "/#2",
-            }, devices);
-        });
+                return sendNotification("Born2Win", "הודעת בדיקה ל:\n" + displayName, {
+                    navigateTo: "/#2",
+                }, devices);
+            });
+        }
+        return;
     });
 });
 
@@ -146,7 +199,7 @@ interface DeviceInfoUpdate {
 async function getWebTokens(to: string[]) {
     const webPushDevices = [] as DeviceInfo[];
 
-    const users = await db.collection(USERS_COLLECTION).get();
+    const users = await db.collection(Collections.Users).get();
 
     to.forEach(sentToUser => {
         if (sentToUser === "all") {
@@ -242,7 +295,7 @@ const sendNotification = (title: string, body: string, data: any, devices: Devic
         // update the devices
         const batch = db.batch();
         updates.forEach(update => {
-            const docRef = db.collection(USERS_COLLECTION).doc(update.ownerId);
+            const docRef = db.collection(Collections.Users).doc(update.ownerId);
             batch.update(docRef, {
                 notificationTokens: update.tokensInfos,
             });

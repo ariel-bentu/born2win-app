@@ -3,6 +3,9 @@
 # firebase
 .firebase
 
+#service-worker js - generated
+public/firebase-messaging-sw.js
+
 # dependencies
 /node_modules
 /.pnp

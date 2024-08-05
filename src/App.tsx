@@ -13,6 +13,8 @@ import { NextOrObserver, User } from 'firebase/auth';
 import { UserInfo } from './types';
 import { ClientJS } from 'clientjs';
 import NotificationsComponent from './notifications-component';
+import { getDB } from './db';
+import { countUnreadNotifications } from './notifications';
 
 const UID_STORAGE_KEY = "born2win_uid";
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
@@ -90,6 +92,7 @@ function App() {
 
     useEffect(() => {
         api.init(onAuth);
+        countUnreadNotifications().then(updateUnreadCount);
     }, []);
 
     const showToast = (severity: "error" | "success" | "info" | "warn" | "secondary" | "contrast" | undefined, summary: string, detail: string) => {
@@ -100,6 +103,9 @@ function App() {
 
     const updateUnreadCount = (count: number) => {
         setUnreadCount(count);
+        if ('setAppBadge' in navigator) {
+            (navigator as any).setAppBadge(count);
+        }
     };
 
     return (
@@ -131,10 +137,21 @@ function App() {
                             }}>Allow Notification</Button>
 
                             <Button onClick={() => api.sendTestNotification()} disabled={!userInfo?.notificationToken}>Send Test Notification</Button>
+                            <Button onClick={async () => {
+                                const db = await getDB();
+                                await db.put('notifications', {
+                                    id: Date.now() + "",
+                                    title: "Test data" + Date.now(),
+                                    body: "",
+                                    read: 0,
+                                    timestamp: Date.now(),
+                                });
+                                countUnreadNotifications().then(updateUnreadCount);
+                            }} >Add Test DATA</Button>
                         </div>
                     </div>
                 </TabPanel>
-                <TabPanel header={<><span>Messages</span> <Badge value={unreadCount} severity="danger" /></>}>
+                <TabPanel header={<><span>Messages</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
                     <NotificationsComponent updateUnreadCount={updateUnreadCount} />
                 </TabPanel>
                 <TabPanel header="Registration">

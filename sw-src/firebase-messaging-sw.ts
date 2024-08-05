@@ -31,7 +31,7 @@ self.addEventListener('push', async (event: any) => {
     await db.put('notifications', {
         id: Date.now()+"",
         title: notificationTitle,
-        body: JSON.stringify(payload),
+        body: payload.notification.body || "",
         read: 0,
         timestamp: Date.now(),
     });

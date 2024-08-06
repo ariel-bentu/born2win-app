@@ -18,6 +18,11 @@
   color: white;
 }
 
+.app-title {
+  font-size: 30px;
+  font-weight: bold;
+}
+
 .App-link {
   color: #61dafb;
 }

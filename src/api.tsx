@@ -20,6 +20,7 @@ import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
 import { Collections, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
+import { isPWA } from "./App";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDC7Yz2zm6DB7WgQHZ_HDojIHzkHwXU4hk",
@@ -51,7 +52,10 @@ export function init(onAuth: NextOrObserver<User>) {
 
         functions = getFunctions(app, 'europe-west1');
     }
-    setPersistence(auth, indexedDBLocalPersistence).then(() => onAuthStateChanged(auth, onAuth));
+    return setPersistence(auth, indexedDBLocalPersistence).then(() => onAuthStateChanged(auth, onAuth));
+}
+
+export function login() {
     signInAnonymously(auth)
         .then((u) => {
             // Signed in..
@@ -66,11 +70,18 @@ export function init(onAuth: NextOrObserver<User>) {
 
 export function getUserInfo(uid: string, volunteerId: string): Promise<UserInfo> {
     let docRef = doc(db, Collections.Users, volunteerId);
+    const unknwon =  {
+        firstName: "לא ידוע",
+        lastName:"",
+        notificationOn: false,
+        notificationToken: undefined,
+    }
+
     return getDoc(docRef).then(doc => {
         const data = doc.data();
         if (!doc.exists || !data) {
             console.log(doc)
-            throw new Error("חשבונך מחכה לאישור - יש לפנות למנהל המערכת");
+            return unknwon;
         }
         return ({
             notificationToken: data.notificationTokens?.find((tokenInfo: TokenInfo) => tokenInfo.uid === uid),
@@ -80,7 +91,9 @@ export function getUserInfo(uid: string, volunteerId: string): Promise<UserInfo>
         });
     })
         .catch((err) => {
-            throw new Error("חשבונך אינו פעיל - יש לפנות למנהל המערכת")
+            console.log(err.message);
+            //throw new Error("חשבונך אינו פעיל - יש לפנות למנהל המערכת")
+            return unknwon
         });
 }
 
@@ -122,14 +135,14 @@ export async function sendTestNotification() {
     return testNotification();
 }
 
-export function updateLoginInfo(volunteerId: string | undefined, fingerprint:string):any {
+export function updateLoginInfo(volunteerId: string | undefined, fingerprint: string): any {
     const updateLoginInfoFunc = httpsCallable(functions, 'UpdateUserLogin');
     const uulp = { fingerprint } as UpdateUserLoginPayload;
     if (volunteerId && fingerprint.length > 0) {
         uulp.volunteerID = volunteerId;
     }
 
-    return updateLoginInfoFunc(uulp).then(res=>res.data);
+    return updateLoginInfoFunc(uulp).then(res => res.data);
 }
 
 export async function updateUserNotification(notificationOn: boolean | undefined, token: string, isSafari: boolean) {
@@ -151,4 +164,26 @@ export async function updateUserNotification(notificationOn: boolean | undefined
     return updateNotification(payload);
 }
 
+export interface Family {
+    id: string;
+    fields: {
+        [key: string]: any;
+        'Name': string;
+        'עיר': string;
+        'גיל החולה': string;
+        'העדפה לסוג ארוחה': string[];
+        'כשרות מטבח': string;
+        'אוהבים לאכול': string;
+        'רגישויות ואלרגיות (from בדיקת ההתאמה)': string;
+        'נפשות מבוגרים בבית': string;
+        'גילאים של הרכב המשפחה': string;
+        'מחוז': string;
+        'קומה': string;
+    };
+}
+
+export function getMealRequests(): Promise<Family[]> {
+    const getMealRequestsFunc = httpsCallable(functions, 'GetMealRequests');
+    return getMealRequestsFunc().then((res: any) => res.data.records as Family[]);
+}
 

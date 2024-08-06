@@ -6,13 +6,13 @@ interface OneNotificationProps {
     body: string;
     unread: boolean;
     footer?: string;
-    onDelete: () => void;
+    onDelete?: () => void;
     onRead: () => void;
 }
 
 const OneNotification: React.FC<OneNotificationProps> = ({ title, body, unread, footer, onDelete, onRead }) => {
     return (
-        <div className="col-12 md:col-6 lg:col-3">
+        <div className="col-12">
             <div className="surface-card shadow-2 p-3 border-round" onClick={onRead}>
                 <div className="flex justify-content-between mb-3">
                     <div>
@@ -24,7 +24,7 @@ const OneNotification: React.FC<OneNotificationProps> = ({ title, body, unread, 
                     </div>
                 </div>
                 {footer && <span className="text-500">{footer}</span>}
-                <div className="flex justify-content-end mt-3">
+                {onDelete && <div className="flex justify-content-end mt-3">
                     <Button icon="pi pi-trash" className="p-button-danger" onClick={(event) => {
                         confirmPopup({
                             target: event.currentTarget,
@@ -33,7 +33,7 @@ const OneNotification: React.FC<OneNotificationProps> = ({ title, body, unread, 
                             accept: onDelete,
                         });                        
                     }} />
-                </div>
+                </div>}
             </div>
         </div>
     );

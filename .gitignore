@@ -2,7 +2,7 @@
 
 # firebase
 .firebase
-
+.env*
 #service-worker js - generated
 public/firebase-messaging-sw.js
 
@@ -10,6 +10,11 @@ public/firebase-messaging-sw.js
 /node_modules
 /.pnp
 .pnp.js
+
+
+
+temp.js
+urls.http
 
 # testing
 /coverage

@@ -15,6 +15,7 @@ import { ClientJS } from 'clientjs';
 import NotificationsComponent from './notifications-component';
 import { getDB } from './db';
 import { countUnreadNotifications } from './notifications';
+import RegistrationComponent from './registration';
 
 const UID_STORAGE_KEY = "born2win_uid";
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
@@ -29,11 +30,12 @@ const fingerprint = client.getFingerprint() + "";
 
 function App() {
     const [user, setUser] = useState<User | null>(null);
+    const [init, setInit] = useState<boolean>(false);
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
     const [volunteerId, setVolunteerId] = useState<string | undefined>();
     const [userPairingRequest, setUserPairingRequest] = useState<string | null>(param_vol_id);
     const [notificationPermission, setNotificationPermission] = useState<string>((typeof Notification !== 'undefined') && Notification && Notification.permission || "unsupported");
-    const [swRegistration, setSWRegistration] = useState<ServiceWorkerRegistration | null>(null);
+    // const [swRegistration, setSWRegistration] = useState<ServiceWorkerRegistration | null>(null);
     const [unreadCount, setUnreadCount] = useState(0);
     const toast = useRef<Toast>(null);
 
@@ -43,41 +45,35 @@ function App() {
 
     useEffect(() => {
         if (user && user.uid) {
-            const currentUid = localStorage.getItem(UID_STORAGE_KEY);
-            const currentVolId = localStorage.getItem(VOL_ID_STORAGE_KEY);
+            // const currentUid = localStorage.getItem(UID_STORAGE_KEY);
 
-            if (userPairingRequest && userPairingRequest.length > 0) {
-                if (userPairingRequest !== currentVolId) {
-                    if (currentVolId && currentVolId.length > 0) {
-                        console.log("Change of vol ID - ignored", currentVolId, "to", userPairingRequest);
-                    } else {
-                        api.updateLoginInfo(userPairingRequest, fingerprint).then(() => {
-                            localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
-                            localStorage.setItem(UID_STORAGE_KEY, user.uid);
-                        });
+            const currentVolId = isPWA ? localStorage.getItem(VOL_ID_STORAGE_KEY) : undefined;
+
+            if (!isPWA) {
+                if (userPairingRequest && userPairingRequest.length > 0) {
+                    // this is a non-pwa flow
+                    if (userPairingRequest !== currentVolId) {
+                        if (currentVolId && currentVolId.length > 0) {
+                            console.log("Change of vol ID - ignored", currentVolId, "to", userPairingRequest);
+                        } else {
+                            api.updateLoginInfo(userPairingRequest, fingerprint).then(() => {
+                                // localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
+                                // localStorage.setItem(UID_STORAGE_KEY, user.uid);
+                            });
+                        }
                     }
+                    setVolunteerId(userPairingRequest);
                 }
-                setVolunteerId(userPairingRequest);
             } else {
                 if (currentVolId && currentVolId.length > 0) {
                     setVolunteerId(currentVolId);
-                    if (currentUid === user.uid) {
-                    } else {
-                        api.updateLoginInfo(currentVolId, fingerprint).then(() => {
-                            localStorage.setItem(UID_STORAGE_KEY, user.uid);
-                        });
-                    }
-                } else {
-                    if (isPWA) {
-                        api.updateLoginInfo(undefined, fingerprint).then((retVolId: string) => {
-                            localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
-                            setVolunteerId(retVolId);
-                            localStorage.setItem(UID_STORAGE_KEY, user.uid);
-                        }).catch((err: Error) => {
-                            console.log("Failed to fetch volunteerId based on fingerprint", err);
-                        });
-                    }
                 }
+                api.updateLoginInfo(undefined, fingerprint).then((retVolId: string) => {
+                    setVolunteerId(retVolId);
+                    localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
+                }).catch((err: Error) => {
+                    console.log("Failed to fetch volunteerId based on fingerprint", err);
+                });
             }
         }
     }, [user, userPairingRequest]);
@@ -91,9 +87,17 @@ function App() {
     }, [user, volunteerId]);
 
     useEffect(() => {
-        api.init(onAuth);
+        api.init(onAuth).then(() => setInit(true));
         countUnreadNotifications().then(updateUnreadCount);
     }, []);
+
+    useEffect(() => {
+        if (init && !user) {
+            if (isPWA || volunteerId && volunteerId.length > 0) {
+                api.login();
+            }
+        }
+    }, [init, volunteerId, user]);
 
     const showToast = (severity: "error" | "success" | "info" | "warn" | "secondary" | "contrast" | undefined, summary: string, detail: string) => {
         if (toast.current) {
@@ -111,7 +115,8 @@ function App() {
     return (
         <div className="App">
             <Toast ref={toast} />
-            <h2>Born to Win</h2>
+            <div className="app-title">נולדת לנצח</div>
+            <div>{userInfo && "שלום " + userInfo.firstName}</div>
             <TabView>
                 <TabPanel header="Settings">
                     <div style={{ display: "flex", flexDirection: "column", textAlign: "left", alignItems: "center" }}>
@@ -155,7 +160,7 @@ function App() {
                     <NotificationsComponent updateUnreadCount={updateUnreadCount} />
                 </TabPanel>
                 <TabPanel header="Registration">
-                    <div>Registration content goes here...</div>
+                    <RegistrationComponent />
                 </TabPanel>
             </TabView>
         </div>

@@ -11,6 +11,9 @@ import admin = require("firebase-admin");
 import dayjs = require("dayjs");
 import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
+import { defineString } from "firebase-functions/params";
+import { Collections, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload } from "../../src/types";
+import axios from "axios";
 // [END Imports]
 
 setGlobalOptions({
@@ -23,8 +26,11 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 const JERUSALEM = "Asia/Jerusalem";
 
-import { Collections, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload } from "../../src/types";
 const db = getFirestore();
+
+const born2winApiKey = defineString("BORN2WIN_API_KEY");
+const testUser = defineString("BORN2WIN_TEST_USER");
+const mainBase = defineString("BORM2WIN_MAIN_BASE");
 
 /**
  * users collection
@@ -303,3 +309,47 @@ const sendNotification = (title: string, body: string, data: any, devices: Devic
         return batch.commit();
     });
 };
+
+
+exports.GetMealRequests = onCall({ cors: true }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Request had invalid credentials.");
+    }
+    const uid = request.auth.uid;
+    if (!uid) {
+        throw new HttpsError("unauthenticated", "Request is missing uid.");
+    }
+
+    const doc = await findUserByUID(uid);
+    if (!doc) {
+        throw new HttpsError("unauthenticated", "unauthorized user");
+    }
+
+    // Temp defaults to test user
+    // const volunteerID = doc.id;
+    const volunteerID = testUser.value();
+    const apiKey = born2winApiKey.value();
+    const airTableNameBase = mainBase.value();
+    const headers = {
+        "Authorization": `Bearer ${apiKey}`,
+    };
+
+    const response1 = await axios.get(`https://api.airtable.com/v0/${airTableNameBase}/tbl9djJMEErRLjrjk/${volunteerID}`, {
+        headers,
+    });
+
+    const mahoz = response1.data.fields["מחוז"];
+    if (mahoz && mahoz.length > 0) {
+        const response2 = await axios.get(`https://api.airtable.com/v0/${airTableNameBase}/%D7%9E%D7%97%D7%95%D7%96/${mahoz[0]}`, {
+            headers,
+        });
+
+        const baseId = response2.data.fields.base_id;
+        const response3 = await axios.get(`https://api.airtable.com/v0/${baseId}/משפחות במחוז?filterByFormula=AND(NOT({דרישות לשיבוצים}=''),({סטטוס בעמותה} = 'פעיל'))&sort[0][field]=שם משפחה של החולה&sort[0][direction]=asc`, {
+            headers,
+        });
+        return response3.data;
+    }
+    return "District not found";
+});
+

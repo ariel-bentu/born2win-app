@@ -1,7 +1,7 @@
 import { Button } from "primereact/button";
 import { Calendar, CalendarDateTemplateEvent } from "primereact/calendar";
 
-        
+
 import { Availability, Family, getFamilyAvailability } from "./api";
 import { useEffect, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
@@ -10,6 +10,14 @@ interface FamilyDetailsProps {
     family: Family | null;
     onClose: () => void;
 }
+
+function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
+    return d &&
+        d.getDate() === event.day &&
+        d.getMonth() === event.month &&
+        d.getFullYear() === event.year;
+}
+
 export function FamilyDetails({ family, onClose }: FamilyDetailsProps) {
     const [availability, setAvailability] = useState<Availability[]>([]);
     const [selectedDate, setSelectedDate] = useState<Nullable<Date>>(null);
@@ -31,9 +39,9 @@ export function FamilyDetails({ family, onClose }: FamilyDetailsProps) {
             availableDate.getFullYear() === event.year
         );
     };
-    const isDateAvailable2 = (date:Nullable<Date>) => {
+    const isDateAvailable2 = (date: Nullable<Date>) => {
         return availableDates.some(availableDate =>
-            date && 
+            date &&
             availableDate.getDate() === date.getDate() &&
             availableDate.getMonth() === date.getMonth() &&
             availableDate.getFullYear() === date.getFullYear()
@@ -43,7 +51,7 @@ export function FamilyDetails({ family, onClose }: FamilyDetailsProps) {
     const dateTemplate = (event: CalendarDateTemplateEvent) => {
         if (isDateAvailable(event)) {
             return (
-                <span className="p-highlight" style={{ display:"flex", alignItems:"center", justifyContent:"center",width: "100%", height: "100%", backgroundColor: '#82c91e', borderRadius: '50%', }}>
+                <span className={"available-day " + (isSameDate(selectedDate, event) ? "selected-day" : "")}>
                     {event.day}
                 </span>
             );
@@ -53,7 +61,7 @@ export function FamilyDetails({ family, onClose }: FamilyDetailsProps) {
 
     return (
         <div className="surface-card shadow-2 p-3 border-round">
-            <Button label="סגור" onClick={onClose} className="mt-3" style={{position:"absolute", left:20}} />
+            <Button label="סגור" onClick={onClose} className="mt-3" style={{ position: "absolute", left: 20 }} />
             <h2>{family.fields.Name}</h2>
             <p><strong>כשרות מטבח:</strong> {family.fields['כשרות מטבח']}</p>
             <p><strong>אוהבים לאכול:</strong> {family.fields['אוהבים לאכול']}</p>
@@ -81,13 +89,13 @@ export function FamilyDetails({ family, onClose }: FamilyDetailsProps) {
             //yearRange="2020:2030" 
             />
 
-            <Button 
+            <Button
                 disabled={!selectedDate}
-                label="שבצו אותי" 
-                onClick={()=>{
-                alert("not implemented yet")
-            }} className="mt-3" />
-            
+                label="שבצו אותי"
+                onClick={() => {
+                    alert("not implemented yet")
+                }} className="mt-3" />
+
         </div>
     );
 }

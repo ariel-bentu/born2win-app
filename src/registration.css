@@ -18,3 +18,17 @@
     max-width: 800px;
     gap: 1rem;
 }
+
+.available-day {
+    background-color: #1A92A2;
+    color: white;
+    display:flex;
+    align-items:center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+}
+.selected-day {
+    border: orange 4px solid;
+}

@@ -14,9 +14,10 @@ import { confirmPopup, ConfirmPopup } from 'primereact/confirmpopup';
 
 interface NotificationsComponentProps {
     updateUnreadCount: (count: number) => void;
+    reload:number;
 }
 
-const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateUnreadCount }) => {
+const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateUnreadCount, reload }) => {
     const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
     const toast = useRef<Toast>(null);
 
@@ -33,7 +34,7 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
 
     useEffect(() => {
         fetchNotifications();
-    }, []);
+    }, [reload]);
 
     const markAsRead = async (id: string) => {
         try {

@@ -104,13 +104,15 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
     // todo - add OTP
     if (doc) {
         if (uulp.volunteerID) {
-            doc.ref.update({
-                uid: FieldValue.arrayUnion(uid),
-                fingerprint: FieldValue.arrayUnion(uulp.fingerprint),
-                loginInfo: FieldValue.arrayUnion({ uid, createdAt: now.format("YYYY-MM-DD HH:mm:ss"), fingerprint: uulp.fingerprint }),
-            });
+            if (!(doc.data()?.uid?.find((u:string)=>u == uid) && doc.data()?.fingerprint?.find((f:string)=>f == uulp.fingerprint))) {
+                await doc.ref.update({
+                    uid: FieldValue.arrayUnion(uid),
+                    fingerprint: FieldValue.arrayUnion(uulp.fingerprint),
+                    loginInfo: FieldValue.arrayUnion({ uid, createdAt: now.format("YYYY-MM-DD HH:mm:ss"), fingerprint: uulp.fingerprint }),
+                });
+            }
         } else {
-            doc.ref.update({
+            await doc.ref.update({
                 uid: FieldValue.arrayUnion(uid),
                 loginInfo: FieldValue.arrayUnion({ uid, createdAt: now.format("YYYY-MM-DD HH:mm:ss"), fingerprint: uulp.fingerprint }),
             });

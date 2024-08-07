@@ -9,6 +9,7 @@ import 'primeicons/primeicons.css';
 import OneNotification from './one-notification';
 import "./registration.css";
 import { FamilyDetails } from './famility-registration-details';
+import { ProgressBar } from 'primereact/progressbar';
 
 interface CitySelectionProps {
     cities: string[];
@@ -25,7 +26,6 @@ const CitySelection: React.FC<CitySelectionProps> = ({ cities, onCityChange }) =
 
     return (
         <div className="city-selection">
-            <h2>בחר עיר</h2>
             <MultiSelect
                 value={selectedCities}
                 options={cities.map(city => ({ label: city, value: city }))}
@@ -101,7 +101,10 @@ const RegistrationComponent: React.FC = () => {
     )
 
     if (!families) return (
-        <div>נתונים נטענים...</div>
+        <>
+            <ProgressBar mode="indeterminate" style={{ height: '6px' }}></ProgressBar>
+            <div>נתונים נטענים...</div>
+        </>
     );
 
     if (families.length == 0) return (

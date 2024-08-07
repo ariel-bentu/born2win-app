@@ -32,3 +32,8 @@
 .selected-day {
     border: orange 4px solid;
 }
+
+.alergies {
+    font-weight: bold;
+    color: #A94442;
+}

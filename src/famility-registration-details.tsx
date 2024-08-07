@@ -5,6 +5,7 @@ import { Calendar, CalendarDateTemplateEvent } from "primereact/calendar";
 import { Availability, Family, getFamilyAvailability } from "./api";
 import { useEffect, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
+import dayjs from "dayjs";
 
 interface FamilyDetailsProps {
     family: Family | null;
@@ -39,14 +40,6 @@ export function FamilyDetails({ family, onClose }: FamilyDetailsProps) {
             availableDate.getFullYear() === event.year
         );
     };
-    const isDateAvailable2 = (date: Nullable<Date>) => {
-        return availableDates.some(availableDate =>
-            date &&
-            availableDate.getDate() === date.getDate() &&
-            availableDate.getMonth() === date.getMonth() &&
-            availableDate.getFullYear() === date.getFullYear()
-        );
-    };
 
     const dateTemplate = (event: CalendarDateTemplateEvent) => {
         if (isDateAvailable(event)) {
@@ -58,19 +51,27 @@ export function FamilyDetails({ family, onClose }: FamilyDetailsProps) {
         }
         return event.day;
     };
+    const minDate = dayjs();
+    const alergies = family.fields['רגישויות ואלרגיות (from בדיקת ההתאמה)'];
 
     return (
-        <div className="surface-card shadow-2 p-3 border-round">
-            <Button label="סגור" onClick={onClose} className="mt-3" style={{ position: "absolute", left: 20 }} />
-            <h2>{family.fields.Name}</h2>
-            <p><strong>כשרות מטבח:</strong> {family.fields['כשרות מטבח']}</p>
-            <p><strong>אוהבים לאכול:</strong> {family.fields['אוהבים לאכול']}</p>
-            <p><strong>רגישויות ואלרגיות:</strong> {family.fields['רגישויות ואלרגיות (from בדיקת ההתאמה)']}</p>
-            <p><strong>נפשות מבוגרים בבית:</strong> {family.fields['נפשות מבוגרים בבית']}</p>
-            <p><strong>גילאים של הרכב המשפחה:</strong> {family.fields['גילאים של הרכב המשפחה']}</p>
-            <p><strong>מחוז:</strong> {family.fields['מחוז']}</p>
-            <p><strong>קומה:</strong> {family.fields['קומה']}</p>
+        <div className="surface-card shadow-2 p-3 border-round relative">
+            <Button label="סגור" onClick={onClose} className="mt-3" style={{ position: "absolute", left: 20, top: 0 }} />
 
+            <ul className="pl-4 list-disc text-right">
+                <li>המשפחה בת <strong> {family.fields['נפשות מבוגרים בבית']}</strong> נפשות</li>
+                <li><strong>הרכב בני המשפחה:</strong> {family.fields['הרכב הורים']}</li>
+                <li><strong>גילאי בני המשפחה:</strong> {family.fields['גילאים של הרכב המשפחה']},{family.fields['גיל החולה']}</li>
+                <li><strong>כשרות:</strong> {family.fields['כשרות מטבח']}</li>
+                <li><strong>העדפה לסוג ארוחה:</strong> {family.fields['העדפה לסוג ארוחה']}</li>
+                <li><strong>העדפות בשר:</strong> {family.fields['העדפות בשר']}</li>
+                <li><strong>העדפות דגים:</strong> {family.fields['העדפות דגים']}</li>
+                <li><strong>תוספות:</strong> {family.fields['תוספות']}</li>
+                <li>
+                    {alergies?.length ? <div className="alergies">נא לשים לב לאלרגיה! {family.fields['רגישויות ואלרגיות (from בדיקת ההתאמה)']}</div> :
+                        <div><strong>אלרגיות:</strong> אין</div>}
+                </li>
+            </ul>
             <h3>לבחירת תאריך:</h3>
             <Calendar
                 value={selectedDate}
@@ -85,6 +86,7 @@ export function FamilyDetails({ family, onClose }: FamilyDetailsProps) {
                 locale="he"
                 //firstDayOfWeek={"Sunday"}
                 monthNavigator
+                minDate={minDate.toDate()}
             //yearNavigator 
             //yearRange="2020:2030" 
             />

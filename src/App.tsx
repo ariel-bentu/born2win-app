@@ -16,6 +16,9 @@ import NotificationsComponent from './notifications-component';
 import { getDB } from './db';
 import { countUnreadNotifications } from './notifications';
 import RegistrationComponent from './registration';
+import header from "./media/header.png";
+import Header from './header';
+import PWAInstructions from './install-instruction';
 
 const UID_STORAGE_KEY = "born2win_uid";
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
@@ -24,24 +27,56 @@ export const isPWA = ((window.navigator as any)?.standalone === true);
 
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
-const param_vol_id = urlParams.get('vol_id');
+const userPairingRequest = urlParams.get('vol_id');
 const client = new ClientJS();
 const fingerprint = client.getFingerprint() + "";
+
+const isNotEmpty = (val: string | null | undefined): val is string => {
+    return !!val && val.length > 0;
+};
 
 function App() {
     const [user, setUser] = useState<User | null>(null);
     const [init, setInit] = useState<boolean>(false);
+    const [readyToInstall, setReadyToInstall] = useState<boolean>(false);
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
     const [volunteerId, setVolunteerId] = useState<string | undefined>();
-    const [userPairingRequest, setUserPairingRequest] = useState<string | null>(param_vol_id);
     const [notificationPermission, setNotificationPermission] = useState<string>((typeof Notification !== 'undefined') && Notification && Notification.permission || "unsupported");
-    // const [swRegistration, setSWRegistration] = useState<ServiceWorkerRegistration | null>(null);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [reloadNotifications, setReloadNotifications] = useState(0);
     const toast = useRef<Toast>(null);
 
     const onAuth: NextOrObserver<User> = (user: User | null) => {
         setUser(user);
     }
+
+    useEffect(() => {
+        const onPostMessage = (payload:any) => {
+          console.log("Recieved Message", payload)
+          if (payload.data?.type == "newMessage") {
+            console.log("New Notification arrived");
+            setTimeout(()=>setReloadNotifications(prev=>prev+1), 2000);
+          }
+        }
+
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                console.log('PWA is now in focus');
+                setReloadNotifications(prev=>prev+1);
+            } else {
+                console.log('PWA is now out of focus');
+            }
+        };
+    
+        navigator.serviceWorker?.addEventListener("message", onPostMessage);
+        document.addEventListener('visibilitychange', onVisibilityChange);
+    
+        return () => {
+          navigator.serviceWorker.removeEventListener('message', onPostMessage);
+          document.removeEventListener('visibilitychange', onVisibilityChange);
+        };
+    
+      }, []);
 
     useEffect(() => {
         if (user && user.uid) {
@@ -50,13 +85,14 @@ function App() {
             const currentVolId = isPWA ? localStorage.getItem(VOL_ID_STORAGE_KEY) : undefined;
 
             if (!isPWA) {
-                if (userPairingRequest && userPairingRequest.length > 0) {
+                if (isNotEmpty(userPairingRequest)) {
                     // this is a non-pwa flow
                     if (userPairingRequest !== currentVolId) {
-                        if (currentVolId && currentVolId.length > 0) {
+                        if (isNotEmpty(currentVolId)) {
                             console.log("Change of vol ID - ignored", currentVolId, "to", userPairingRequest);
                         } else {
                             api.updateLoginInfo(userPairingRequest, fingerprint).then(() => {
+                                setReadyToInstall(true);
                                 // localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
                                 // localStorage.setItem(UID_STORAGE_KEY, user.uid);
                             });
@@ -65,21 +101,23 @@ function App() {
                     setVolunteerId(userPairingRequest);
                 }
             } else {
-                if (currentVolId && currentVolId.length > 0) {
+                if (isNotEmpty(currentVolId)) {
                     setVolunteerId(currentVolId);
+                } else {
+                    // first time as PWA - load the volunteerId based on finger print
+                    api.updateLoginInfo(undefined, fingerprint).then((retVolId: string) => {
+                        setVolunteerId(retVolId);
+                        localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
+                    }).catch((err: Error) => {
+                        console.log("Failed to fetch volunteerId based on fingerprint", err);
+                    });
                 }
-                api.updateLoginInfo(undefined, fingerprint).then((retVolId: string) => {
-                    setVolunteerId(retVolId);
-                    localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
-                }).catch((err: Error) => {
-                    console.log("Failed to fetch volunteerId based on fingerprint", err);
-                });
             }
         }
     }, [user, userPairingRequest]);
 
     useEffect(() => {
-        if (user && volunteerId && volunteerId.length > 0) {
+        if (user && isNotEmpty(volunteerId)) {
             api.getUserInfo(user.uid, volunteerId).then((uInfo) => {
                 setUserInfo(uInfo);
             });
@@ -88,12 +126,15 @@ function App() {
 
     useEffect(() => {
         api.init(onAuth).then(() => setInit(true));
-        countUnreadNotifications().then(updateUnreadCount);
     }, []);
+
+    useEffect(()=>{
+        countUnreadNotifications().then(updateUnreadCount);
+    },[reloadNotifications])
 
     useEffect(() => {
         if (init && !user) {
-            if (isPWA || volunteerId && volunteerId.length > 0) {
+            if (isPWA || isNotEmpty(volunteerId)) {
                 api.login();
             }
         }
@@ -112,57 +153,61 @@ function App() {
         }
     };
 
+    const settings = <div style={{ display: "flex", flexDirection: "column", textAlign: "left", alignItems: "flex-start" }}>
+        <div><strong>Technical Status:</strong></div>
+        <div>Environment: {isPWA ? "PWA" : "Browser"}</div>
+        <div>Finger Print: {fingerprint}</div>
+        <div>Login Status: {user ? "uid:" + user.uid : "Not logged in"}</div>
+        <div>VolunteerID: {volunteerId ? volunteerId : "Missing"}</div>
+        <div>Notification Permission: {notificationPermission}</div>
+        <div>Notification Token: {userInfo?.notificationToken ? "Exists: " + userInfo.notificationToken.token.substring(0, 5) + "..." : "Missing"}</div>
+        <div style={{ display: "flex", flexDirection: "column", width: 200, padding: 10 }}>
+            {isPWA && <Button onClick={() => {
+                api.requestWebPushToken().then(token => {
+                    if (token) {
+                        api.updateUserNotification(true, token, isSafari).then(() => {
+                            showToast('success', 'Success', 'Notification permission granted');
+                            setNotificationPermission("granted");
+                            if (user && isNotEmpty(volunteerId)) {
+                                api.getUserInfo(user?.uid, volunteerId).then(uInfo => setUserInfo(uInfo));
+                            }
+                        });
+                    }
+                });
+            }}>Allow Notification</Button>}
+
+            {isPWA && <Button onClick={() => api.sendTestNotification()} disabled={!userInfo?.notificationToken}>שלח הודעת בדיקה</Button>}
+            <Button onClick={async () => {
+                const db = await getDB();
+                await db.put('notifications', {
+                    id: Date.now() + "",
+                    title: "Test data" + Date.now(),
+                    body: "",
+                    read: 0,
+                    timestamp: Date.now(),
+                });
+                countUnreadNotifications().then(updateUnreadCount);
+            }} >Add Test DATA</Button>
+        </div>
+    </div>
+
+    const appReady = isPWA && isNotEmpty(volunteerId);
+    const rejected = !isPWA && !isNotEmpty(userPairingRequest);
+
     return (
         <div className="App">
             <Toast ref={toast} />
-            <div className="app-title">נולדת לנצח</div>
-            <div>{userInfo && "שלום " + userInfo.firstName}</div>
-            <TabView dir='rtl'>
-                <TabPanel header="הגדרות">
-                    <div style={{ display: "flex", flexDirection: "column", textAlign: "left", alignItems: "center" }}>
-                        <div>{isPWA ? "Run as PWA" : "Run in Browser"}</div>
-                        <div>Finger Print: {fingerprint}</div>
-                        <div>{user ? "Logged in: " + user.uid : "Not logged in"}</div>
-                        <div>{volunteerId ? "VolunteerID: " + volunteerId : "Not registered as a volunteer yet"}</div>
-                        <div>Notification Permission: {notificationPermission}</div>
-                        <div>Notification Token: {userInfo?.notificationToken ? "Exists: " + userInfo.notificationToken.token.substring(0, 5) + "..." : "Missing"}</div>
-                        <div style={{ display: "flex", flexDirection: "column", width: 200 }}>
-                            {isPWA && <Button onClick={() => {
-                                api.requestWebPushToken().then(token => {
-                                    if (token) {
-                                        api.updateUserNotification(true, token, isSafari).then(() => {
-                                            showToast('success', 'Success', 'Notification permission granted');
-                                            setNotificationPermission("granted");
-                                            if (user && volunteerId && volunteerId.length > 0) {
-                                                api.getUserInfo(user?.uid, volunteerId).then(uInfo => setUserInfo(uInfo));
-                                            }
-                                        });
-                                    }
-                                });
-                            }}>Allow Notification</Button>}
-
-                            {isPWA && <Button onClick={() => api.sendTestNotification()} disabled={!userInfo?.notificationToken}>שלח הודעת בדיקה</Button>}
-                            <Button onClick={async () => {
-                                const db = await getDB();
-                                await db.put('notifications', {
-                                    id: Date.now() + "",
-                                    title: "Test data" + Date.now(),
-                                    body: "",
-                                    read: 0,
-                                    timestamp: Date.now(),
-                                });
-                                countUnreadNotifications().then(updateUnreadCount);
-                            }} >Add Test DATA</Button>
-                        </div>
-                    </div>
+            <Header userName={userInfo ? userInfo.firstName : ""} logoSrc={header} settingsComponent={settings} />
+            {readyToInstall && <PWAInstructions />}
+            {rejected && <div>זיהוי נכשל - צור קשר עם העמותה</div>}
+            {appReady && <TabView dir='rtl'>
+                <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
+                    <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications}/>
                 </TabPanel>
-                <TabPanel header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
-                    <NotificationsComponent updateUnreadCount={updateUnreadCount} />
-                </TabPanel>
-                <TabPanel header="רישום">
+                <TabPanel headerStyle={{ fontSize: 20 }} header="רישום">
                     <RegistrationComponent />
                 </TabPanel>
-            </TabView>
+            </TabView>}
         </div>
     );
 }

@@ -29,7 +29,7 @@ self.addEventListener('push', async (event: any) => {
 
     const db = await getDB();
     await db.put('notifications', {
-        id: Date.now()+"",
+        id: Date.now() + "",
         title: notificationTitle,
         body: payload.notification.body || "",
         read: 0,
@@ -55,6 +55,14 @@ self.addEventListener('push', async (event: any) => {
 
 
     promises.push((self as any).registration.showNotification(notificationTitle, notificationOptions));
+
+    promises.push(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList: any) => {
+        for (let i = 0; i < clientList.length; i++) {
+            if (clientList[i].visibilityState !== "hidden") {
+                return clientList[i].postMessage({ type: "newMessage" });
+            }
+        }
+    }));
 
     // Finally...
     event.waitUntil(Promise.all(promises));

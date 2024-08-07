@@ -8,6 +8,7 @@ import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
 import OneNotification from './one-notification';
 import "./registration.css";
+import { FamilyDetails } from './famility-registration-details';
 
 interface CitySelectionProps {
     cities: string[];
@@ -62,28 +63,7 @@ const FamilyList: React.FC<FamilyListProps> = ({ families, onFamilyClick }) => {
     );
 };
 
-interface FamilyDetailsProps {
-    family: Family | null;
-    onClose: () => void;
-}
 
-const FamilyDetails: React.FC<FamilyDetailsProps> = ({ family, onClose }) => {
-    if (!family) return null;
-
-    return (
-        <div className="surface-card shadow-2 p-3 border-round">
-            <h2>{family.fields.Name}</h2>
-            <p><strong>כשרות מטבח:</strong> {family.fields['כשרות מטבח']}</p>
-            <p><strong>אוהבים לאכול:</strong> {family.fields['אוהבים לאכול']}</p>
-            <p><strong>רגישויות ואלרגיות:</strong> {family.fields['רגישויות ואלרגיות (from בדיקת ההתאמה)']}</p>
-            <p><strong>נפשות מבוגרים בבית:</strong> {family.fields['נפשות מבוגרים בבית']}</p>
-            <p><strong>גילאים של הרכב המשפחה:</strong> {family.fields['גילאים של הרכב המשפחה']}</p>
-            <p><strong>מחוז:</strong> {family.fields['מחוז']}</p>
-            <p><strong>קומה:</strong> {family.fields['קומה']}</p>
-            <Button label="סגור" onClick={onClose} />
-        </div>
-    );
-};
 
 const RegistrationComponent: React.FC = () => {
     const [cities, setCities] = useState<string[]>([]);
@@ -97,7 +77,7 @@ const RegistrationComponent: React.FC = () => {
         getMealRequests().then((records: Family[]) => {
             setFamilies(records);
             setCities(getUniqueCities(records));
-        }).catch(err=>setError(err));
+        }).catch(err => setError(err));
     }, []);
 
     useEffect(() => {
@@ -117,7 +97,7 @@ const RegistrationComponent: React.FC = () => {
     };
 
     if (error) return (
-<div>תקלת טעינה - {error.message}</div>
+        <div>תקלת טעינה - {error.message}</div>
     )
 
     if (!families) return (

@@ -12,7 +12,7 @@ import dayjs = require("dayjs");
 import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
-import { Collections, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload } from "../../src/types";
+import { Collections, GetFamilityAvailabilityPayload, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload } from "../../src/types";
 import axios from "axios";
 // [END Imports]
 
@@ -325,7 +325,7 @@ exports.GetMealRequests = onCall({ cors: true }, async (request) => {
         throw new HttpsError("unauthenticated", "unauthorized user");
     }
 
-    // Temp defaults to test user
+    // TODO: Temp defaults to test user
     // const volunteerID = doc.id;
     const volunteerID = testUser.value();
     const apiKey = born2winApiKey.value();
@@ -353,3 +353,35 @@ exports.GetMealRequests = onCall({ cors: true }, async (request) => {
     return "District not found";
 });
 
+
+exports.GetFamilityAvailability = onCall({ cors: true }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Request had invalid credentials.");
+    }
+    const uid = request.auth.uid;
+    if (!uid) {
+        throw new HttpsError("unauthenticated", "Request is missing uid.");
+    }
+
+    const doc = await findUserByUID(uid);
+    if (!doc) {
+        throw new HttpsError("unauthenticated", "unauthorized user");
+    }
+
+    // TODO: verify user is the same mahuz
+
+    const gfap = request.data as GetFamilityAvailabilityPayload;
+
+    const apiKey = born2winApiKey.value();
+    const headers = {
+        "Authorization": `Bearer ${apiKey}`,
+    };
+    const formula = encodeURIComponent(`AND((FIND("${gfap.familyId}",  ARRAYJOIN({record_id (from משפחה)}))>0),  AND(    ({זמינות שיבוץ}='זמין')    ,IS_AFTER({תאריך},TODAY())    ,IS_BEFORE({תאריך},DATEADD(TODAY(),45,'days')    )))`);
+    const query = `https://api.airtable.com/v0/${gfap.baseId}/דרישות לשיבוצים?filterByFormula=${formula}`;
+
+    console.log("Availability Query:", query);
+    const response = await axios.get(query, {
+        headers,
+    });
+    return response.data;
+});

@@ -19,7 +19,7 @@ import {
 import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
-import { Collections, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
+import { Collections, GetFamilityAvailabilityPayload, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
 import { isPWA } from "./App";
 
 const firebaseConfig = {
@@ -70,9 +70,9 @@ export function login() {
 
 export function getUserInfo(uid: string, volunteerId: string): Promise<UserInfo> {
     let docRef = doc(db, Collections.Users, volunteerId);
-    const unknwon =  {
+    const unknwon = {
         firstName: "לא ידוע",
-        lastName:"",
+        lastName: "",
         notificationOn: false,
         notificationToken: undefined,
     }
@@ -179,6 +179,7 @@ export interface Family {
         'גילאים של הרכב המשפחה': string;
         'מחוז': string;
         'קומה': string;
+        base_id: string;
     };
 }
 
@@ -187,3 +188,28 @@ export function getMealRequests(): Promise<Family[]> {
     return getMealRequestsFunc().then((res: any) => res.data.records as Family[]);
 }
 
+
+export interface Availability {
+    id: string;
+    createdTime: string;
+    fields: {
+        [key: string]: any;
+        'Name': string;
+        "תעדוף": string;
+        "תאריך": string;
+        "יום בשבוע1": string;
+    }
+}
+  
+export function getFamilyAvailability(familyId: string, baseId: string): Promise<Availability[]> {
+    const GetFamilityAvailabilityFunc = httpsCallable(functions, 'GetFamilityAvailability');
+    const payload = {
+        familyId,
+        baseId,
+    };
+
+    return GetFamilityAvailabilityFunc(payload).then((res: any) => {
+        console.log("GetFamilityAvailabilityFunc result", res)
+        return res.data.records as Availability[];
+    });
+}

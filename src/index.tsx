@@ -4,6 +4,12 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+import { locale, addLocale, updateLocaleOption, updateLocaleOptions, localeOption, localeOptions } from 'primereact/api';
+import he from 'primelocale/he.json'
+
+addLocale("he", he.he);
+
+
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );

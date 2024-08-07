@@ -7,6 +7,12 @@ export interface NotificationUpdatePayload {
     tokenInfo: TokenInfo;
 }
 
+export interface GetFamilityAvailabilityPayload {
+    familyId: string;
+    baseId: string;
+}
+
+
 export interface TokenInfo {
     token: string;
     isSafari: boolean;

@@ -117,8 +117,8 @@ function App() {
             <Toast ref={toast} />
             <div className="app-title">נולדת לנצח</div>
             <div>{userInfo && "שלום " + userInfo.firstName}</div>
-            <TabView>
-                <TabPanel header="Settings">
+            <TabView dir='rtl'>
+                <TabPanel header="הגדרות">
                     <div style={{ display: "flex", flexDirection: "column", textAlign: "left", alignItems: "center" }}>
                         <div>{isPWA ? "Run as PWA" : "Run in Browser"}</div>
                         <div>Finger Print: {fingerprint}</div>
@@ -127,7 +127,7 @@ function App() {
                         <div>Notification Permission: {notificationPermission}</div>
                         <div>Notification Token: {userInfo?.notificationToken ? "Exists: " + userInfo.notificationToken.token.substring(0, 5) + "..." : "Missing"}</div>
                         <div style={{ display: "flex", flexDirection: "column", width: 200 }}>
-                            <Button onClick={() => {
+                            {isPWA && <Button onClick={() => {
                                 api.requestWebPushToken().then(token => {
                                     if (token) {
                                         api.updateUserNotification(true, token, isSafari).then(() => {
@@ -139,9 +139,9 @@ function App() {
                                         });
                                     }
                                 });
-                            }}>Allow Notification</Button>
+                            }}>Allow Notification</Button>}
 
-                            <Button onClick={() => api.sendTestNotification()} disabled={!userInfo?.notificationToken}>Send Test Notification</Button>
+                            {isPWA && <Button onClick={() => api.sendTestNotification()} disabled={!userInfo?.notificationToken}>שלח הודעת בדיקה</Button>}
                             <Button onClick={async () => {
                                 const db = await getDB();
                                 await db.put('notifications', {
@@ -156,10 +156,10 @@ function App() {
                         </div>
                     </div>
                 </TabPanel>
-                <TabPanel header={<><span>Messages</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
+                <TabPanel header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
                     <NotificationsComponent updateUnreadCount={updateUnreadCount} />
                 </TabPanel>
-                <TabPanel header="Registration">
+                <TabPanel header="רישום">
                     <RegistrationComponent />
                 </TabPanel>
             </TabView>

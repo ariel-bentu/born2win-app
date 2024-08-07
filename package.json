@@ -15,6 +15,7 @@
     "firebase": "^10.12.5",
     "primeflex": "^3.3.1",
     "primeicons": "^7.0.0",
+    "primelocale": "^1.0.0",
     "primereact": "^10.8.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -49,11 +50,11 @@
   },
   "devDependencies": {
     "@types/clientjs": "^0.2.2",
+    "axios": "^1.7.3",
     "copy-webpack-plugin": "^12.0.2",
     "path": "^0.12.7",
     "ts-loader": "^9.5.1",
     "typescript": "^5.5.4",
-    "webpack-cli": "^5.1.4",
-    "axios": "^1.7.3"
+    "webpack-cli": "^5.1.4"
   }
 }

@@ -1,4 +1,4 @@
-import { getDB } from '../src/db';
+import { getDB, NotificationStatus } from '../src/db';
 import { countUnreadNotifications } from '../src/notifications';
 
 // Type definitions for the push and notification event data
@@ -32,7 +32,7 @@ self.addEventListener('push', async (event: any) => {
         id: Date.now() + "",
         title: notificationTitle,
         body: payload.notification.body || "",
-        read: 0,
+        read: NotificationStatus.Unread,
         timestamp: Date.now(),
     });
     const unreadCount = await countUnreadNotifications();

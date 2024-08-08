@@ -32,3 +32,11 @@
   top: 0;
   left:0;
 } 
+
+
+.icon-btn {
+  border: none;
+  background-color: transparent;
+  width:20px;
+  height: 20px;
+}

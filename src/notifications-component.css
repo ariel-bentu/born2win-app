@@ -1,0 +1,41 @@
+/* styles.css */
+.select-button-container {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 5px;
+  }
+  
+  .select-button-item {
+    padding: 10px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+    color: white;
+  }
+  
+  .select-button-item:not(.p-highlight) {
+    background-color: lightgray;
+
+  }
+  
+  .select-button-item.p-highlight {
+    background-color: #2196F3;
+  }
+
+  .three-dot-menu {
+    position: absolute;
+    left: 0;
+    height: 40px;
+    border: none;
+    background-color: transparent;
+  }
+
+  .no-messages {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100px;
+    font-size: 35px;
+  }

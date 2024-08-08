@@ -3,6 +3,12 @@ import { openDB, DBSchema, IDBPDatabase } from 'idb';
 export const NOTIFICATIONS_TABLE = "notifications";
 // Define the shape of your database
 
+export enum NotificationStatus {
+    Unread = 0,
+    Read = 1
+}
+
+
 export interface NotificationRecord {
     id: string;
     title: string;

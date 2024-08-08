@@ -7,6 +7,13 @@ import reportWebVitals from './reportWebVitals';
 import { locale, addLocale, updateLocaleOption, updateLocaleOptions, localeOption, localeOptions } from 'primereact/api';
 import he from 'primelocale/he.json'
 
+import localeData from 'dayjs/plugin/localeData';
+import dayjs from 'dayjs';
+require('dayjs/locale/he')
+
+
+dayjs.extend(localeData);
+dayjs.locale('he');
 addLocale("he", he.he);
 
 

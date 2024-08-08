@@ -28,6 +28,7 @@ export const isPWA = ((window.navigator as any)?.standalone === true);
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
 const userPairingRequest = urlParams.get('vol_id');
+const isDev = !!urlParams.get('dev');
 const client = new ClientJS();
 const fingerprint = client.getFingerprint() + "";
 
@@ -182,7 +183,7 @@ function App() {
                 await db.put('notifications', {
                     id: Date.now() + "",
                     title: "Test data" + Date.now(),
-                    body: "",
+                    body: "This is the message body",
                     read: 0,
                     timestamp: Date.now(),
                 });
@@ -191,14 +192,14 @@ function App() {
         </div>
     </div>
 
-    const appReady = isPWA && isNotEmpty(volunteerId);
-    const rejected = !isPWA && !isNotEmpty(userPairingRequest);
+    const appReady = (isPWA || isDev) && isNotEmpty(volunteerId);
+    const rejected = !isPWA && !isNotEmpty(userPairingRequest) && !isDev;
 
     return (
         <div className="App">
             <Toast ref={toast} />
             <Header userName={userInfo ? userInfo.firstName : ""} logoSrc={header} settingsComponent={settings} />
-            {readyToInstall && <PWAInstructions />}
+            {readyToInstall && !isDev && <PWAInstructions />}
             {rejected && <div>זיהוי נכשל - צור קשר עם העמותה</div>}
             {appReady && <TabView dir='rtl'>
                 <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>

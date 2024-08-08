@@ -8,22 +8,41 @@ import {
 } from './notifications'; // Adjust the import path to your actual notifications file
 import { Button } from 'primereact/button';
 import { Toast } from 'primereact/toast';
-import { NotificationRecord } from './db';
+import { NotificationRecord, NotificationStatus } from './db';
 import OneNotification from './one-notification';
 import { confirmPopup, ConfirmPopup } from 'primereact/confirmpopup';
+import { SelectButton } from 'primereact/selectbutton';
+import "./notifications-component.css";
+import { Menu } from 'primereact/menu';
+import { MenuItem } from 'primereact/menuitem';
+import dayjs from 'dayjs';
 
 interface NotificationsComponentProps {
     updateUnreadCount: (count: number) => void;
-    reload:number;
+    reload: number;
 }
+const Filters = {
+    ALL: 1,
+    UNREAD: 2,
+    array: [
+        { name: 'הכל', value: 1 },
+        { name: 'לא נקראו', value: 2 },
+    ]
+}
+
 
 const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateUnreadCount, reload }) => {
     const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
     const toast = useRef<Toast>(null);
+    const [filter, setFilter] = useState(Filters.ALL);
+
+    const menu = useRef<Menu>(null);
+
 
     const fetchNotifications = async () => {
         try {
             const allNotifications = await readAllNotifications();
+            allNotifications.sort((n1, n2)=>n2.timestamp - n1.timestamp);
             setNotifications(allNotifications);
 
 
@@ -56,20 +75,27 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
         }
     };
 
-    const deleteAll = async () => {
-        try {
-            await deleteAllNotifications();
-            fetchNotifications();
-            countUnreadNotifications().then(updateUnreadCount);
-        } catch (error) {
-            console.error('Error deleting all notifications:', error);
-        }
-    };
+    const deleteAll = (event:React.SyntheticEvent) => {
+        confirmPopup({
+            target: event.currentTarget as any,
+            message: 'האם למחוק את כל ההודעות?',
+            icon: 'pi pi-exclamation-triangle',
+            accept: async () => {
+                try {
+                    await deleteAllNotifications();
+                    fetchNotifications();
+                    countUnreadNotifications().then(updateUnreadCount);
+                } catch (error) {
+                    console.error('Error deleting all notifications:', error);
+                }
+            }
+        });   
+    }
 
-    const markAllAsRead = async () => {
+    const markAllAsRead = () => {
         try {
-            const waitFor = notifications.map(n=>updateNotification(n.id, 1));
-            Promise.all(waitFor).then(()=>{
+            const waitFor = notifications.map(n => updateNotification(n.id, 1));
+            Promise.all(waitFor).then(() => {
                 updateUnreadCount(0);
                 fetchNotifications();
             });
@@ -78,33 +104,48 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
         }
     };
 
+    const contextMenu = [
+        { label: 'מחיקת כל ההודעות', icon: 'pi pi-fw pi-trash', command: (e)=>deleteAll(e.originalEvent) },
+        { label: 'סימון הכל כנקרא', icon: 'pi pi-fw pi-eye', command:markAllAsRead },
+    ] as MenuItem[];
+
+    const notificationToShow = notifications?.filter(n=>filter === Filters.ALL || n.read==NotificationStatus.Unread);
+
     return (
         <div>
             <Toast ref={toast} />
             <ConfirmPopup />
-            <Button onClick={(event) => {
-                        confirmPopup({
-                            target: event.currentTarget,
-                            message: 'Are you sure you want to delete all notifications?',
-                            icon: 'pi pi-exclamation-triangle',
-                            accept: deleteAll,
-                        });                        
-                    }}>Delete All</Button>
-            <Button onClick={markAllAsRead}>Mark All as Read</Button>
-
+            <div className='flex flex-row relative'>
+                <SelectButton
+                    pt={{ root: { className: "select-button-container" } }}
+                    unstyled
+                    value={filter} onChange={(e) => setFilter(e.value)} optionLabel="name" options={Filters.array}
+                    itemTemplate={(option) => (
+                        <div className={`select-button-item ${filter === option.value ? 'p-highlight' : ''}`}>
+                            {option.name}
+                        </div>
+                    )}
+                />
+                <Menu model={contextMenu} popup ref={menu} />
+                <Button unstyled icon="pi pi-ellipsis-v" className="three-dot-menu" onClick={(event) => menu.current?.toggle(event)} />
+            </div>
 
             <div className="surface-ground px-4 py-5 md:px-6 lg:px-8">
                 <div className="grid">
-                    {notifications?.map(notification => (
+                    {notificationToShow?.length ?
+                     notificationToShow.map(notification => (
                         <OneNotification
                             key={notification.id}
                             title={notification.title}
                             body={notification.body}
-                            unread={notification.read == 0}
+                            footer={dayjs(notification.timestamp).format("[יום ]dddd, D [ב]MMMM")}
+                            unread={notification.read == NotificationStatus.Unread}
                             onDelete={() => deleteOne(notification.id)}
-                            onRead={()=>markAsRead(notification.id)}
+                            onRead={() => markAsRead(notification.id)}
                         />
-                    ))}
+                    )):
+                    <div className='no-messages'>אין הודעות</div>
+                }
 
                 </div>
             </div>

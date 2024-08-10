@@ -15,12 +15,13 @@ const OneNotification: React.FC<OneNotificationProps> = ({ title, body, unread, 
         <div className="col-12">
             <div className="surface-card shadow-2 p-3 border-round" onClick={onRead}>
                 <div className="flex justify-content-between mb-3">
-                    <div>
-                        <span className={`block text-xl font-xlarge mb-3 ${unread ? 'font-bold' : ''}`}>{title}</span>
+                    <div className="flex flex-column align-right">
+                        <div className={`text-right  text-xl font-xlarge mb-3 ${unread ? 'font-bold' : ''}`}>{title}</div>
                         <div className="text-900 font-medium text-700">{body}</div>
                     </div>
-                    <div className="flex align-items-center justify-content-center bg-purple-100 border-round" style={{ width: '2.5rem', height: '2.5rem' }}>
+                    <div className="flex relative align-items-center justify-content-center bg-purple-100 border-round" style={{ width: '2.5rem', height: '2.5rem' }}>
                         <i className="pi pi-comment text-purple-500 text-xl"></i>
+                        {unread && <div className='red-dot'/>}
                     </div>
                 </div>
                 <div className="flex flex-row align-items-end justify-content-between">

@@ -1,6 +1,6 @@
 
 
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { setGlobalOptions, logger } from "firebase-functions/v2";
 
 // Dependencies for the addMessage function.
@@ -14,6 +14,9 @@ import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
 import { Collections, GetFamilityAvailabilityPayload, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload } from "../../src/types";
 import axios from "axios";
+import express = require("express");
+import crypto = require("crypto");
+
 // [END Imports]
 
 setGlobalOptions({
@@ -31,6 +34,7 @@ const db = getFirestore();
 const born2winApiKey = defineString("BORN2WIN_API_KEY");
 const testUser = defineString("BORN2WIN_TEST_USER");
 const mainBase = defineString("BORM2WIN_MAIN_BASE");
+const usersMacSecretBase64 = defineString("BORM2WIN_AT_WEBHOOK_USERS");
 
 /**
  * users collection
@@ -104,7 +108,7 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
     // todo - add OTP
     if (doc) {
         if (uulp.volunteerID) {
-            if (!(doc.data()?.uid?.find((u:string)=>u == uid) && doc.data()?.fingerprint?.find((f:string)=>f == uulp.fingerprint))) {
+            if (!(doc.data()?.uid?.find((u: string) => u == uid) && doc.data()?.fingerprint?.find((f: string) => f == uulp.fingerprint))) {
                 await doc.ref.update({
                     uid: FieldValue.arrayUnion(uid),
                     fingerprint: FieldValue.arrayUnion(uulp.fingerprint),
@@ -331,18 +335,18 @@ exports.GetMealRequests = onCall({ cors: true }, async (request) => {
     // const volunteerID = doc.id;
     const volunteerID = testUser.value();
     const apiKey = born2winApiKey.value();
-    const airTableNameBase = mainBase.value();
+    const airTableMainBase = mainBase.value();
     const headers = {
         "Authorization": `Bearer ${apiKey}`,
     };
 
-    const response1 = await axios.get(`https://api.airtable.com/v0/${airTableNameBase}/tbl9djJMEErRLjrjk/${volunteerID}`, {
+    const response1 = await axios.get(`https://api.airtable.com/v0/${airTableMainBase}/מתנדבים/${volunteerID}`, {
         headers,
     });
 
     const mahoz = response1.data.fields["מחוז"];
     if (mahoz && mahoz.length > 0) {
-        const response2 = await axios.get(`https://api.airtable.com/v0/${airTableNameBase}/%D7%9E%D7%97%D7%95%D7%96/${mahoz[0]}`, {
+        const response2 = await axios.get(`https://api.airtable.com/v0/${airTableMainBase}/מחוז/${mahoz[0]}`, {
             headers,
         });
 
@@ -387,3 +391,34 @@ exports.GetFamilityAvailability = onCall({ cors: true }, async (request) => {
     });
     return response.data;
 });
+
+/**
+ * WEB HOOKS
+ */
+const app = express();
+app.use(express.json());
+
+function verifyAirtableWebhook(req: any, secret: string) {
+    const macSecretDecoded = Buffer.from(secret, "base64");
+    const body = Buffer.from(JSON.stringify(req.body), "utf8");
+    const hmac = crypto.createHmac("sha256", macSecretDecoded);
+    hmac.update(body.toString(), "ascii");
+    const expectedContentHmac = "hmac-sha256=" + hmac.digest("hex");
+
+    const providedHmac = req.headers["x-airtable-content-mac"];
+
+    return providedHmac === expectedContentHmac;
+}
+
+app.post("/airtable/users", (req, res) => {
+    if (!verifyAirtableWebhook(req, usersMacSecretBase64.value())) {
+        logger.info("Airtable Users Webhook GET: unverified", req.headers["x-airtable-content-mac"], JSON.stringify(req.body));
+        return res.status(403).send("Unauthorized request");
+    }
+    logger.info("Airtable Users Webhook GET: ", JSON.stringify(req.body));
+
+    res.json({});
+    return;
+});
+
+exports.httpApp = onRequest(app);

@@ -29,6 +29,7 @@ const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
 const userPairingRequest = urlParams.get('vol_id');
 const isDev = !!urlParams.get('dev');
+const offline = !!urlParams.get('offline');
 const client = new ClientJS();
 const fingerprint = client.getFingerprint() + "";
 
@@ -37,7 +38,7 @@ const isNotEmpty = (val: string | null | undefined): val is string => {
 };
 
 function App() {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<User | null>(offline ? {uid:"123"} as any:null);
     const [init, setInit] = useState<boolean>(false);
     const [readyToInstall, setReadyToInstall] = useState<boolean>(false);
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
@@ -52,32 +53,32 @@ function App() {
     }
 
     useEffect(() => {
-        const onPostMessage = (payload:any) => {
-          console.log("Recieved Message", payload)
-          if (payload.data?.type == "newMessage") {
-            console.log("New Notification arrived");
-            setTimeout(()=>setReloadNotifications(prev=>prev+1), 2000);
-          }
+        const onPostMessage = (payload: any) => {
+            console.log("Recieved Message", payload)
+            if (payload.data?.type == "newMessage") {
+                console.log("New Notification arrived");
+                setTimeout(() => setReloadNotifications(prev => prev + 1), 2000);
+            }
         }
 
         const onVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 console.log('PWA is now in focus');
-                setReloadNotifications(prev=>prev+1);
+                setReloadNotifications(prev => prev + 1);
             } else {
                 console.log('PWA is now out of focus');
             }
         };
-    
+
         navigator.serviceWorker?.addEventListener("message", onPostMessage);
         document.addEventListener('visibilitychange', onVisibilityChange);
-    
+
         return () => {
-          navigator.serviceWorker.removeEventListener('message', onPostMessage);
-          document.removeEventListener('visibilitychange', onVisibilityChange);
+            navigator.serviceWorker.removeEventListener('message', onPostMessage);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
         };
-    
-      }, []);
+
+    }, []);
 
     useEffect(() => {
         if (user && user.uid) {
@@ -86,9 +87,9 @@ function App() {
             const currentVolId = isPWA ? localStorage.getItem(VOL_ID_STORAGE_KEY) : undefined;
 
             if (!isPWA) {
-                if (isNotEmpty(userPairingRequest)) {
+                if (isNotEmpty(userPairingRequest) ) {
                     // this is a non-pwa flow
-                    if (userPairingRequest !== currentVolId) {
+                    if (userPairingRequest !== currentVolId && !offline) {
                         if (isNotEmpty(currentVolId)) {
                             console.log("Change of vol ID - ignored", currentVolId, "to", userPairingRequest);
                         } else {
@@ -118,7 +119,7 @@ function App() {
     }, [user, userPairingRequest]);
 
     useEffect(() => {
-        if (user && isNotEmpty(volunteerId)) {
+        if (user && isNotEmpty(volunteerId) && !offline) {
             api.getUserInfo(user.uid, volunteerId).then((uInfo) => {
                 setUserInfo(uInfo);
             });
@@ -126,17 +127,19 @@ function App() {
     }, [user, volunteerId]);
 
     useEffect(() => {
-        api.init(onAuth).then(() => setInit(true));
+        if (!offline) {
+            api.init(onAuth).then(() => setInit(true));
+        }
     }, []);
 
-    useEffect(()=>{
+    useEffect(() => {
         countUnreadNotifications().then(updateUnreadCount);
-    },[reloadNotifications])
+    }, [reloadNotifications])
 
     useEffect(() => {
         if (init && !user) {
             if (isPWA || isNotEmpty(volunteerId)) {
-                api.login();
+                !offline && api.login();
             }
         }
     }, [init, volunteerId, user]);
@@ -182,8 +185,8 @@ function App() {
                 const db = await getDB();
                 await db.put('notifications', {
                     id: Date.now() + "",
-                    title: "Test data" + Date.now(),
-                    body: "This is the message body",
+                    title: "ממתינים שיבוצים" ,
+                    body: "יש עוד 5 משפחות שטרם שובצו להם מבשלים.ות",
                     read: 0,
                     timestamp: Date.now(),
                 });
@@ -203,7 +206,7 @@ function App() {
             {rejected && <div>זיהוי נכשל - צור קשר עם העמותה</div>}
             {appReady && <TabView dir='rtl'>
                 <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
-                    <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications}/>
+                    <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />
                 </TabPanel>
                 <TabPanel headerStyle={{ fontSize: 20 }} header="רישום">
                     <RegistrationComponent />

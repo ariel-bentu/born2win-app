@@ -30,13 +30,23 @@
 .msg-badge {
   position: absolute;
   top: 0;
-  left:0;
-} 
+  left: 0;
+}
 
 
 .icon-btn {
   border: none;
   background-color: transparent;
-  width:20px;
+  width: 20px;
   height: 20px;
+}
+
+.red-dot {
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  background-color: red;
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
 }

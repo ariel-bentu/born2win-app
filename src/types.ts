@@ -1,4 +1,4 @@
-export const Collections =  {
+export const Collections = {
     Users: "users",
 };
 
@@ -17,8 +17,8 @@ export interface TokenInfo {
     token: string;
     isSafari: boolean;
     createdAt: string;
-    lastMessageDate?:string;
-    uid?:string;
+    lastMessageDate?: string;
+    uid?: string;
 }
 
 export interface UpdateUserLoginPayload {
@@ -32,4 +32,22 @@ export interface UserInfo {
     firstName: string,
     lastName: string,
     notificationOn: boolean,
+}
+
+export interface LoginInfo {
+    uid: string;
+    fingerprint: string;
+    createdAt: string;
+}
+
+export interface UserRecord {
+    active: boolean;
+    firstName: string;
+    lastName: string;
+    uid?: string[];
+    fingerpring?: string[];
+    loginInfo?: LoginInfo[],
+    notificationTokens?: TokenInfo[];
+    lastModified: string;
+    otp?:string;
 }

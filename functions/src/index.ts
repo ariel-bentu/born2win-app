@@ -1,6 +1,7 @@
 
 
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { setGlobalOptions, logger } from "firebase-functions/v2";
 
 // Dependencies for the addMessage function.
@@ -12,7 +13,7 @@ import dayjs = require("dayjs");
 import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
-import { Collections, GetFamilityAvailabilityPayload, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload } from "../../src/types";
+import { Collections, GetFamilityAvailabilityPayload, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload, UserRecord } from "../../src/types";
 import axios from "axios";
 import express = require("express");
 import crypto = require("crypto");
@@ -34,8 +35,9 @@ const db = getFirestore();
 const born2winApiKey = defineString("BORN2WIN_API_KEY");
 const testUser = defineString("BORN2WIN_TEST_USER");
 const mainBase = defineString("BORM2WIN_MAIN_BASE");
-const usersMacSecretBase64 = defineString("BORM2WIN_AT_WEBHOOK_USERS");
 
+const usersWebHookID = defineString("BORM2WIN_AT_WEBHOOK_USERS_ID");
+const usersWebHookMacSecretBase64 = defineString("BORM2WIN_AT_WEBHOOK_USERS_MAC");
 /**
  * users collection
  * doc-id = volunteerId
@@ -411,14 +413,185 @@ function verifyAirtableWebhook(req: any, secret: string) {
 }
 
 app.post("/airtable/users", (req, res) => {
-    if (!verifyAirtableWebhook(req, usersMacSecretBase64.value())) {
+    if (!verifyAirtableWebhook(req, usersWebHookMacSecretBase64.value())) {
         logger.info("Airtable Users Webhook GET: unverified", req.headers["x-airtable-content-mac"], JSON.stringify(req.body));
         return res.status(403).send("Unauthorized request");
     }
     logger.info("Airtable Users Webhook GET: ", JSON.stringify(req.body));
 
-    res.json({});
-    return;
+    return syncBorn2WinUsers(dayjs().subtract(10, "minute")).then(() => {
+        res.json({});
+        return;
+    });
 });
 
 exports.httpApp = onRequest(app);
+
+
+/**
+ * SCHEDULING
+ */
+/** Schedules:
+ * desc: for logs
+ * min: the minute in the hour, or * for every minute
+ * hour: a number or an array of numbers - the hour in the day to run the scheduled task, * for every hour
+ * weekday: day in the week 0-Sat, 1-Sun,..., * for every day
+ * callback: an async function to call at the scheduled time
+*/
+
+const schedules = [
+    { desc: "Reminder on Sunday at 18:00", min: 0, hour: [18], weekDay: 1, callback: remindVolunteersToRegister },
+    { desc: "Refresh webhook registration", min: 0, hour: [0], weekDay: "*", callback: refreshWebhookToken },
+    { desc: "Sync Born2Win users daily", min: 0, hour: [17], weekDay: "*", callback: syncBorn2WinUsers },
+];
+
+function check(obj: any, fieldName: string, value: any) {
+    const expectedValue = obj && obj[fieldName];
+    if (expectedValue == "*") return true;
+    if (expectedValue === value) return true;
+
+    if (Array.isArray(expectedValue)) {
+        return expectedValue.some(v => v === value);
+    }
+    return false;
+}
+
+
+exports.doSchedule = onSchedule({
+    schedule: "every 1 minutes",
+    timeZone: "Asia/Jerusalem",
+    region: "europe-west1",
+}, async () => {
+    const now = dayjs().utc().tz(JERUSALEM);
+    const waitFor = [] as Promise<any>[];
+    schedules.forEach(schedule => {
+        if (check(schedule, "min", now.minute()) &&
+            check(schedule, "hour", now.hour()) &&
+            check(schedule, "weekDay", now.day())) {
+            logger.info("Scheduled Task", schedule.desc, now.format("YYYY-MM-DD HH:mm:ss"));
+            waitFor.push(schedule.callback());
+        }
+    });
+
+    await Promise.all(waitFor);
+});
+
+
+async function remindVolunteersToRegister() {
+    // TODO
+}
+
+async function refreshWebhookToken() {
+    const webhookID = usersWebHookID.value();
+    const airTableMainBase = mainBase.value();
+    const apiKey = born2winApiKey.value();
+
+    const headers = {
+        "Authorization": `Bearer ${apiKey}`,
+    };
+
+    return axios.post(`https://api.airtable.com/v0/bases/${airTableMainBase}/webhooks/${webhookID}/refresh`, {
+        headers,
+    });
+}
+
+async function syncBorn2WinUsers(sinceDate?: any) {
+    let offset = null;
+    let count = 0;
+    let countActive = 0;
+    const airTableMainBase = mainBase.value();
+    const apiKey = born2winApiKey.value();
+    if (!sinceDate) {
+        sinceDate = dayjs().subtract(25, "hour");
+    }
+    const now = dayjs().format("YYYY-MM-DD HH:mm:ss[z]");
+    const newLinksToAdmin = [] as string[];
+
+    const url = `https://api.airtable.com/v0/${airTableMainBase}/מתנדבים`;
+    const batch = db.batch();
+    const seenUsers: any = {};
+    const duplicates: any = [];
+    do {
+        const response: any = await axios.get(url, {
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+            },
+            params: {
+                filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
+                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל"],
+                offset: offset,
+            },
+        });
+        offset = response.data.offset;
+        count += response.data.records.length;
+        countActive += response.data.records.filter((user: any) => user.fields["פעיל"] == "פעיל").length;
+        for (let i = 0; i < response.data.records.length; i++) {
+            const user = response.data.records[i];
+            const userId = user.fields.record_id;
+            if (seenUsers[userId]) {
+                duplicates.push(userId);
+                continue;
+            }
+
+            seenUsers[userId] = true;
+            const docRef = db.collection(Collections.Users).doc(userId);
+            const userDoc = await docRef.get();
+
+            const userRecord = {
+                active: user.fields["פעיל"] == "פעיל",
+                firstName: user.fields["שם פרטי"],
+                lastName: user.fields["שם משפחה"],
+                lastModified: now,
+            } as UserRecord;
+
+            if (userDoc && userDoc.exists) {
+                const prevUserRecord = userDoc.data()!;
+                if (userRecord.active === prevUserRecord.active &&
+                    userRecord.firstName === prevUserRecord.firstName &&
+                    userRecord.lastName === prevUserRecord.lastName) {
+                    // No change!
+                    continue;
+                }
+
+                // update it
+                if (userRecord.active !== prevUserRecord.active && userRecord.active) {
+                    // user has changed to active, add OTP and send it to admins
+                    userRecord.otp = crypto.randomUUID();
+                }
+                batch.update(userDoc.ref, userRecord as any);
+            } else {
+                // create new
+                if (userRecord.active) {
+                    userRecord.otp = crypto.randomUUID();
+                }
+                batch.create(docRef, userRecord);
+            }
+            if (userRecord.otp) {
+                newLinksToAdmin.push(getRegistrationLink(userId, userRecord.otp));
+            }
+        }
+    } while (offset);
+
+    return batch.commit().then(() => {
+        logger.info("Sync Users: obsered modified:", count, "observed Active", countActive, "registrationLinks", newLinksToAdmin, "duplicates:", duplicates);
+        if (newLinksToAdmin.length > 0) {
+            return getWebTokens(["arielb"]).then(tokens => {
+                return sendNotification("New Link", newLinksToAdmin[0], undefined, tokens);
+            });
+        }
+        return;
+    });
+}
+
+function getRegistrationLink(userId: string, otp: string): string {
+    return `https://born2win-1.web.app?vol_id=${userId}&otp=${otp}`;
+}
+
+// exports.TestSync = onCall({ cors: true }, async () => {
+//     logger.info("Start test sync");
+//     try {
+//         return syncBorn2WinUsers();
+//     } catch (e) {
+//         logger.info("error test sync", e);
+//     }
+// });

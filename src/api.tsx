@@ -19,7 +19,7 @@ import {
 import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
-import { Collections, GetFamilityAvailabilityPayload, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
+import { Collections, GetFamilityAvailabilityPayload, NotificationUpdatePayload, RegistrationRecord, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
 import { isPWA } from "./App";
 
 const firebaseConfig = {
@@ -200,7 +200,7 @@ export interface Availability {
         "יום בשבוע1": string;
     }
 }
-  
+
 export function getFamilyAvailability(familyId: string, baseId: string): Promise<Availability[]> {
     const GetFamilityAvailabilityFunc = httpsCallable(functions, 'GetFamilityAvailability');
     const payload = {
@@ -213,3 +213,17 @@ export function getFamilyAvailability(familyId: string, baseId: string): Promise
         return res.data.records as Availability[];
     });
 }
+
+export function getUserRegistrations(): Promise<RegistrationRecord[]> {
+    const getUserRegistrationsFunc = httpsCallable(functions, 'GetUserRegistrations');
+    return getUserRegistrationsFunc().then((res: any) => res.data.records.map((rec: any) => {
+        return {
+            id: rec.id,
+            date: rec.fields["תאריך"],
+            city: rec.fields["עיר"][0],
+            familyLastName: rec.fields["שם משפחה של החולה"],
+            weekday: rec.fields["יום בשבוע1"],
+        } as RegistrationRecord;
+    }));
+}
+

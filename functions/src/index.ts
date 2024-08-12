@@ -1,6 +1,6 @@
 
 
-import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { setGlobalOptions, logger } from "firebase-functions/v2";
 
@@ -317,9 +317,7 @@ const sendNotification = (title: string, body: string, data: any, devices: Devic
     });
 };
 
-let districts: any = undefined;
-
-exports.GetMealRequests = onCall({ cors: true }, async (request) => {
+async function authenticate(request: CallableRequest<any>): Promise<QueryDocumentSnapshot> {
     if (!request.auth) {
         throw new HttpsError("unauthenticated", "Request had invalid credentials.");
     }
@@ -332,58 +330,64 @@ exports.GetMealRequests = onCall({ cors: true }, async (request) => {
     if (!doc) {
         throw new HttpsError("unauthenticated", "unauthorized user");
     }
+    return doc;
+}
 
-    const apiKey = born2winApiKey.value();
-    const airTableMainBase = mainBase.value();
-    const mahoz = doc.data().mahoz;
-    const headers = {
-        "Authorization": `Bearer ${apiKey}`,
-    };
+let districts: District[] | undefined = undefined;
+interface District {
+    id: string;
+    base_id: string;
+}
 
+async function getDestricts(): Promise<District[]> {
     if (!districts) {
         // districts are cached
+        const apiKey = born2winApiKey.value();
+        const airTableMainBase = mainBase.value();
+        const headers = {
+            "Authorization": `Bearer ${apiKey}`,
+        };
+
         const districtResponse = await axios.get(`https://api.airtable.com/v0/${airTableMainBase}/מחוז`, {
             headers,
         });
         districts = districtResponse.data.records.map((r: any) => ({ id: r.id, base_id: r.fields.base_id }));
     }
+    return districts || [];
+}
+
+exports.GetMealRequests = onCall({ cors: true }, async (request) => {
+    const doc = await authenticate(request);
+    const mahoz = doc.data().mahoz;
 
     if (mahoz && mahoz.length > 0) {
-        const mahuzRec = districts.find((d: any) => d.id === mahoz);
-
-        const baseId = mahuzRec.base_id;
-        const districtFamilies = await axios.get(`https://api.airtable.com/v0/${baseId}/משפחות במחוז?filterByFormula=AND(NOT({דרישות לשיבוצים}=''),({סטטוס בעמותה} = 'פעיל'))&sort[0][field]=שם משפחה של החולה&sort[0][direction]=asc`, {
-            headers,
-        });
-        return districtFamilies.data;
+        const apiKey = born2winApiKey.value();
+        const headers = {
+            "Authorization": `Bearer ${apiKey}`,
+        };
+        const mahuzRec = (await getDestricts()).find((d: any) => d.id === mahoz);
+        if (mahuzRec) {
+            const baseId = mahuzRec.base_id;
+            const districtFamilies = await axios.get(`https://api.airtable.com/v0/${baseId}/משפחות במחוז?filterByFormula=AND(NOT({דרישות לשיבוצים}=''),({סטטוס בעמותה} = 'פעיל'))&sort[0][field]=שם משפחה של החולה&sort[0][direction]=asc`, {
+                headers,
+            });
+            return districtFamilies.data;
+        }
     }
     return "District not found";
 });
 
 
 exports.GetFamilityAvailability = onCall({ cors: true }, async (request) => {
-    if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Request had invalid credentials.");
-    }
-    const uid = request.auth.uid;
-    if (!uid) {
-        throw new HttpsError("unauthenticated", "Request is missing uid.");
-    }
-
-    const doc = await findUserByUID(uid);
-    if (!doc) {
-        throw new HttpsError("unauthenticated", "unauthorized user");
-    }
-
-    // TODO: verify user is the same mahuz
-
+    await authenticate(request);
     const gfap = request.data as GetFamilityAvailabilityPayload;
 
+    // TODO: verify user is the same mahuz
     const apiKey = born2winApiKey.value();
     const headers = {
         "Authorization": `Bearer ${apiKey}`,
     };
-    const formula = encodeURIComponent(`AND((FIND("${gfap.familyId}",  ARRAYJOIN({record_id (from משפחה)}))>0),  AND(    ({זמינות שיבוץ}='זמין')    ,IS_AFTER({תאריך},TODAY())    ,IS_BEFORE({תאריך},DATEADD(TODAY(),45,'days')    )))`);
+    const formula = encodeURIComponent(`AND((FIND("${gfap.familyId}",  ARRAYJOIN({record_id (from משפחה)}))>0),AND(({זמינות שיבוץ}='זמין'),IS_AFTER({תאריך},TODAY()),IS_BEFORE({תאריך},DATEADD(TODAY(),45,'days'))))`);
     const query = `https://api.airtable.com/v0/${gfap.baseId}/דרישות לשיבוצים?filterByFormula=${formula}`;
 
     console.log("Availability Query:", query);
@@ -391,6 +395,34 @@ exports.GetFamilityAvailability = onCall({ cors: true }, async (request) => {
         headers,
     });
     return response.data;
+});
+
+
+exports.GetUserRegistrations = onCall({ cors: true }, async (request) => {
+    const doc = await authenticate(request);
+    let mahoz = doc.data().mahoz;
+    let volunteerId = doc.id;
+
+    // temp fixed data
+    volunteerId = "recpvp2E7B5yEywPi";
+    mahoz = "recP17rsfOseG3Frx";
+
+    if (mahoz && mahoz.length > 0) {
+        const apiKey = born2winApiKey.value();
+        const headers = {
+            "Authorization": `Bearer ${apiKey}`,
+        };
+        const mahuzRec = (await getDestricts()).find((d: any) => d.id === mahoz);
+        if (mahuzRec) {
+            const baseId = mahuzRec.base_id;
+            const formula = encodeURIComponent(`{volunteer_id}='${volunteerId}'`);
+            const userRegistrations = await axios.get(`https://api.airtable.com/v0/${baseId}/דרישות לשיבוצים?filterByFormula=${formula}&sort[0][field]=תאריך&sort[0][direction]=desc`, {
+                headers,
+            });
+            return userRegistrations.data;
+        }
+    }
+    return [];
 });
 
 /**

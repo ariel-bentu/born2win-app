@@ -34,3 +34,44 @@
 - move code into it
 - add all collaborators to firebase
 - maybe move firebase to born2win?
+
+
+# Tables for each mahoz
+משפחות במחוז
+דרישות שיבוץ
+example:
+```json
+{
+      "id": "rec64eNUmvcXYqyEI",
+      "createdTime": "2024-06-19T07:39:27.000Z",
+      "fields": {
+        "תאריך": "2024-07-18",
+        "תעדוף": "1",
+        "זמינות שיבוץ": "תפוס",
+        "משפחה": [
+          "recyT0GRTb4aOqiZE"
+        ],
+        "volunteer_id": "recpvp2E7B5yEywPi",
+        "עיר": [
+          "יבנה"
+        ],
+        "record_id (from משפחה)": [
+          "recyT0GRTb4aOqiZE"
+        ],
+        "יום בשבוע1": "Thursday",
+        "שם משפחה של החולה": [
+          "אבג"
+        ],
+        "Family_id": [
+          "recPSJYXnZVas4RLs"
+        ],
+        "id": "rec64eNUmvcXYqyEI",
+        "formula_date_critical": "2024-07-18",
+        "חודש": "July",
+        "סטטוס בעמותה": [
+          "לא פעיל"
+        ],
+        "Name": "אבג"
+      }
+    }
+```

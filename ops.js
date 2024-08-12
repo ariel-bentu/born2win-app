@@ -54,6 +54,7 @@ async function fetchAllUsers() {
                 firstName: user.fields["שם פרטי"],
                 lastName: user.fields["שם משפחה"],
                 mahoz: user.fields["מחוז"][0],
+                volId: user.id,
             }
             //console.log("add", userId, userRecord);
             const docRef = db.collection("users").doc(userId);
@@ -68,4 +69,42 @@ async function fetchAllUsers() {
 
 
 //fetchAllUsers();
+let districts
+async function getDestricts() {
+    if (!districts) {
+        // districts are cached
+        const headers = {
+            "Authorization": `Bearer ${apiKey}`,
+        };
 
+        const districtResponse = await axios.get(`https://api.airtable.com/v0/${baseId}/מחוז`, {
+            headers,
+        });
+        districts = districtResponse.data.records.map((r) => ({ id: r.id, base_id: r.fields.base_id }));
+    }
+    return districts || [];
+}
+async function testRegistrations() {
+    // temp fixed data
+    volunteerId = "recpvp2E7B5yEywPi";
+    mahoz = "recP17rsfOseG3Frx";
+
+    if (mahoz && mahoz.length > 0) {
+        const headers = {
+            "Authorization": `Bearer ${apiKey}`,
+        };
+        //const mahuzRec = (await getDestricts()).find((d) => d.id === mahoz);
+        //if (mahuzRec) {
+        const baseId = "appLTxCrbOFaAjmtW";
+        const formula = encodeURIComponent(`{volunteer_id}='${volunteerId}'`);
+        const userRegistrations = await axios.get(`https://api.airtable.com/v0/appLTxCrbOFaAjmtW/%D7%93%D7%A8%D7%99%D7%A9%D7%95%D7%AA%20%D7%9C%D7%A9%D7%99%D7%91%D7%95%D7%A6%D7%99%D7%9D?filterByFormula=${formula}&sort[0][field]=תאריך&sort[0][direction]=desc`
+            , {
+            headers,
+        });
+        return userRegistrations.data;
+        //}
+    }
+    return [];
+}
+
+testRegistrations();

@@ -19,6 +19,7 @@ import RegistrationComponent from './registration';
 import header from "./media/header.png";
 import Header from './header';
 import PWAInstructions from './install-instruction';
+import { ExistingRegistrationsComponent } from './existing-registration-component';
 
 const UID_STORAGE_KEY = "born2win_uid";
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
@@ -210,6 +211,9 @@ function App() {
                 </TabPanel>
                 <TabPanel headerStyle={{ fontSize: 20 }} header="רישום">
                     <RegistrationComponent />
+                </TabPanel>
+                <TabPanel headerStyle={{ fontSize: 20 }} header="התחייבויות">
+                    <ExistingRegistrationsComponent />
                 </TabPanel>
             </TabView>}
         </div>

@@ -51,3 +51,11 @@ export interface UserRecord {
     lastModified: string;
     otp?:string;
 }
+
+export interface RegistrationRecord {
+    id: string;
+    date: string;
+    city: string;
+    familyLastName: string;
+    weekday: string;
+}

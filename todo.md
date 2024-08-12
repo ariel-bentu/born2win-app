@@ -2,12 +2,12 @@
 - maintain in firebase admin and mahoz admins
 
 ## Sync users
-- one time sync all active users
+- one time sync all active users - V
 - implement a webhook that:
-  - when changes to users table: read last day's modified records,
-  - create/update users in firebase (fname, lname, id, mahoz, active, OTP)
+  - when changes to users table: read last day's modified records, - V
+  - create/update users in firebase (fname, lname, id, mahoz, active, OTP) - V
   - if change is from inactive to active: issue a registration link with OTP and send to Mahoz's admin and main admin
-  - refresh web-hook token
+  - refresh web-hook token - V
 
 ## Schdule tasks
 - read all unfulfilled demands for the next 3 (?) days and send message to all Mahoz users
@@ -27,10 +27,6 @@
 - able to deactivate user (do we need - we can react to inactive in airtable?)
 - re-issue registration with OTP
 - impersonate to any mahuz? have a list of missing schedules?
-
-
-## Optimize server
-- improve query for family demand 3 rest-calls to one rest call (having mahoz in users, and having mahuz's base in firebase/hardcoded)
 
 
 ## Setup

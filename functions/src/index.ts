@@ -33,7 +33,6 @@ const JERUSALEM = "Asia/Jerusalem";
 const db = getFirestore();
 
 const born2winApiKey = defineString("BORN2WIN_API_KEY");
-const testUser = defineString("BORN2WIN_TEST_USER");
 const mainBase = defineString("BORM2WIN_MAIN_BASE");
 
 const usersWebHookID = defineString("BORM2WIN_AT_WEBHOOK_USERS_ID");
@@ -318,6 +317,7 @@ const sendNotification = (title: string, body: string, data: any, devices: Devic
     });
 };
 
+let districts: any = undefined;
 
 exports.GetMealRequests = onCall({ cors: true }, async (request) => {
     if (!request.auth) {
@@ -333,30 +333,29 @@ exports.GetMealRequests = onCall({ cors: true }, async (request) => {
         throw new HttpsError("unauthenticated", "unauthorized user");
     }
 
-    // TODO: Temp defaults to test user
-    // const volunteerID = doc.id;
-    const volunteerID = testUser.value();
     const apiKey = born2winApiKey.value();
     const airTableMainBase = mainBase.value();
+    const mahoz = doc.data().mahoz;
     const headers = {
         "Authorization": `Bearer ${apiKey}`,
     };
 
-    const response1 = await axios.get(`https://api.airtable.com/v0/${airTableMainBase}/מתנדבים/${volunteerID}`, {
-        headers,
-    });
+    if (!districts) {
+        // districts are cached
+        const districtResponse = await axios.get(`https://api.airtable.com/v0/${airTableMainBase}/מחוז`, {
+            headers,
+        });
+        districts = districtResponse.data.records.map((r: any) => ({ id: r.id, base_id: r.fields.base_id }));
+    }
 
-    const mahoz = response1.data.fields["מחוז"];
     if (mahoz && mahoz.length > 0) {
-        const response2 = await axios.get(`https://api.airtable.com/v0/${airTableMainBase}/מחוז/${mahoz[0]}`, {
-            headers,
-        });
+        const mahuzRec = districts.find((d: any) => d.id === mahoz);
 
-        const baseId = response2.data.fields.base_id;
-        const response3 = await axios.get(`https://api.airtable.com/v0/${baseId}/משפחות במחוז?filterByFormula=AND(NOT({דרישות לשיבוצים}=''),({סטטוס בעמותה} = 'פעיל'))&sort[0][field]=שם משפחה של החולה&sort[0][direction]=asc`, {
+        const baseId = mahuzRec.base_id;
+        const districtFamilies = await axios.get(`https://api.airtable.com/v0/${baseId}/משפחות במחוז?filterByFormula=AND(NOT({דרישות לשיבוצים}=''),({סטטוס בעמותה} = 'פעיל'))&sort[0][field]=שם משפחה של החולה&sort[0][direction]=asc`, {
             headers,
         });
-        return response3.data;
+        return districtFamilies.data;
     }
     return "District not found";
 });
@@ -545,8 +544,9 @@ async function syncBorn2WinUsers(sinceDate?: any) {
             } as UserRecord;
 
             if (userDoc && userDoc.exists) {
-                const prevUserRecord = userDoc.data()!;
-                if (userRecord.active === prevUserRecord.active &&
+                const prevUserRecord = userDoc.data();
+                if (prevUserRecord &&
+                    userRecord.active === prevUserRecord.active &&
                     userRecord.firstName === prevUserRecord.firstName &&
                     userRecord.lastName === prevUserRecord.lastName) {
                     // No change!
@@ -554,7 +554,7 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                 }
 
                 // update it
-                if (userRecord.active !== prevUserRecord.active && userRecord.active) {
+                if (prevUserRecord && userRecord.active !== prevUserRecord.active && userRecord.active) {
                     // user has changed to active, add OTP and send it to admins
                     userRecord.otp = crypto.randomUUID();
                 }

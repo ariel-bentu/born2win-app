@@ -30,6 +30,7 @@ async function fetchAllUsers() {
     const url = `https://api.airtable.com/v0/${baseId}/מתנדבים`;
     // const modifiedSince = dayjs().subtract(2, "day");
 
+
     const batch = db.batch();
     do {
         const response = await axios.get(url, {
@@ -41,21 +42,22 @@ async function fetchAllUsers() {
                 fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל"],
                 offset: offset,
             }
-        }).catch(e=>console.log(e));
+        }).catch(e => console.log(e));
         offset = response.data.offset;
         count += response.data.records.length;
         countActive += response.data.records.filter(user => user.fields["פעיל"] == "פעיל").length;
 
-        response.data.records.forEach(user=>{
+        response.data.records.forEach(user => {
             const userId = user.fields.record_id;
             const userRecord = {
                 active: user.fields["פעיל"] == "פעיל",
                 firstName: user.fields["שם פרטי"],
                 lastName: user.fields["שם משפחה"],
+                mahoz: user.fields["מחוז"][0],
             }
             //console.log("add", userId, userRecord);
             const docRef = db.collection("users").doc(userId);
-            batch.create(docRef, userRecord);
+            batch.update(docRef, userRecord);
         })
 
     } while (offset);

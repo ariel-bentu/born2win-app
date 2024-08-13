@@ -20,6 +20,7 @@ import header from "./media/header.png";
 import Header from './header';
 import PWAInstructions from './install-instruction';
 import { ExistingRegistrationsComponent } from './existing-registration-component';
+import { ProgressBar } from 'primereact/progressbar';
 
 const UID_STORAGE_KEY = "born2win_uid";
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
@@ -198,13 +199,14 @@ function App() {
 
     const appReady = (isPWA || isDev) && isNotEmpty(volunteerId);
     const rejected = !isPWA && !isNotEmpty(userPairingRequest) && !isDev;
-
+    const showProgress = !appReady && !rejected && !(readyToInstall && !isDev);
     return (
         <div className="App">
             <Toast ref={toast} />
             <Header userName={userInfo ? userInfo.firstName : ""} logoSrc={header} settingsComponent={settings} />
             {readyToInstall && !isDev && <PWAInstructions />}
             {rejected && <div>זיהוי נכשל - צור קשר עם העמותה</div>}
+            {showProgress && <ProgressBar mode="indeterminate" style={{ height: '6px' }}></ProgressBar>}
             {appReady && <TabView dir='rtl'>
                 <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
                     <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />

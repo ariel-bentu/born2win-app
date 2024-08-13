@@ -9,6 +9,7 @@ import dayjs from "dayjs";
 
 interface FamilyDetailsProps {
     family: Family | null;
+    detailsOnly?: boolean;
     onClose: () => void;
 }
 
@@ -19,15 +20,18 @@ function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
         d.getFullYear() === event.year;
 }
 
-export function FamilyDetails({ family, onClose }: FamilyDetailsProps) {
+export function FamilyDetails({ family, onClose, detailsOnly }: FamilyDetailsProps) {
     const [availability, setAvailability] = useState<Availability[]>([]);
     const [selectedDate, setSelectedDate] = useState<Nullable<Date>>(null);
+    const [error, setError] = useState<any>(undefined);
 
     useEffect(() => {
-        if (family?.id) {
-            getFamilyAvailability(family.id, family.fields.base_id).then(res => setAvailability(res));
+        if (family?.id && !detailsOnly) {
+            getFamilyAvailability(family.id, family.fields.base_id)
+                .then(res => setAvailability(res))
+                .catch(err => setError(err));
         }
-    }, [family]);
+    }, [family, detailsOnly]);
 
     if (!family) return null;
 
@@ -58,7 +62,9 @@ export function FamilyDetails({ family, onClose }: FamilyDetailsProps) {
         <div className="surface-card shadow-2 p-3 border-round relative">
             <Button label="סגור" onClick={onClose} className="mt-3" style={{ position: "absolute", left: 20, top: 0 }} />
 
+            <strong>{family.fields.Name}</strong>
             <ul className="pl-4 list-disc text-right">
+
                 <li>המשפחה בת <strong> {family.fields['נפשות מבוגרים בבית']}</strong> נפשות</li>
                 <li><strong>הרכב בני המשפחה:</strong> {family.fields['הרכב הורים']}</li>
                 <li><strong>גילאי בני המשפחה:</strong> {family.fields['גילאים של הרכב המשפחה']},{family.fields['גיל החולה']}</li>
@@ -72,32 +78,34 @@ export function FamilyDetails({ family, onClose }: FamilyDetailsProps) {
                         <div><strong>אלרגיות:</strong> אין</div>}
                 </li>
             </ul>
-            <h3>לבחירת תאריך:</h3>
-            <Calendar
-                value={selectedDate}
-                enabledDates={availableDates}
-                onChange={(e) => {
-                    console.log("date selected", e.value)
-                    setSelectedDate(e.value)
-                }}
-                inline
-                showButtonBar
-                dateTemplate={dateTemplate}
-                locale="he"
-                //firstDayOfWeek={"Sunday"}
-                monthNavigator
-                minDate={minDate.toDate()}
-            //yearNavigator 
-            //yearRange="2020:2030" 
-            />
+            {error && <div>תקלה בקריאת זמינות</div>}
+            {!detailsOnly && <>
+                <h3>לבחירת תאריך:</h3>
+                <Calendar
+                    value={selectedDate}
+                    enabledDates={availableDates}
+                    onChange={(e) => {
+                        console.log("date selected", e.value)
+                        setSelectedDate(e.value)
+                    }}
+                    inline
+                    showButtonBar
+                    dateTemplate={dateTemplate}
+                    locale="he"
+                    //firstDayOfWeek={"Sunday"}
+                    monthNavigator
+                    minDate={minDate.toDate()}
+                //yearNavigator 
+                //yearRange="2020:2030" 
+                />
 
-            <Button
-                disabled={!selectedDate}
-                label="שבצו אותי"
-                onClick={() => {
-                    alert("not implemented yet")
-                }} className="mt-3" />
-
+                <Button
+                    disabled={!selectedDate}
+                    label="שבצו אותי"
+                    onClick={() => {
+                        alert("not implemented yet")
+                    }} className="mt-3" />
+            </>}
         </div>
     );
 }

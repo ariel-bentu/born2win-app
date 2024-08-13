@@ -16,7 +16,6 @@
 
 ## App todo
 - Implement OTP flow
-- A new tab with booked cookings (past and future)
 - Other languages (Arabic/English)?
 - Optimize: 
   - Cache data when moving between tabs

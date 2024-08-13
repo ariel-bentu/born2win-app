@@ -13,7 +13,7 @@ import dayjs = require("dayjs");
 import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
-import { Collections, GetFamilityAvailabilityPayload, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload, UserRecord } from "../../src/types";
+import { Collections, FamilityIDPayload, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload, UserRecord } from "../../src/types";
 import axios from "axios";
 import express = require("express");
 import crypto = require("crypto");
@@ -337,6 +337,8 @@ let districts: District[] | undefined = undefined;
 interface District {
     id: string;
     base_id: string;
+    demandsTable: string;
+    familiesTable: string;
 }
 
 async function getDestricts(): Promise<District[]> {
@@ -351,7 +353,12 @@ async function getDestricts(): Promise<District[]> {
         const districtResponse = await axios.get(`https://api.airtable.com/v0/${airTableMainBase}/מחוז`, {
             headers,
         });
-        districts = districtResponse.data.records.map((r: any) => ({ id: r.id, base_id: r.fields.base_id }));
+        districts = districtResponse.data.records.map((r: any) => ({
+            id: r.id,
+            base_id: r.fields.base_id,
+            demandsTable: r.fields.table_id,
+            familiesTable: r.fields.table_familyid,
+        }));
     }
     return districts || [];
 }
@@ -380,15 +387,15 @@ exports.GetMealRequests = onCall({ cors: true }, async (request) => {
 
 exports.GetFamilityAvailability = onCall({ cors: true }, async (request) => {
     await authenticate(request);
-    const gfap = request.data as GetFamilityAvailabilityPayload;
+    const gfp = request.data as FamilityIDPayload;
 
     // TODO: verify user is the same mahuz
     const apiKey = born2winApiKey.value();
     const headers = {
         "Authorization": `Bearer ${apiKey}`,
     };
-    const formula = encodeURIComponent(`AND((FIND("${gfap.familyId}",  ARRAYJOIN({record_id (from משפחה)}))>0),AND(({זמינות שיבוץ}='זמין'),IS_AFTER({תאריך},TODAY()),IS_BEFORE({תאריך},DATEADD(TODAY(),45,'days'))))`);
-    const query = `https://api.airtable.com/v0/${gfap.baseId}/דרישות לשיבוצים?filterByFormula=${formula}`;
+    const formula = encodeURIComponent(`AND((FIND("${gfp.familyId}",  ARRAYJOIN({record_id (from משפחה)}))>0),AND(({זמינות שיבוץ}='זמין'),IS_AFTER({תאריך},TODAY()),IS_BEFORE({תאריך},DATEADD(TODAY(),45,'days'))))`);
+    const query = `https://api.airtable.com/v0/${gfp.baseId}/דרישות לשיבוצים?filterByFormula=${formula}`;
 
     console.log("Availability Query:", query);
     const response = await axios.get(query, {
@@ -403,7 +410,7 @@ exports.GetUserRegistrations = onCall({ cors: true }, async (request) => {
     let mahoz = doc.data().mahoz;
     let volunteerId = doc.id;
 
-    // temp fixed data
+    // todo temp fixed dummie data
     volunteerId = "recpvp2E7B5yEywPi";
     mahoz = "recP17rsfOseG3Frx";
 
@@ -423,6 +430,31 @@ exports.GetUserRegistrations = onCall({ cors: true }, async (request) => {
         }
     }
     return [];
+});
+
+exports.GetFamilyDetails = onCall({ cors: true }, async (request) => {
+    const doc = await authenticate(request);
+    const gfp = request.data as FamilityIDPayload;
+    let mahoz = doc.data().mahoz;
+
+    // todo - fix the mahoz for dummie data
+    mahoz = "recP17rsfOseG3Frx";
+
+    const mahuzRec = (await getDestricts()).find((d: any) => d.id === mahoz);
+    if (mahuzRec) {
+        const apiKey = born2winApiKey.value();
+        const headers = {
+            "Authorization": `Bearer ${apiKey}`,
+        };
+        const baseId = mahuzRec.base_id;
+        const familiesTable = mahuzRec.familiesTable;
+
+        const userRegistrations = await axios.get(`https://api.airtable.com/v0/${baseId}/${familiesTable}/${gfp.familyId}`, {
+            headers,
+        });
+        return userRegistrations.data;
+    }
+    throw new HttpsError("not-found", "Family not found");
 });
 
 /**

@@ -19,8 +19,7 @@ import {
 import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
-import { Collections, GetFamilityAvailabilityPayload, NotificationUpdatePayload, RegistrationRecord, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
-import { isPWA } from "./App";
+import { Collections, FamilityIDPayload, NotificationUpdatePayload, RegistrationRecord, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDC7Yz2zm6DB7WgQHZ_HDojIHzkHwXU4hk",
@@ -209,8 +208,19 @@ export function getFamilyAvailability(familyId: string, baseId: string): Promise
     };
 
     return GetFamilityAvailabilityFunc(payload).then((res: any) => {
-        console.log("GetFamilityAvailabilityFunc result", res)
         return res.data.records as Availability[];
+    });
+}
+
+export function getFamilyDetails(familyId: string, baseId: string) {
+    const getFamilyDetailsFunc = httpsCallable(functions, 'GetFamilyDetails');
+    const payload = {
+        familyId,
+        baseId,
+    };
+
+    return getFamilyDetailsFunc(payload).then((res: any) => {
+        return res.data as Family;
     });
 }
 
@@ -223,6 +233,7 @@ export function getUserRegistrations(): Promise<RegistrationRecord[]> {
             city: rec.fields["עיר"][0],
             familyLastName: rec.fields["שם משפחה של החולה"],
             weekday: rec.fields["יום בשבוע1"],
+            familyId: rec.fields["משפחה"][0],
         } as RegistrationRecord;
     }));
 }

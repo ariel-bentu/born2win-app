@@ -7,7 +7,7 @@ export interface NotificationUpdatePayload {
     tokenInfo: TokenInfo;
 }
 
-export interface GetFamilityAvailabilityPayload {
+export interface FamilityIDPayload {
     familyId: string;
     baseId: string;
 }
@@ -58,4 +58,5 @@ export interface RegistrationRecord {
     city: string;
     familyLastName: string;
     weekday: string;
+    familyId: string;
 }

@@ -25,7 +25,18 @@ import { ProgressBar } from 'primereact/progressbar';
 const UID_STORAGE_KEY = "born2win_uid";
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-export const isPWA = ((window.navigator as any)?.standalone === true);
+
+export const testIsPWA = () => {
+    // Check for iOS PWA
+    const isStandalone = (window.navigator as any).standalone === true;
+
+    // Check for Android and other platforms
+    const isDisplayModeStandalone = window.matchMedia('(display-mode: standalone)').matches;
+
+    return isStandalone || isDisplayModeStandalone;
+};
+
+export const isPWA = testIsPWA();
 
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
@@ -44,7 +55,7 @@ function App() {
     const [init, setInit] = useState<boolean>(false);
     const [readyToInstall, setReadyToInstall] = useState<boolean>(false);
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
-    const [volunteerId, setVolunteerId] = useState<string | undefined>();
+    const [volunteerId, setVolunteerId] = useState<string | null>(userPairingRequest);
     const [notificationPermission, setNotificationPermission] = useState<string>((typeof Notification !== 'undefined') && Notification && Notification.permission || "unsupported");
     const [unreadCount, setUnreadCount] = useState(0);
     const [reloadNotifications, setReloadNotifications] = useState(0);

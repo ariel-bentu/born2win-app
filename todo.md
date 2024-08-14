@@ -15,6 +15,8 @@
 - remind users to register for coocking - all, and maybe personalized
 
 ## App todo
+- Implement android install easier
+    - check with chrome/Sumsung
 - Implement OTP flow
 - Other languages (Arabic/English)?
 - Optimize: 

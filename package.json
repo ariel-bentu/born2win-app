@@ -10,6 +10,7 @@
     "@types/node": "^16.18.104",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "chart.js": "^4.4.3",
     "clientjs": "^0.2.1",
     "dayjs": "^1.11.12",
     "dotenv": "^16.4.5",
@@ -51,7 +52,7 @@
   },
   "devDependencies": {
     "@types/clientjs": "^0.2.2",
-    "axios": "^1.7.3",
+    "axios": "^1.7.4",
     "copy-webpack-plugin": "^12.0.2",
     "firebase-admin": "^12.3.1",
     "path": "^0.12.7",

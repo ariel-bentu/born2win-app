@@ -20,7 +20,9 @@ import header from "./media/header.png";
 import Header from './header';
 import PWAInstructions from './install-instruction';
 import { ExistingRegistrationsComponent } from './existing-registration-component';
-import { ProgressBar } from 'primereact/progressbar';
+
+import { Stats } from './charts';
+import { InProgress } from './common-ui';
 
 const UID_STORAGE_KEY = "born2win_uid";
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
@@ -51,7 +53,7 @@ const isNotEmpty = (val: string | null | undefined): val is string => {
 };
 
 function App() {
-    const [user, setUser] = useState<User | null>(offline ? {uid:"123"} as any:null);
+    const [user, setUser] = useState<User | null>(offline ? { uid: "123" } as any : null);
     const [init, setInit] = useState<boolean>(false);
     const [readyToInstall, setReadyToInstall] = useState<boolean>(false);
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
@@ -100,7 +102,7 @@ function App() {
             const currentVolId = isPWA ? localStorage.getItem(VOL_ID_STORAGE_KEY) : undefined;
 
             if (!isPWA) {
-                if (isNotEmpty(userPairingRequest) ) {
+                if (isNotEmpty(userPairingRequest)) {
                     // this is a non-pwa flow
                     if (userPairingRequest !== currentVolId && !offline) {
                         if (isNotEmpty(currentVolId)) {
@@ -133,7 +135,7 @@ function App() {
 
     useEffect(() => {
         if (user && isNotEmpty(volunteerId) && !offline) {
-            api.getUserInfo(user.uid, volunteerId).then((uInfo) => {
+            api.getUserInfo().then((uInfo) => {
                 setUserInfo(uInfo);
             });
         }
@@ -186,7 +188,7 @@ function App() {
                             showToast('success', 'Success', 'Notification permission granted');
                             setNotificationPermission("granted");
                             if (user && isNotEmpty(volunteerId)) {
-                                api.getUserInfo(user?.uid, volunteerId).then(uInfo => setUserInfo(uInfo));
+                                api.getUserInfo().then(uInfo => setUserInfo(uInfo));
                             }
                         });
                     }
@@ -198,7 +200,7 @@ function App() {
                 const db = await getDB();
                 await db.put('notifications', {
                     id: Date.now() + "",
-                    title: "ממתינים שיבוצים" ,
+                    title: "ממתינים שיבוצים",
                     body: "יש עוד 5 משפחות שטרם שובצו להם מבשלים.ות",
                     read: 0,
                     timestamp: Date.now(),
@@ -217,7 +219,7 @@ function App() {
             <Header userName={userInfo ? userInfo.firstName : ""} logoSrc={header} settingsComponent={settings} />
             {readyToInstall && !isDev && <PWAInstructions />}
             {rejected && <div>זיהוי נכשל - צור קשר עם העמותה</div>}
-            {showProgress && <ProgressBar mode="indeterminate" style={{ height: '6px' }}></ProgressBar>}
+            {showProgress && <InProgress />}
             {appReady && <TabView dir='rtl'>
                 <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
                     <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />
@@ -228,6 +230,9 @@ function App() {
                 <TabPanel headerStyle={{ fontSize: 20 }} header="התחייבויות">
                     <ExistingRegistrationsComponent />
                 </TabPanel>
+                {userInfo?.isAdmin && userInfo.districts?.length && <TabPanel headerStyle={{ fontSize: 20 }} header="גרפים">
+                    <Stats userInfo={userInfo} />
+                </TabPanel>}
             </TabView>}
         </div>
     );

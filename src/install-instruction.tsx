@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import iosIcon from './media/ios-share.png'; // Add your ios icon in the assets folder
 import { Button } from 'primereact/button';
-import { ProgressBar } from 'primereact/progressbar';
+
+import { InProgress } from './common-ui';
 
 let deferredInstallPrompt: any = undefined;
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -29,7 +30,7 @@ const PWAInstructions: React.FC = () => {
 
     if (installInProgress) {
         return <div>
-            <ProgressBar mode="indeterminate" style={{ height: '6px' }}></ProgressBar>;
+            <InProgress />
             <div>התקנה בתהליך...</div>
         </div>
     }

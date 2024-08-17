@@ -8,8 +8,9 @@ import dayjs from 'dayjs';
 import { Family, getFamilyDetails, getUserRegistrations } from './api';
 import { SelectButton } from 'primereact/selectbutton';
 import { RegistrationRecord } from './types';
-import { ProgressBar } from 'primereact/progressbar';
+
 import { FamilyDetails } from './famility-registration-details';
+import { InProgress } from './common-ui';
 
 const Filters = {
     ALL: 1,
@@ -53,7 +54,7 @@ export function ExistingRegistrationsComponent() {
 
     if (!registrations) return (
         <>
-            <ProgressBar mode="indeterminate" style={{ height: '6px' }}></ProgressBar>
+            <InProgress />
             <div>נתונים נטענים...</div>
         </>
     );
@@ -84,7 +85,7 @@ export function ExistingRegistrationsComponent() {
                 />
             </div>
 
-            {showProgress && <ProgressBar mode="indeterminate" style={{ height: '6px' }}></ProgressBar>}
+            {showProgress && <InProgress/>}
             <div className="surface-ground px-4 py-5 md:px-6 lg:px-8">
                 <div className="grid">
                     {registrationsToShow?.length ?

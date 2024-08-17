@@ -9,7 +9,8 @@ import 'primeicons/primeicons.css';
 import OneNotification from './one-notification';
 import "./registration.css";
 import { FamilyDetails } from './famility-registration-details';
-import { ProgressBar } from 'primereact/progressbar';
+
+import { InProgress } from './common-ui';
 
 interface CitySelectionProps {
     cities: string[];
@@ -102,7 +103,7 @@ const RegistrationComponent: React.FC = () => {
 
     if (!families) return (
         <>
-            <ProgressBar mode="indeterminate" style={{ height: '6px' }}></ProgressBar>
+            <InProgress />
             <div>נתונים נטענים...</div>
         </>
     );

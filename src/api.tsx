@@ -19,7 +19,9 @@ import {
 import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
-import { Collections, FamilityIDPayload, NotificationUpdatePayload, RegistrationRecord, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
+import {  GetDemandStatPayload, NotificationUpdatePayload, RegistrationRecord, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
+
+
 
 const firebaseConfig = {
     apiKey: "AIzaSyDC7Yz2zm6DB7WgQHZ_HDojIHzkHwXU4hk",
@@ -67,33 +69,9 @@ export function login() {
         });
 }
 
-export function getUserInfo(uid: string, volunteerId: string): Promise<UserInfo> {
-    let docRef = doc(db, Collections.Users, volunteerId);
-    const unknwon = {
-        firstName: "לא ידוע",
-        lastName: "",
-        notificationOn: false,
-        notificationToken: undefined,
-    }
-
-    return getDoc(docRef).then(doc => {
-        const data = doc.data();
-        if (!doc.exists || !data) {
-            console.log(doc)
-            return unknwon;
-        }
-        return ({
-            notificationToken: data.notificationTokens?.find((tokenInfo: TokenInfo) => tokenInfo.uid === uid),
-            firstName: data.firstName,
-            lastName: data.lastName,
-            notificationOn: data.notificationOn === true,
-        });
-    })
-        .catch((err) => {
-            console.log(err.message);
-            //throw new Error("חשבונך אינו פעיל - יש לפנות למנהל המערכת")
-            return unknwon
-        });
+export function getUserInfo(): Promise<UserInfo> {
+    const getUserInfoFunc = httpsCallable(functions, 'GetUserInfo');
+    return getUserInfoFunc().then(res => res.data as UserInfo);
 }
 
 
@@ -238,3 +216,15 @@ export function getUserRegistrations(): Promise<RegistrationRecord[]> {
     }));
 }
 
+
+export async function getDemandStats(dateRange: [Date | null, Date | null], districts: string []): Promise<StatsData> {
+    if (!dateRange[0] || !dateRange[1]) return { totalDemands: [0], fulfilledDemands: [0], labels: [""] }
+
+    const getDemandStatsFunc = httpsCallable(functions, 'GetDemandStats');
+    const payload = {
+        from: dateRange[0].toUTCString(),
+        to: dateRange[1].toUTCString(),
+        districts
+    } as GetDemandStatPayload;
+    return getDemandStatsFunc(payload).then(res => res.data as StatsData);
+}

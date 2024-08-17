@@ -1,5 +1,6 @@
 export const Collections = {
     Users: "users",
+    Admins: "admins",
 };
 
 export interface NotificationUpdatePayload {
@@ -32,6 +33,8 @@ export interface UserInfo {
     firstName: string,
     lastName: string,
     notificationOn: boolean,
+    isAdmin: boolean,
+    districts?:{id:string, name:string}[],
 }
 
 export interface LoginInfo {
@@ -59,4 +62,17 @@ export interface RegistrationRecord {
     familyLastName: string;
     weekday: string;
     familyId: string;
+}
+
+
+export interface StatsData {
+    totalDemands: number[];
+    fulfilledDemands: number[];
+    labels: string[];
+}
+
+export interface GetDemandStatPayload {
+    districts: string[];
+    from: string;
+    to: string;
 }

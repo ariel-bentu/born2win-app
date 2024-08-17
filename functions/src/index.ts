@@ -13,7 +13,7 @@ import dayjs = require("dayjs");
 import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
-import { Collections, FamilityIDPayload, NotificationUpdatePayload, TokenInfo, UpdateUserLoginPayload, UserRecord } from "../../src/types";
+import { Collections, FamilityIDPayload, GetDemandStatPayload, NotificationUpdatePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord } from "../../src/types";
 import axios from "axios";
 import express = require("express");
 import crypto = require("crypto");
@@ -129,73 +129,102 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
     }
 });
 
-exports.UpdateNotification = onCall({ cors: true }, request => {
-    if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Request had invalid credentials.");
-    }
-    const uid = request.auth.uid;
-    if (!uid) {
-        throw new HttpsError("unauthenticated", "Request is missing uid.");
-    }
-    const unp = request.data as NotificationUpdatePayload;
+exports.UpdateNotification = onCall({ cors: true }, async (request) => {
+    const doc = await authenticate(request);
+    const uid = request.auth?.uid || "";
+    if (doc) {
+        const unp = request.data as NotificationUpdatePayload;
+        let dirty = false;
 
+        const update: any = {};
+        if (unp.notificationOn !== undefined) {
+            update.notificationOn = unp.notificationOn;
+            dirty = true;
+        }
 
-    return findUserByUID(uid).then(doc => {
-        if (doc) {
-            let dirty = false;
-
-            const update: any = {};
-            if (unp.notificationOn !== undefined) {
-                update.notificationOn = unp.notificationOn;
+        if (unp.tokenInfo !== undefined) {
+            if (doc.data().notificationTokens === undefined || doc.data().notificationTokens.length === 0) {
+                update.notificationTokens = [{ ...unp.tokenInfo, uid }];
                 dirty = true;
-            }
-
-            if (unp.tokenInfo !== undefined) {
-                if (doc.data().notificationTokens === undefined || doc.data().notificationTokens.length === 0) {
-                    update.notificationTokens = [{ ...unp.tokenInfo, uid }];
-                    dirty = true;
+            } else {
+                let currNotificationTokens = doc.data().notificationTokens;
+                if (currNotificationTokens.find((nt: TokenInfo) => nt.uid === uid && nt.token === unp.tokenInfo.token)) {
+                    // this token already exists for this uid - do nothing
                 } else {
-                    let currNotificationTokens = doc.data().notificationTokens;
-                    if (currNotificationTokens.find((nt: TokenInfo) => nt.uid === uid && nt.token === unp.tokenInfo.token)) {
-                        // this token already exists for this uid - do nothing
-                    } else {
-                        currNotificationTokens = currNotificationTokens.filter((nt: TokenInfo) => nt.uid !== uid);
-                        currNotificationTokens.push({ ...unp.tokenInfo, uid });
-                        update.notificationTokens = currNotificationTokens;
-                        dirty = true;
-                    }
+                    currNotificationTokens = currNotificationTokens.filter((nt: TokenInfo) => nt.uid !== uid);
+                    currNotificationTokens.push({ ...unp.tokenInfo, uid });
+                    update.notificationTokens = currNotificationTokens;
+                    dirty = true;
                 }
             }
-            if (dirty) {
-                return doc.ref.update(update);
-            }
         }
-        return;
-    });
+        if (dirty) {
+            return doc.ref.update(update);
+        }
+    }
+    return;
 });
 
-exports.TestNotification = onCall({ cors: true }, request => {
-    if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Request had invalid credentials.");
-    }
-    const uid = request.auth.uid;
-    if (!uid) {
-        throw new HttpsError("unauthenticated", "Request is missing uid.");
-    }
 
-    return findUserByUID(uid).then(doc => {
-        if (doc) {
-            return getWebTokens([doc.id]).then(devices => {
-                const displayName = doc.data().firstName + " " + doc.data().lastName;
-                logger.info("Test notification for: ", doc.id, displayName, "tokens: ", devices);
+exports.GetUserInfo = onCall({ cors: true }, getUserInfo);
 
-                return sendNotification("Born2Win", "הודעת בדיקה ל:\n" + displayName, {
-                    navigateTo: "/#2",
-                }, devices);
-            });
-        }
-        return;
-    });
+async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
+    const doc = await authenticate(request);
+    if (doc) {
+        const data = doc.data();
+        const response = {
+            id: doc.id,
+            isAdmin: false,
+            notificationToken: data.notificationTokens?.find((tokenInfo: TokenInfo) => tokenInfo.uid === request.auth?.uid),
+            firstName: data.firstName,
+            lastName: data.lastName,
+            notificationOn: data.notificationOn,
+        } as UserInfo;
+
+        return db.collection(Collections.Admins).doc(doc.id).get().then(async (adminDoc) => {
+            if (adminDoc.exists) {
+                response.isAdmin = true;
+                const allDistricts = await getDestricts();
+                if (adminDoc.data()?.districts.length > 0 && adminDoc.data()?.districts[0] === "all") {
+                    response.districts = allDistricts.map(d => ({ id: d.id, name: d.name }));
+                } else {
+                    response.districts = [];
+                    adminDoc.data()?.districts?.forEach((did: string) => {
+                        const district = allDistricts.find(d => d.id === did);
+                        if (district) {
+                            response.districts?.push({
+                                id: did,
+                                name: district.id,
+                            });
+                        }
+                    });
+                }
+            }
+            return response;
+        });
+    }
+    return {
+        isAdmin: false,
+        firstName: "לא ידוע",
+        lastName: "",
+        notificationOn: false,
+        notificationToken: undefined,
+    };
+}
+
+exports.TestNotification = onCall({ cors: true }, async (request) => {
+    const doc = await authenticate(request);
+    if (doc) {
+        return getWebTokens([doc.id]).then(devices => {
+            const displayName = doc.data().firstName + " " + doc.data().lastName;
+            logger.info("Test notification for: ", doc.id, displayName, "tokens: ", devices);
+
+            return sendNotification("Born2Win", "הודעת בדיקה ל:\n" + displayName, {
+                navigateTo: "/#2",
+            }, devices);
+        });
+    }
+    return;
 });
 
 
@@ -336,6 +365,7 @@ async function authenticate(request: CallableRequest<any>): Promise<QueryDocumen
 let districts: District[] | undefined = undefined;
 interface District {
     id: string;
+    name: string;
     base_id: string;
     demandsTable: string;
     familiesTable: string;
@@ -355,6 +385,7 @@ async function getDestricts(): Promise<District[]> {
         });
         districts = districtResponse.data.records.map((r: any) => ({
             id: r.id,
+            name: r.fields["מחוז"],
             base_id: r.fields.base_id,
             demandsTable: r.fields.table_id,
             familiesTable: r.fields.table_familyid,
@@ -659,3 +690,73 @@ function getRegistrationLink(userId: string, otp: string): string {
 //         logger.info("error test sync", e);
 //     }
 // });
+
+
+/**
+ * ANALITICS
+ */
+exports.GetDemandStats = onCall({ cors: true }, async (request): Promise<StatsData> => {
+    const userInfo = await getUserInfo(request);
+    if (userInfo.isAdmin) {
+        const gdsp = request.data as GetDemandStatPayload;
+        const totalDemandsMap: { [key: string]: number } = {};
+        const fulfilledDemandsMap: { [key: string]: number } = {};
+
+        const startDate = dayjs(gdsp.from).startOf("day");
+        const endDate = dayjs(gdsp.to).endOf("day");
+        const apiKey = born2winApiKey.value();
+        for (let i = 0; i < gdsp.districts.length; i++) {
+            const requestedDistrict = gdsp.districts[i];
+            // Verify the user is admin of that district
+            if (userInfo.districts?.find((d: any) => d.id === requestedDistrict)) {
+                // find district info
+                const district = (await getDestricts()).find(d => d.id === requestedDistrict);
+                if (district) {
+                    const url = `https://api.airtable.com/v0/${district.base_id}/${district.demandsTable}`;
+                    let offset = undefined;
+
+                    do {
+                        const response: any = await axios.get<{ records: any[] }>(url, {
+                            headers: {
+                                Authorization: `Bearer ${apiKey}`,
+                            },
+                            params: {
+                                fields: ["תאריך", "זמינות שיבוץ", "volunteer_id"],
+                                offset: offset,
+                                filterByFormula: `AND(IS_AFTER({תאריך}, '${startDate.format("YYYY-MM-DD")}'), IS_BEFORE({תאריך}, '${endDate.format("YYYY-MM-DD")}'))`,
+                            },
+                        });
+
+                        const records = response.data.records;
+                        offset = response.data.offset;
+
+                        records.forEach((record: any) => {
+                            const weekLabel = dayjs(record.fields["תאריך"]).startOf("week").format("YYYY-MM-DD");
+
+                            if (!totalDemandsMap[weekLabel]) {
+                                totalDemandsMap[weekLabel] = 0;
+                                fulfilledDemandsMap[weekLabel] = 0;
+                            }
+
+                            totalDemandsMap[weekLabel] += 1;
+
+                            if (record.fields["זמינות שיבוץ"] === "תפוס" && record.fields.volunteer_id) {
+                                fulfilledDemandsMap[weekLabel] += 1;
+                            }
+                        });
+                    } while (offset);
+                }
+            }
+        }
+        const labels = Object.keys(totalDemandsMap).sort();
+        const totalDemands = labels.map(label => totalDemandsMap[label]);
+        const fulfilledDemands = labels.map(label => fulfilledDemandsMap[label]);
+
+        return {
+            totalDemands,
+            fulfilledDemands,
+            labels,
+        };
+    }
+    return { totalDemands: [0], fulfilledDemands: [0], labels: [""] };
+});

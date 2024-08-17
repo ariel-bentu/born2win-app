@@ -22,7 +22,7 @@ import PWAInstructions from './install-instruction';
 import { ExistingRegistrationsComponent } from './existing-registration-component';
 
 import { Stats } from './charts';
-import { InProgress } from './common-ui';
+import { InProgress, RegisterToNotification } from './common-ui';
 
 const UID_STORAGE_KEY = "born2win_uid";
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
@@ -172,6 +172,20 @@ function App() {
         }
     };
 
+    const onAllowNotification = () => {
+        api.requestWebPushToken().then(token => {
+            if (token) {
+                api.updateUserNotification(true, token, isSafari).then(() => {
+                    showToast('success', 'נשמר בהצלחה', 'הודעות אושרו בהצלחה');
+                    setNotificationPermission("granted");
+                    if (user && isNotEmpty(volunteerId)) {
+                        api.getUserInfo().then(uInfo => setUserInfo(uInfo));
+                    }
+                });
+            }
+        });
+    }
+
     const settings = <div style={{ display: "flex", flexDirection: "column", textAlign: "left", alignItems: "flex-start" }}>
         <div><strong>Technical Status:</strong></div>
         <div>Environment: {isPWA ? "PWA" : "Browser"}</div>
@@ -181,22 +195,9 @@ function App() {
         <div>Notification Permission: {notificationPermission}</div>
         <div>Notification Token: {userInfo?.notificationToken ? "Exists: " + userInfo.notificationToken.token.substring(0, 5) + "..." : "Missing"}</div>
         <div style={{ display: "flex", flexDirection: "column", width: 200, padding: 10 }}>
-            {isPWA && <Button onClick={() => {
-                api.requestWebPushToken().then(token => {
-                    if (token) {
-                        api.updateUserNotification(true, token, isSafari).then(() => {
-                            showToast('success', 'Success', 'Notification permission granted');
-                            setNotificationPermission("granted");
-                            if (user && isNotEmpty(volunteerId)) {
-                                api.getUserInfo().then(uInfo => setUserInfo(uInfo));
-                            }
-                        });
-                    }
-                });
-            }}>Allow Notification</Button>}
 
-            {isPWA && <Button onClick={() => api.sendTestNotification()} disabled={!userInfo?.notificationToken}>שלח הודעת בדיקה</Button>}
-            <Button onClick={async () => {
+            {/* {isPWA && <Button onClick={() => api.sendTestNotification()} disabled={!userInfo?.notificationToken}>שלח הודעת בדיקה</Button>} */}
+            {/* <Button onClick={async () => {
                 const db = await getDB();
                 await db.put('notifications', {
                     id: Date.now() + "",
@@ -206,7 +207,7 @@ function App() {
                     timestamp: Date.now(),
                 });
                 countUnreadNotifications().then(updateUnreadCount);
-            }} >Add Test DATA</Button>
+            }} >Add Test DATA</Button> */}
         </div>
     </div>
 
@@ -216,10 +217,16 @@ function App() {
     return (
         <div className="App">
             <Toast ref={toast} />
-            <Header userName={userInfo ? userInfo.firstName : ""} logoSrc={header} settingsComponent={settings} />
+            <Header userName={userInfo ? userInfo.firstName : ""}
+                logoSrc={header}
+                settingsComponent={settings}
+                onRefreshTokenClick={onAllowNotification}
+                onSendTestNotificationClick={userInfo?.notificationToken ? api.sendTestNotification : undefined}
+            />
             {readyToInstall && !isDev && <PWAInstructions />}
             {rejected && <div>זיהוי נכשל - צור קשר עם העמותה</div>}
             {showProgress && <InProgress />}
+            {appReady && !userInfo?.notificationToken && <RegisterToNotification onClick={onAllowNotification} />}
             {appReady && <TabView dir='rtl'>
                 <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
                     <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />

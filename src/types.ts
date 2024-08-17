@@ -3,6 +3,8 @@ export const Collections = {
     Admins: "admins",
 };
 
+export type onClickEvent = (e: any) => void;
+
 export interface NotificationUpdatePayload {
     notificationOn?: boolean;
     tokenInfo: TokenInfo;
@@ -34,7 +36,7 @@ export interface UserInfo {
     lastName: string,
     notificationOn: boolean,
     isAdmin: boolean,
-    districts?:{id:string, name:string}[],
+    districts?: { id: string, name: string }[],
 }
 
 export interface LoginInfo {
@@ -52,7 +54,7 @@ export interface UserRecord {
     loginInfo?: LoginInfo[],
     notificationTokens?: TokenInfo[];
     lastModified: string;
-    otp?:string;
+    otp?: string;
 }
 
 export interface RegistrationRecord {

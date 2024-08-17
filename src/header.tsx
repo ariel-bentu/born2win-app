@@ -1,15 +1,37 @@
 import React, { useState } from "react";
 import { Sidebar } from "primereact/sidebar";
 import { Button } from "primereact/button";
+import { onClickEvent } from "./types";
+import { MenuItem } from "primereact/menuitem";
+import { PanelMenu } from "primereact/panelmenu";
+import "./header.css";
 
 interface HeaderProps {
-    userName: string; 
+    userName: string;
     logoSrc: string;
     settingsComponent: JSX.Element;
+    onRefreshTokenClick: onClickEvent;
+    onSendTestNotificationClick?: onClickEvent;
 }
 
-function Header({ userName, logoSrc, settingsComponent }: HeaderProps) {
+function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onSendTestNotificationClick }: HeaderProps) {
     const [sidebarVisible, setSidebarVisible] = useState(false);
+
+    const items: MenuItem[] = [
+        {
+            label: 'רענן טוקן הודעות',
+            icon: 'pi pi-refresh',
+            command:  onRefreshTokenClick,
+            className: "settingMenuItem",
+            
+        },
+        {
+            label: 'שלח הודעות בדיקה',
+            icon: 'pi pi-envelope',
+            disabled: !onSendTestNotificationClick,
+            command:  onSendTestNotificationClick,
+        }
+    ];
 
     return (
         <header className="flex justify-content-between align-items-center p-3 shadow-2 "
@@ -25,12 +47,14 @@ function Header({ userName, logoSrc, settingsComponent }: HeaderProps) {
             <Sidebar
                 visible={sidebarVisible}
                 onHide={() => setSidebarVisible(false)}
-                className="p-sidebar-md"
+                className="settings-sidebar"
                 position={"right"}
                 style={{ width: "60%" }}
             >
+                <h2 className="settings-title">הגדרות</h2>
+                <PanelMenu model={items} className="settings-menu" />
                 <div className="p-3">
-                {settingsComponent}
+                    {settingsComponent}
                 </div>
             </Sidebar>
 

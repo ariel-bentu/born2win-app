@@ -50,3 +50,11 @@
   height: 6px;
   border-radius: 3px;
 }
+
+.settingMenuItem {
+  /* display: flex; */
+  text-align: right;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}

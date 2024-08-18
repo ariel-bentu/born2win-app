@@ -5,7 +5,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { setGlobalOptions, logger } from "firebase-functions/v2";
 
 // Dependencies for the addMessage function.
-import { getFirestore, FieldValue, QueryDocumentSnapshot, DocumentSnapshot } from "firebase-admin/firestore";
+import { getFirestore, FieldValue, QueryDocumentSnapshot, DocumentSnapshot, FieldPath } from "firebase-admin/firestore";
 // const sanitizer = require("./sanitizer");
 // import { initializeApp } from "firebase-admin";
 import admin = require("firebase-admin");
@@ -238,14 +238,23 @@ interface DeviceInfoUpdate {
     tokensInfos: TokenInfo[],
 }
 
-async function getWebTokens(to: string[]) {
+/**
+ * getWebTokens
+ * @param to may be an array volunteerIds, or a string "all", or a string with this format: "district:<districtId>"
+ *
+ * the users are filtered to only active users and only those who notificationOn=true
+ * @returns array of DeviceInfo
+ */
+
+async function getWebTokens(to: string | string[]): Promise<DeviceInfo[]> {
     const webPushDevices = [] as DeviceInfo[];
+    const usersRef = db.collection("users").where("active", "==", true).where("notificationOn", "==", true);
 
-    const users = await db.collection(Collections.Users).get();
-
-    to.forEach(sentToUser => {
-        if (sentToUser === "all") {
-            users.docs.map(user => {
+    if (typeof to === "string") {
+        // Case 1: "all" - select all active users
+        if (to === "all") {
+            const activeUsersSnapshot = await usersRef.get();
+            activeUsersSnapshot.forEach(user => {
                 user.data().notificationTokens?.forEach((nt: TokenInfo) => {
                     webPushDevices.push({
                         ownerId: user.id,
@@ -253,20 +262,61 @@ async function getWebTokens(to: string[]) {
                     });
                 });
             });
-        } else {
-            const user = users.docs.find(u => u.id === sentToUser);
-            if (user) {
+
+            // Case 2: district:xyz - select users based on district
+        } else if (to.startsWith("district:")) {
+            const districtId = to.split(":")[1];
+            const districtUsersSnapshot = await usersRef.where("mahoz", "==", districtId).get();
+            districtUsersSnapshot.forEach(user => {
                 user.data().notificationTokens?.forEach((nt: TokenInfo) => {
                     webPushDevices.push({
                         ownerId: user.id,
                         tokenInfo: nt,
                     });
                 });
-            }
+            });
         }
-    });
+    } else if (Array.isArray(to)) {
+        // Case 3: Array of doc-ids
+
+        if (to.length < 50) {
+            // Chunk doc-ids and perform a batched query
+            const chunks = chunkArray(to, 10); // Assuming you want to query in chunks of 10
+            for (const chunk of chunks) {
+                const chunkedUsersSnapshot = await usersRef.where(FieldPath.documentId(), "in", chunk).get();
+                chunkedUsersSnapshot.forEach(user => {
+                    user.data().notificationTokens?.forEach((nt: TokenInfo) => {
+                        webPushDevices.push({
+                            ownerId: user.id,
+                            tokenInfo: nt,
+                        });
+                    });
+                });
+            }
+        } else {
+            // Query all active users if array length >= 50
+            const activeUsersSnapshot = await usersRef.get();
+            activeUsersSnapshot.forEach(user => {
+                user.data().notificationTokens?.forEach((nt: TokenInfo) => {
+                    webPushDevices.push({
+                        ownerId: user.id,
+                        tokenInfo: nt,
+                    });
+                });
+            });
+        }
+    }
 
     return webPushDevices;
+}
+
+// Utility function to chunk an array into smaller arrays
+function chunkArray(array: any[], chunkSize: number) {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+        chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
 }
 
 const sendNotification = (title: string, body: string, data: any, devices: DeviceInfo[]) => {
@@ -595,11 +645,17 @@ async function syncBorn2WinUsers(sinceDate?: any) {
     let countActive = 0;
     const airTableMainBase = mainBase.value();
     const apiKey = born2winApiKey.value();
+    let notifyForNewUsers = true;
     if (!sinceDate) {
         sinceDate = dayjs().subtract(25, "hour");
+        notifyForNewUsers = false;
     }
     const now = dayjs().format("YYYY-MM-DD HH:mm:ss[z]");
-    const newLinksToAdmin = [] as string[];
+    const newLinksToAdmin = [] as {
+        name: string,
+        phone: string,
+        link: string,
+    }[];
 
     const url = `https://api.airtable.com/v0/${airTableMainBase}/מתנדבים`;
     const batch = db.batch();
@@ -612,7 +668,7 @@ async function syncBorn2WinUsers(sinceDate?: any) {
             },
             params: {
                 filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
-                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל"],
+                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון"],
                 offset: offset,
             },
         });
@@ -636,6 +692,7 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                 firstName: user.fields["שם פרטי"],
                 lastName: user.fields["שם משפחה"],
                 lastModified: now,
+                phone: user.fields["טלפון"],
             } as UserRecord;
 
             if (userDoc && userDoc.exists) {
@@ -643,7 +700,8 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                 if (prevUserRecord &&
                     userRecord.active === prevUserRecord.active &&
                     userRecord.firstName === prevUserRecord.firstName &&
-                    userRecord.lastName === prevUserRecord.lastName) {
+                    userRecord.lastName === prevUserRecord.lastName &&
+                    userRecord.phone === prevUserRecord.phone) {
                     // No change!
                     continue;
                 }
@@ -662,16 +720,24 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                 batch.create(docRef, userRecord);
             }
             if (userRecord.otp) {
-                newLinksToAdmin.push(getRegistrationLink(userId, userRecord.otp));
+                newLinksToAdmin.push({
+                    name: userRecord.firstName + " " + userRecord.lastName,
+                    phone: userRecord.phone,
+                    link: getRegistrationLink(userId, userRecord.otp),
+                });
             }
         }
     } while (offset);
 
     return batch.commit().then(() => {
         logger.info("Sync Users: obsered modified:", count, "observed Active", countActive, "registrationLinks", newLinksToAdmin, "duplicates:", duplicates);
-        if (newLinksToAdmin.length > 0) {
+        if (notifyForNewUsers && newLinksToAdmin.length > 0) {
             return getWebTokens(["arielb"]).then(tokens => {
-                return sendNotification("New Link", newLinksToAdmin[0], undefined, tokens);
+                // send a notification for each new user
+                return Promise.all(newLinksToAdmin.map(link => sendNotification("לינק למשתמש", `שם: ${link.name}
+טלפון: ${link.phone}
+לינק לשליחה למשתמש: ${link.link}
+`, undefined, tokens)));
             });
         }
         return;

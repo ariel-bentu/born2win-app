@@ -16,6 +16,22 @@ import "./notifications-component.css";
 import { Menu } from 'primereact/menu';
 import { MenuItem } from 'primereact/menuitem';
 import dayjs from 'dayjs';
+import isToday from 'dayjs/plugin/isToday';
+import isYesterday from 'dayjs/plugin/isYesterday';
+
+dayjs.extend(isToday);
+dayjs.extend(isYesterday);
+
+
+function getNiceDateTime(d: number) {
+    const theDate = dayjs(d);
+    if (theDate.isToday()) {
+        return "היום ב " + theDate.format("HH:mm");
+    } else if (theDate.isYesterday()) {
+        return "אתמול ב " + theDate.format("HH:mm");
+    }
+    return theDate.format("[יום ]dddd, D [ב]MMMM HH:mm");
+}
 
 interface NotificationsComponentProps {
     updateUnreadCount: (count: number) => void;
@@ -42,7 +58,7 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
     const fetchNotifications = async () => {
         try {
             const allNotifications = await readAllNotifications();
-            allNotifications.sort((n1, n2)=>n2.timestamp - n1.timestamp);
+            allNotifications.sort((n1, n2) => n2.timestamp - n1.timestamp);
             setNotifications(allNotifications);
 
 
@@ -75,7 +91,7 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
         }
     };
 
-    const deleteAll = (event:React.SyntheticEvent) => {
+    const deleteAll = (event: React.SyntheticEvent) => {
         confirmPopup({
             target: event.currentTarget as any,
             message: 'האם למחוק את כל ההודעות?',
@@ -89,7 +105,7 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                     console.error('Error deleting all notifications:', error);
                 }
             }
-        });   
+        });
     }
 
     const markAllAsRead = () => {
@@ -105,11 +121,11 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
     };
 
     const contextMenu = [
-        { label: 'מחיקת כל ההודעות', icon: 'pi pi-fw pi-trash', command: (e)=>deleteAll(e.originalEvent) },
-        { label: 'סימון הכל כנקרא', icon: 'pi pi-fw pi-eye', command:markAllAsRead },
+        { label: 'מחיקת כל ההודעות', icon: 'pi pi-fw pi-trash', command: (e) => deleteAll(e.originalEvent) },
+        { label: 'סימון הכל כנקרא', icon: 'pi pi-fw pi-eye', command: markAllAsRead },
     ] as MenuItem[];
 
-    const notificationToShow = notifications?.filter(n=>filter === Filters.ALL || n.read==NotificationStatus.Unread);
+    const notificationToShow = notifications?.filter(n => filter === Filters.ALL || n.read == NotificationStatus.Unread);
 
     return (
         <div>
@@ -133,19 +149,19 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
             <div className="surface-ground px-4 py-5 md:px-6 lg:px-8">
                 <div className="grid">
                     {notificationToShow?.length ?
-                     notificationToShow.map(notification => (
-                        <OneNotification
-                            key={notification.id}
-                            title={notification.title}
-                            body={notification.body}
-                            footer={dayjs(notification.timestamp).format("[יום ]dddd, D [ב]MMMM")}
-                            unread={notification.read == NotificationStatus.Unread}
-                            onDelete={() => deleteOne(notification.id)}
-                            onRead={() => markAsRead(notification.id)}
-                        />
-                    )):
-                    <div className='no-messages'>אין הודעות</div>
-                }
+                        notificationToShow.map(notification => (
+                            <OneNotification
+                                key={notification.id}
+                                title={notification.title}
+                                body={notification.body}
+                                footer={getNiceDateTime(notification.timestamp)}
+                                unread={notification.read == NotificationStatus.Unread}
+                                onDelete={() => deleteOne(notification.id)}
+                                onRead={() => markAsRead(notification.id)}
+                            />
+                        )) :
+                        <div className='no-messages'>אין הודעות</div>
+                    }
 
                 </div>
             </div>

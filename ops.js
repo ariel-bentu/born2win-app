@@ -11,6 +11,11 @@ const serviceAccountPath = path.join(homeDirectory, 'Library', 'CloudStorage', '
 
 var admin = require("firebase-admin");
 
+const {
+    FieldPath,
+    FieldValue,
+} = require("@google-cloud/firestore");
+
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccountPath),
@@ -39,7 +44,7 @@ async function fetchAllUsers() {
             },
             params: {
                 //filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${modifiedSince}')`,
-                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל"],
+                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון"],
                 offset: offset,
             }
         }).catch(e => console.log(e));
@@ -54,6 +59,7 @@ async function fetchAllUsers() {
                 firstName: user.fields["שם פרטי"],
                 lastName: user.fields["שם משפחה"],
                 mahoz: user.fields["מחוז"][0],
+                phone: user.fields["טלפון"],
                 volId: user.id,
             }
             //console.log("add", userId, userRecord);
@@ -99,12 +105,12 @@ async function testRegistrations() {
         const formula = encodeURIComponent(`{volunteer_id}='${volunteerId}'`);
         const userRegistrations = await axios.get(`https://api.airtable.com/v0/appLTxCrbOFaAjmtW/%D7%93%D7%A8%D7%99%D7%A9%D7%95%D7%AA%20%D7%9C%D7%A9%D7%99%D7%91%D7%95%D7%A6%D7%99%D7%9D?filterByFormula=${formula}&sort[0][field]=תאריך&sort[0][direction]=desc`
             , {
-            headers,
-        });
+                headers,
+            });
         return userRegistrations.data;
         //}
     }
     return [];
 }
 
-testRegistrations();
+//testRegistrations();

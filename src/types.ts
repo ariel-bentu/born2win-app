@@ -49,6 +49,7 @@ export interface UserRecord {
     active: boolean;
     firstName: string;
     lastName: string;
+    phone: string;
     uid?: string[];
     fingerpring?: string[];
     loginInfo?: LoginInfo[],

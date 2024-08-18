@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { TabView, TabPanel } from 'primereact/tabview';
 import { Button } from 'primereact/button';
 import { Badge } from 'primereact/badge';
@@ -10,7 +10,7 @@ import 'primeflex/primeflex.css';
 import './App.css';
 import * as api from './api';
 import { NextOrObserver, User } from 'firebase/auth';
-import { UserInfo } from './types';
+import { Cached, UserInfo } from './types';
 import { ClientJS } from 'clientjs';
 import NotificationsComponent from './notifications-component';
 import { getDB } from './db';
@@ -23,6 +23,7 @@ import { ExistingRegistrationsComponent } from './existing-registration-componen
 
 import { Stats } from './charts';
 import { InProgress, RegisterToNotification } from './common-ui';
+import dayjs from 'dayjs';
 
 const UID_STORAGE_KEY = "born2win_uid";
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
@@ -51,6 +52,28 @@ const fingerprint = client.getFingerprint() + "";
 const isNotEmpty = (val: string | null | undefined): val is string => {
     return !!val && val.length > 0;
 };
+
+let mealRequests = { fetchedTS: dayjs() } as Cached<api.Family[]>;
+
+const getCachedMealRequest = async (): Promise<api.Family[]> => {
+    if (mealRequests.inProgress) {
+        await mealRequests.inProgress;
+    }
+
+    // allow cache of 10 minutes
+    if (!mealRequests.data || mealRequests.fetchedTS.diff(dayjs(), "minutes") > 10) {
+        mealRequests.inProgress = api.getMealRequests();
+
+        return mealRequests.inProgress
+            .then((mr) => {
+                mealRequests.data = mr;
+                return mr;
+            })
+            .finally(() => mealRequests.inProgress = undefined);
+    }
+    return mealRequests.data;
+};
+
 
 function App() {
     const [user, setUser] = useState<User | null>(offline ? { uid: "123" } as any : null);
@@ -232,7 +255,7 @@ function App() {
                     <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />
                 </TabPanel>
                 <TabPanel headerStyle={{ fontSize: 20 }} header="רישום">
-                    <RegistrationComponent />
+                    <RegistrationComponent getCachedMealRequest={getCachedMealRequest} />
                 </TabPanel>
                 <TabPanel headerStyle={{ fontSize: 20 }} header="התחייבויות">
                     <ExistingRegistrationsComponent />

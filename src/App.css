@@ -58,3 +58,12 @@
   justify-content: space-between;
   width: 100%;
 }
+
+/* Flip the arrows for hebrew experience of the Calendar control */
+.p-calendar .p-datepicker .p-datepicker-prev {
+  transform: rotate(180deg);
+}
+
+.p-calendar .p-datepicker .p-datepicker-next {
+  transform: rotate(180deg);
+}

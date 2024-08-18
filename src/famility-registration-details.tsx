@@ -80,31 +80,33 @@ export function FamilyDetails({ family, onClose, detailsOnly }: FamilyDetailsPro
             </ul>
             {error && <div>תקלה בקריאת זמינות</div>}
             {!detailsOnly && <>
-                <h3>לבחירת תאריך:</h3>
-                <Calendar
-                    value={selectedDate}
-                    enabledDates={availableDates}
-                    onChange={(e) => {
-                        console.log("date selected", e.value)
-                        setSelectedDate(e.value)
-                    }}
-                    inline
-                    showButtonBar
-                    dateTemplate={dateTemplate}
-                    locale="he"
-                    //firstDayOfWeek={"Sunday"}
-                    monthNavigator
-                    minDate={minDate.toDate()}
-                //yearNavigator 
-                //yearRange="2020:2030" 
-                />
+                <div className="flex flex-column">
+                    <h3>לבחירת תאריך:</h3>
+                    <Calendar
+                        value={selectedDate}
+                        enabledDates={availableDates}
+                        onChange={(e) => {
+                            console.log("date selected", e.value)
+                            setSelectedDate(e.value)
+                        }}
+                        inline
+                        // showButtonBar
+                        dateTemplate={dateTemplate}
+                        locale="he"
+                        //firstDayOfWeek={"Sunday"}
+                        monthNavigator
+                        minDate={minDate.toDate()}
+                    //yearNavigator 
+                    //yearRange="2020:2030" 
+                    />
 
-                <Button
-                    disabled={!selectedDate}
-                    label="שבצו אותי"
-                    onClick={() => {
-                        alert("not implemented yet")
-                    }} className="mt-3" />
+                    <Button
+                        disabled={!selectedDate}
+                        label="שבצו אותי"
+                        onClick={() => {
+                            alert("not implemented yet")
+                        }} className="mt-3" />
+                </div>
             </>}
         </div>
     );

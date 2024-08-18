@@ -64,9 +64,11 @@ const FamilyList: React.FC<FamilyListProps> = ({ families, onFamilyClick }) => {
     );
 };
 
+interface RegistrationComponentProps {
+    getCachedMealRequest: () => Promise<Family[]>;
+}
 
-
-const RegistrationComponent: React.FC = () => {
+function RegistrationComponent({ getCachedMealRequest }: RegistrationComponentProps) {
     const [cities, setCities] = useState<string[]>([]);
     const [selectedCities, setSelectedCities] = useState<string[]>([]);
     const [families, setFamilies] = useState<Family[] | null>(null);
@@ -75,7 +77,7 @@ const RegistrationComponent: React.FC = () => {
     const [error, setError] = useState<any>(undefined);
 
     useEffect(() => {
-        getMealRequests().then((records: Family[]) => {
+        getCachedMealRequest().then((records: Family[]) => {
             setFamilies(records);
             setCities(getUniqueCities(records));
         }).catch(err => setError(err));

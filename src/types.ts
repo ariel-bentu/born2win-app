@@ -1,3 +1,5 @@
+import { Dayjs } from "dayjs";
+
 export const Collections = {
     Users: "users",
     Admins: "admins",
@@ -78,4 +80,10 @@ export interface GetDemandStatPayload {
     districts: string[];
     from: string;
     to: string;
+}
+
+export interface Cached<T> {
+    data: T | undefined;
+    fetchedTS: Dayjs;
+    inProgress?: Promise<T>;
 }

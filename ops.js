@@ -1,4 +1,4 @@
-require("dotenv").config({ path: "./functions/.env.born2win-1" });
+require("dotenv").config({ path: "./functions/.env.born2win-prod" });
 const os = require('os');
 const path = require('path');
 
@@ -7,7 +7,8 @@ const homeDirectory = os.homedir();
 const axios = require("axios");
 const dayjs = require("dayjs");
 
-const serviceAccountPath = path.join(homeDirectory, 'Library', 'CloudStorage', 'OneDrive-SAPSE', 'Documents', 'born2win', 'firebase', 'born2win-1-firebase-adminsdk-i4v9g-17dd373de0.json');
+const serviceAccountPath = path.join(homeDirectory, 'Library', 'CloudStorage', 'OneDrive-SAPSE', 'Documents', 'born2win', 'firebase', 'born2win-prod-firebase-adminsdk-dltch-7d0cd3c9f4.json');
+const manualUsersPath = path.join(homeDirectory, 'Library', 'CloudStorage', 'OneDrive-SAPSE', 'Documents', 'born2win', 'users.json');
 
 var admin = require("firebase-admin");
 
@@ -28,6 +29,8 @@ const baseId = process.env.BORM2WIN_MAIN_BASE;
 const apiKey = process.env.BORN2WIN_API_KEY;
 
 
+const manualUsers = require(manualUsersPath);
+
 async function fetchAllUsers() {
     let offset = null;
     let count = 0;
@@ -44,7 +47,7 @@ async function fetchAllUsers() {
             },
             params: {
                 //filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${modifiedSince}')`,
-                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון"],
+                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "אמייל", "manychat_id"],
                 offset: offset,
             }
         }).catch(e => console.log(e));
@@ -62,12 +65,42 @@ async function fetchAllUsers() {
                 phone: user.fields["טלפון"],
                 volId: user.id,
             }
+
+            if (user.fields.manychat_id) {
+                userRecord.manychat_id = user.fields.manychat_id
+            }
+
+            if (user.fields["אמייל"]) {
+                userRecord.email = user.fields["אמייל"];
+            }
+
             //console.log("add", userId, userRecord);
             const docRef = db.collection("users").doc(userId);
-            batch.update(docRef, userRecord);
+            batch.create(docRef, userRecord);
         })
 
+
+
     } while (offset);
+
+    // Add manual users
+    manualUsers.forEach(mu => {
+        const userRecord = {
+            active: true,
+            firstName: mu.firstName,
+            lastName: mu.lastName,
+            mahoz: mu.mahoz,
+            phone: mu.phone,
+            volId: mu.id,
+        }
+        //console.log("add", userId, userRecord);
+        const docRef = db.collection("users").doc(mu.id);
+        batch.create(docRef, userRecord);
+    });
+
+
+
+
     batch.commit();
 
     console.log("count", count, "countActive", countActive);
@@ -75,6 +108,8 @@ async function fetchAllUsers() {
 
 
 //fetchAllUsers();
+
+
 let districts
 async function getDestricts() {
     if (!districts) {

@@ -19,22 +19,20 @@ import {
 import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
-import {  GetDemandStatPayload, NotificationUpdatePayload, RegistrationRecord, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
-
+import { GetDemandStatPayload, NotificationUpdatePayload, RegistrationRecord, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
 
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDC7Yz2zm6DB7WgQHZ_HDojIHzkHwXU4hk",
-    authDomain: "born2win-1.firebaseapp.com",
-    projectId: "born2win-1",
-    storageBucket: "born2win-1.appspot.com",
-    messagingSenderId: "244359776136",
-    appId: "1:244359776136:web:d7685c4a14714bd2129c3d",
-    measurementId: "G-YFG1BK8564"
+    apiKey: "AIzaSyDVO_fe3wOIp66it8AzF00oqjvyuI3HLWg",
+    authDomain: "born2win-prod.firebaseapp.com",
+    projectId: "born2win-prod",
+    storageBucket: "born2win-prod.appspot.com",
+    messagingSenderId: "126118201382",
+    appId: "1:126118201382:web:849e06fa978ee250d5fee7",
+    measurementId: "G-FWWBBZ7KNC"
 };
 
-const VAPID_KEY = "BKoNH8dLa3kdG_u6ZPU1AAM56o4SCqmhXYkTwGwpI8VIEHx5xAQek4HhKVpPTb-dhMBPwM761w6T57tPPisLQL8";
-
+const VAPID_KEY = "BN_C98WkGcuT-h8cwniGtDjPwlJ1K_iP12wCgWPNehBfDLUiXALz98jZCLTGug_uoWI8ryoGJT-QxKHJjHIqEUE";
 let app: FirebaseApp;
 let db: Firestore;
 let auth: Auth;
@@ -217,7 +215,7 @@ export function getUserRegistrations(): Promise<RegistrationRecord[]> {
 }
 
 
-export async function getDemandStats(dateRange: [Date | null, Date | null], districts: string []): Promise<StatsData> {
+export async function getDemandStats(dateRange: [Date | null, Date | null], districts: string[]): Promise<StatsData> {
     if (!dateRange[0] || !dateRange[1]) return { totalDemands: [0], fulfilledDemands: [0], labels: [""] }
 
     const getDemandStatsFunc = httpsCallable(functions, 'GetDemandStats');

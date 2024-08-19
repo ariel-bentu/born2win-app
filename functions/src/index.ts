@@ -22,7 +22,6 @@ import crypto = require("crypto");
 
 setGlobalOptions({
     region: "europe-west1",
-    serviceAccount: "firebase-adminsdk-i4v9g@born2win-1.iam.gserviceaccount.com",
 });
 admin.initializeApp();
 
@@ -320,8 +319,8 @@ function chunkArray(array: any[], chunkSize: number) {
 }
 
 const sendNotification = (title: string, body: string, data: any, devices: DeviceInfo[]) => {
-    const imageUrl = "https://born2win-1.web.app/favicon.ico";
-    const actionUrl = "https://born2win-1.web.app";
+    const imageUrl = "https://born2win-prod.web.app/favicon.ico";
+    const actionUrl = "https://born2win-prod.web.app";
     const message = {
         notification: {
             title,
@@ -745,7 +744,7 @@ async function syncBorn2WinUsers(sinceDate?: any) {
 }
 
 function getRegistrationLink(userId: string, otp: string): string {
-    return `https://born2win-1.web.app?vol_id=${userId}&otp=${otp}`;
+    return `https://born2win-prod.web.app?vol_id=${userId}&otp=${otp}`;
 }
 
 // exports.TestSync = onCall({ cors: true }, async () => {

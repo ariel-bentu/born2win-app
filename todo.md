@@ -10,9 +10,8 @@ V- האם מתנדבים מעיר אחת מבשלים גם למשפחות מעי
 - מה קורה אם מתנדב נאלץ לבטל?
   - 
 
-- סיפרת שיש מנהלי מחוז – מה הם עושים בהקשר הזה של לוודא שלא נותרות משפחות ללא מענה? אם בכלל זה תפקידם?
 - initial registration for 1000 people? האם לכולם יש מייל?
-- integration with manychat to migration
+  - integration with manychat to migration
 
 
 

@@ -3,6 +3,7 @@ import iosIcon from './media/ios-share.png'; // Add your ios icon in the assets 
 import { Button } from 'primereact/button';
 
 import { InProgress } from './common-ui';
+import { isAndroid, isIOS } from './App';
 
 let deferredInstallPrompt: any = undefined;
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -12,8 +13,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 
 const PWAInstructions: React.FC = () => {
-    const isAndroid = /android/i.test(navigator.userAgent);
-    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
     const [installComplete, setInstallComplete] = useState<boolean>(false);
     const [installInProgress, setInstallInProgress] = useState<boolean>(false);
     
@@ -41,16 +40,28 @@ const PWAInstructions: React.FC = () => {
             <div style={{ textAlign: 'center' }}>
                 {isAndroid && (
                     <div>
-                        <Button label="התקנה למסך הבית" onClick={async () => {
-                            if (deferredInstallPrompt !== null) {
+                        {deferredInstallPrompt && deferredInstallPrompt.prompt ? <Button label="התקנה למסך הבית" onClick={async () => {
+                            if (deferredInstallPrompt !== null && deferredInstallPrompt.prompt) {
                                 deferredInstallPrompt.prompt();
                                 const { outcome } = await deferredInstallPrompt.userChoice;
                                 if (outcome === 'accepted') {
                                     deferredInstallPrompt = undefined;
                                     setInstallInProgress(true);
                                 }
-                            }
-                        }} />
+                            } 
+                        }} />:
+                        <div>
+
+                        <p>
+                            <strong>הוראות:</strong>
+                        </p>
+                        <ol style={{ textAlign: 'right' }}>
+                            <li>ודאו שפתחתם את האתר בדפדפן chrome</li>
+                            <li>פתחו את תפריט הדפדפן. איקון שלוש נקודות <Button unstyled icon="pi pi-ellipsis-v" className="three-dot-menu"/>  או איקון שלושה קווים אופקיים <Button unstyled icon="pi pi-bars" className="three-dot-menu"/></li>
+                            <li>בחרו "הוספה למסך הבית".</li>
+                        </ol>
+                    </div>
+                    }
                     </div>
                 )}
                 {isIOS && (

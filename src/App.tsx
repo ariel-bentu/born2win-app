@@ -25,9 +25,9 @@ import { Stats } from './charts';
 import { InProgress, RegisterToNotification } from './common-ui';
 import dayjs from 'dayjs';
 
-const UID_STORAGE_KEY = "born2win_uid";
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
 
 export const testIsPWA = () => {
     // Check for iOS PWA
@@ -40,6 +40,9 @@ export const testIsPWA = () => {
 };
 
 export const isPWA = testIsPWA();
+export const isAndroid = /android/i.test(navigator.userAgent);
+export const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
 
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
@@ -84,6 +87,7 @@ function App() {
     const [notificationPermission, setNotificationPermission] = useState<string>((typeof Notification !== 'undefined') && Notification && Notification.permission || "unsupported");
     const [unreadCount, setUnreadCount] = useState(0);
     const [reloadNotifications, setReloadNotifications] = useState(0);
+    const [requestWebTokenInprogress, setRequestWebTokenInprogress] = useState<boolean>(false);
     const toast = useRef<Toast>(null);
 
     const onAuth: NextOrObserver<User> = (user: User | null) => {
@@ -120,8 +124,6 @@ function App() {
 
     useEffect(() => {
         if (user && user.uid) {
-            // const currentUid = localStorage.getItem(UID_STORAGE_KEY);
-
             const currentVolId = isPWA ? localStorage.getItem(VOL_ID_STORAGE_KEY) : undefined;
 
             if (!isPWA) {
@@ -133,8 +135,9 @@ function App() {
                         } else {
                             api.updateLoginInfo(userPairingRequest, fingerprint).then(() => {
                                 setReadyToInstall(true);
-                                // localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
-                                // localStorage.setItem(UID_STORAGE_KEY, user.uid);
+                                if (isAndroid) {
+                                    localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
+                                }
                             });
                         }
                     }
@@ -196,9 +199,10 @@ function App() {
     };
 
     const onAllowNotification = () => {
+        setRequestWebTokenInprogress(true);
         api.requestWebPushToken().then(token => {
             if (token) {
-                api.updateUserNotification(true, token, isSafari).then(() => {
+                return api.updateUserNotification(true, token, isSafari).then(() => {
                     showToast('success', 'נשמר בהצלחה', 'הודעות אושרו בהצלחה');
                     setNotificationPermission("granted");
                     if (user && isNotEmpty(volunteerId)) {
@@ -206,12 +210,17 @@ function App() {
                     }
                 });
             }
-        });
+        })
+            .catch((err) => showToast('error', 'תקלה ברישום להודעות', err.message))
+            .finally(() => setRequestWebTokenInprogress(false));
     }
 
     const settings = <div style={{ display: "flex", flexDirection: "column", textAlign: "left", alignItems: "flex-start" }}>
         <div><strong>Technical Status:</strong></div>
-        <div>Environment: {isPWA ? "PWA" : "Browser"}</div>
+        <div>Environment: {isPWA ? "PWA" : "Browser: " + navigator.userAgent}</div>
+        <div>isAndroid: {isAndroid ? "Yes" : "No: "}</div>
+        <div>isIOS: {isIOS ? "Yes" : "No: "}</div>
+        <div>isChrome: {isChrome ? "Yes" : "No: "}</div>
         <div>Finger Print: {fingerprint}</div>
         <div>Login Status: {user ? "uid:" + user.uid : "Not logged in"}</div>
         <div>VolunteerID: {volunteerId ? volunteerId : "Missing"}</div>
@@ -236,7 +245,7 @@ function App() {
 
     const appReady = (isPWA || isDev) && isNotEmpty(volunteerId);
     const rejected = !isPWA && !isNotEmpty(userPairingRequest) && !isDev;
-    const showProgress = !appReady && !rejected && !(readyToInstall && !isDev);
+    const showProgress = requestWebTokenInprogress || !appReady && !rejected && !(readyToInstall && !isDev);
     return (
         <div className="App">
             <Toast ref={toast} />
@@ -249,7 +258,7 @@ function App() {
             {readyToInstall && !isDev && <PWAInstructions />}
             {rejected && <div>זיהוי נכשל - צור קשר עם העמותה</div>}
             {showProgress && <InProgress />}
-            {appReady && !userInfo?.notificationToken && <RegisterToNotification onClick={onAllowNotification} />}
+            {appReady && userInfo && !userInfo?.notificationToken && <RegisterToNotification onClick={requestWebTokenInprogress?undefined:onAllowNotification} />}
             {appReady && <TabView dir='rtl'>
                 <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
                     <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />
@@ -266,6 +275,7 @@ function App() {
             </TabView>}
         </div>
     );
+
 }
 
 export default App;

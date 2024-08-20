@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MultiSelect } from 'primereact/multiselect';
-import { Button } from 'primereact/button';
-import { Family, getMealRequests } from './api';
+import { Family } from './api';
 
 import 'primereact/resources/themes/saga-blue/theme.css';
 import 'primereact/resources/primereact.min.css';

@@ -9,7 +9,7 @@ export function InProgress() {
 }
 
 interface RegisterToNotificationProps {
-    onClick: (e: any) => void,
+    onClick?: (e: any) => void,
 }
 
 export function RegisterToNotification({ onClick }: RegisterToNotificationProps) {
@@ -19,7 +19,7 @@ export function RegisterToNotification({ onClick }: RegisterToNotificationProps)
                 <div className="notification-text">לצורך שימוש יעיל באפליקציה יש לאשר קבלת הודעות</div>
                 <div className="button-container">
                     <i className={`arrow-animation ${PrimeIcons.ANGLE_RIGHT}`}></i>
-                    <Button label="אישור קבלת הודעות" onClick={onClick} className="notification-button" />
+                    <Button label="אישור קבלת הודעות" disabled={!onClick} onClick={onClick} className="notification-button" />
                 </div>
             </div>
         </div>

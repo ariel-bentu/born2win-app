@@ -82,8 +82,25 @@ export interface GetDemandStatPayload {
     to: string;
 }
 
+export interface SendMessagePayload {
+    toDistricts: string[];
+    toRecipient: string;
+    title: string;
+    body: string;
+}
+
 export interface Cached<T> {
     data: T | undefined;
     fetchedTS: Dayjs;
     inProgress?: Promise<T>;
+}
+
+export interface Recipient {
+    name: string;
+    id: string;
+    mahoz: string;
+}
+
+export interface SearchUsersPayload {
+    query: string;
 }

@@ -19,7 +19,7 @@ import {
 import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
-import { GetDemandStatPayload, NotificationUpdatePayload, RegistrationRecord, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
+import { GetDemandStatPayload, NotificationUpdatePayload, Recipient, RegistrationRecord, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
 
 
 const firebaseConfig = {
@@ -226,3 +226,24 @@ export async function getDemandStats(dateRange: [Date | null, Date | null], dist
     } as GetDemandStatPayload;
     return getDemandStatsFunc(payload).then(res => res.data as StatsData);
 }
+
+export async function sendMessage(districts: string[], recipient: Recipient | Recipient[] | undefined, title: string, body: string) {
+    const sendMessageFunc = httpsCallable(functions, 'SendMessage');
+    const payload = {
+        toDistricts: districts,
+        toRecipient: Array.isArray(recipient) ? recipient.length > 0 ? recipient[0].id : "" : recipient?.id,
+        title,
+        body
+    } as SendMessagePayload;
+    return sendMessageFunc(payload);
+}
+
+export async function searchUsers(query: string): Promise<Recipient[]> {
+    const searchUsersFunc = httpsCallable(functions, 'SearchUsers');
+    const payload = {
+        query
+    } as SearchUsersPayload;
+
+    return searchUsersFunc(payload).then(res => res.data as Recipient[]);
+}
+

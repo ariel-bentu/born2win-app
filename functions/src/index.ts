@@ -13,7 +13,7 @@ import dayjs = require("dayjs");
 import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
-import { Collections, FamilityIDPayload, GetDemandStatPayload, NotificationUpdatePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord } from "../../src/types";
+import { Collections, FamilityIDPayload, GetDemandStatPayload, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord } from "../../src/types";
 import axios from "axios";
 import express = require("express");
 import crypto = require("crypto");
@@ -226,6 +226,64 @@ exports.TestNotification = onCall({ cors: true }, async (request) => {
     return;
 });
 
+exports.SearchUsers = onCall({ cors: true }, async (request):Promise<Recipient[]> => {
+    const userInfo = await getUserInfo(request);
+    if (userInfo.isAdmin) {
+        const sup = request.data as SearchUsersPayload;
+        const query = sup.query;
+        if (query.length < 0) {
+            return [];
+        }
+
+        const baseQuery = db.collection(Collections.Users).where("active", "==", true);
+        const firstNameQuery = baseQuery
+            .where("firstName", ">=", query)
+            .where("firstName", "<", query + '\uf8ff'); // The \uf8ff character is the last character in the Unicode range
+
+        const lastNameQuery = baseQuery
+            .where("lastName", ">=", query)
+            .where("lastName", "<", query + '\uf8ff');
+
+        const [firstNameSnapshot, lastNameSnapshot] = await Promise.all([firstNameQuery.get(), lastNameQuery.get()]);
+
+        const users = new Map();
+
+        firstNameSnapshot.forEach(doc => users.set(doc.id, doc));
+        lastNameSnapshot.forEach(doc => users.set(doc.id, doc));
+
+        return Array.from(users.values()).map(u=> ({
+            name: u.data().firstName + " " + u.data().lastName,
+            id: u.id,
+            mahoz: u.data().mahoz,
+        }));
+    }
+    throw new HttpsError("unauthenticated", "Only admin can send message.");
+});
+
+
+exports.SendMessage = onCall({ cors: true }, async (request) => {
+    const userInfo = await getUserInfo(request);
+    if (userInfo.isAdmin) {
+        const smp = request.data as SendMessagePayload;
+        const waitFor = [];
+        if (smp.toRecipient && smp.toRecipient.length > 0) {
+            // send to one person
+            const devices = await getWebTokens([smp.toRecipient]);
+            waitFor.push(sendNotification(smp.title, smp.body, {}, devices));
+        }
+
+        if (smp.toDistricts && smp.toDistricts.length > 0) {
+            for (let i = 0; i < smp.toDistricts.length; i++) {
+                const devices = await getWebTokens(`district:${smp.toDistricts[i]}`);
+                waitFor.push(sendNotification(smp.title, smp.body, {}, devices));
+            }
+        }
+
+        return Promise.all(waitFor);
+    }
+
+    throw new HttpsError("unauthenticated", "Only admin can send message.");
+});
 
 interface DeviceInfo {
     ownerId: string,

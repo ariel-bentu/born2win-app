@@ -24,6 +24,7 @@ import { ExistingRegistrationsComponent } from './existing-registration-componen
 import { Stats } from './charts';
 import { InProgress, RegisterToNotification } from './common-ui';
 import dayjs from 'dayjs';
+import { SendMessage } from './send-message';
 
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
@@ -94,9 +95,29 @@ function App() {
         setUser(user);
     }
 
+    const showToast = (severity: "error" | "success" | "info" | "warn" | "secondary" | "contrast" | undefined, summary: string, detail: string) => {
+        if (toast.current) {
+            toast.current.show({ severity, summary, detail });
+        }
+    };
+
+    // hack until Apple fix the postMessage not recieved when app is openned
+    useEffect(() => {
+        if (isIOS) {
+            const interval = setInterval(() => {
+                if (document.visibilityState === "visible") {
+                    setReloadNotifications(prev => prev + 1);
+                }
+            }, 10000);
+            return () => clearInterval(interval);
+        }
+    }, [])
+
+
     useEffect(() => {
         const onPostMessage = (payload: any) => {
             console.log("Recieved Message", payload)
+            showToast("info", "הודעה חדשה התקבלה", "");
             if (payload.data?.type == "newMessage") {
                 console.log("New Notification arrived");
                 setTimeout(() => setReloadNotifications(prev => prev + 1), 2000);
@@ -185,11 +206,6 @@ function App() {
         }
     }, [init, volunteerId, user]);
 
-    const showToast = (severity: "error" | "success" | "info" | "warn" | "secondary" | "contrast" | undefined, summary: string, detail: string) => {
-        if (toast.current) {
-            toast.current.show({ severity, summary, detail });
-        }
-    };
 
     const updateUnreadCount = (count: number) => {
         setUnreadCount(count);
@@ -243,6 +259,7 @@ function App() {
         </div>
     </div>
 
+    console.log(userInfo)
     const appReady = (isPWA || isDev) && isNotEmpty(volunteerId);
     const rejected = !isPWA && !isNotEmpty(userPairingRequest) && !isDev;
     const showProgress = requestWebTokenInprogress || !appReady && !rejected && !(readyToInstall && !isDev);
@@ -258,7 +275,7 @@ function App() {
             {readyToInstall && !isDev && <PWAInstructions />}
             {rejected && <div>זיהוי נכשל - צור קשר עם העמותה</div>}
             {showProgress && <InProgress />}
-            {appReady && userInfo && !userInfo?.notificationToken && <RegisterToNotification onClick={requestWebTokenInprogress?undefined:onAllowNotification} />}
+            {appReady && userInfo && !userInfo?.notificationToken && <RegisterToNotification onClick={requestWebTokenInprogress ? undefined : onAllowNotification} />}
             {appReady && <TabView dir='rtl'>
                 <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
                     <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />
@@ -269,11 +286,17 @@ function App() {
                 <TabPanel headerStyle={{ fontSize: 20 }} header="התחייבויות">
                     <ExistingRegistrationsComponent />
                 </TabPanel>
-                {userInfo?.isAdmin && userInfo.districts?.length && <TabPanel headerStyle={{ fontSize: 20 }} header="גרפים">
-                    <Stats userInfo={userInfo} />
-                </TabPanel>}
+                {userInfo?.isAdmin && userInfo?.districts?.length &&
+                    <TabPanel headerStyle={{ fontSize: 20 }} header="שליחה">
+                        <SendMessage userInfo={userInfo} />
+                    </TabPanel>}
+                {userInfo?.isAdmin && userInfo?.districts?.length &&
+                    <TabPanel headerStyle={{ fontSize: 20 }} header="גרפים">
+                        <Stats userInfo={userInfo} />
+                    </TabPanel>
+                }
             </TabView>}
-        </div>
+        </div >
     );
 
 }

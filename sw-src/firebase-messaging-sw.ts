@@ -15,8 +15,7 @@ interface NotificationPayload {
 
 declare const clients: any; // Add this line to declare `clients`
 
-self.addEventListener('push', async (event: any) => {
-
+self.addEventListener('push',  (event: any) => {
     event.stopImmediatePropagation();
     console.log('[Service Worker] Push Received.');
 
@@ -24,48 +23,55 @@ self.addEventListener('push', async (event: any) => {
         return;
     }
 
-    const payload = event.data.json() as NotificationPayload;
-    let notificationTitle = payload.notification.title;
+    const payload = event.data.json();
+    const notificationTitle = payload.notification.title;
 
-    const db = await getDB();
-    await db.put('notifications', {
-        id: Date.now() + "",
-        title: notificationTitle,
-        body: payload.notification.body || "",
-        read: NotificationStatus.Unread,
-        timestamp: Date.now(),
-    });
-    const unreadCount = await countUnreadNotifications();
+    event.waitUntil(
+        (async () => {
+            try {
+                const db = await getDB();
 
-    const notificationOptions: NotificationOptions = {
-        requireInteraction: true,
-        ...payload.notification,
-        data: {
-            ...payload.data,
-            click_url: payload.notification.click_action,
-        }
-    };
+                await db.put('notifications', {
+                    id: Date.now() + "",
+                    title: notificationTitle,
+                    body: payload.notification.body || "",
+                    read: NotificationStatus.Unread,
+                    timestamp: Date.now(),
+                });
 
-    const promises: Promise<void>[] = [];
+                const unreadCount = await countUnreadNotifications();
+                const notificationOptions = {
+                    requireInteraction: true,
+                    ...payload.notification,
+                    data: {
+                        ...payload.data,
+                        click_url: payload.notification.click_action,
+                    },
+                };
 
-    if ('setAppBadge' in self.navigator) {
-        const badgeCount = unreadCount;
-        promises.push((self.navigator as any).setAppBadge(badgeCount));
-    }
+                const promises = [];
 
+                if ('setAppBadge' in self.navigator) {
+                    const badgeCount = unreadCount;
+                    promises.push(self.navigator.setAppBadge(badgeCount));
+                }
 
-    promises.push((self as any).registration.showNotification(notificationTitle, notificationOptions));
+                promises.push(
+                    (self as any).registration.showNotification(notificationTitle, notificationOptions)
+                );
 
-    promises.push(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList: any) => {
-        for (let i = 0; i < clientList.length; i++) {
-            if (clientList[i].visibilityState !== "hidden") {
-                return clientList[i].postMessage({ type: "newMessage" });
+                const clientList = await (self as any).clients.matchAll( { type: 'window', includeUncontrolled: true });
+                clientList.forEach((client:any) => {
+                    client.postMessage({ type: "newMessage" });
+                });
+
+                // Wait for all promises to complete
+                await Promise.all(promises);
+            } catch (error) {
+                console.error('Error in push event:', error);
             }
-        }
-    }));
-
-    // Finally...
-    event.waitUntil(Promise.all(promises));
+        })()
+    );
 });
 
 self.addEventListener('notificationclick', function (event: any) {

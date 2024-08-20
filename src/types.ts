@@ -3,6 +3,7 @@ import { Dayjs } from "dayjs";
 export const Collections = {
     Users: "users",
     Admins: "admins",
+    Notifications: "notifications",
 };
 
 export type onClickEvent = (e: any) => void;
@@ -84,7 +85,7 @@ export interface GetDemandStatPayload {
 
 export interface SendMessagePayload {
     toDistricts: string[];
-    toRecipient: string;
+    toRecipients: string[];
     title: string;
     body: string;
 }
@@ -104,3 +105,10 @@ export interface Recipient {
 export interface SearchUsersPayload {
     query: string;
 }
+
+export interface SendNotificationStats {
+    successCount:number;
+    errorCount:number;
+}
+
+export type ShowToast = (severity: "error" | "success" | "info" | "warn" | "secondary" | "contrast" | undefined, summary: string, detail: string)=>void;

@@ -4,30 +4,40 @@ import { InputTextarea } from 'primereact/inputtextarea';
 import { Dropdown } from 'primereact/dropdown';
 import { Button } from 'primereact/button';
 import { MultiSelect } from 'primereact/multiselect';
-import { Recipient, UserInfo } from './types';
+import { Recipient, ShowToast, UserInfo } from './types';
 import { searchUsers, sendMessage } from './api';
 import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete';
 import { getByDisplayValue } from '@testing-library/react';
+import { Toast } from 'primereact/toast';
+import { InProgress } from './common-ui';
 
 interface SendMessageProps {
     userInfo: UserInfo,
+    showToast: ShowToast,
 }
 
-export const SendMessage: React.FC<SendMessageProps> = ({ userInfo }) => {
+export const SendMessage: React.FC<SendMessageProps> = ({ userInfo, showToast }) => {
     const [title, setTitle] = useState<string>('');
     const [body, setBody] = useState<string>('');
-    const [recipient, setRecipient] = useState< Recipient[] | undefined>();
+    const [recipients, setRecipients] = useState<Recipient[] | undefined>();
     const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
     const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
+    const [inProgress, setInProgress] = useState<boolean>(false);
 
 
     const handleSend = useCallback(() => {
-        sendMessage(selectedDistricts, recipient, title, body);
-        //     setTitle('');
-        //     setBody('');
-        //     setRecipient('');
-        //     setRecipientType('all');
-    }, [title, body, recipient]);
+        setInProgress(true)
+        sendMessage(selectedDistricts, recipients, title, body || "").then(() => showToast("success", "נשלח", ""))
+            .catch((err) => showToast("error", "שליחה נכשלה", err.message))
+            .finally(() => setInProgress(false));
+    }, [title, body, recipients]);
+
+    const handleClear = ()=> {
+        setTitle('');
+        setBody('');
+        setRecipients(undefined);
+        setSelectedDistricts([]);
+    }
 
     const handleDistrictChange = (e: any) => {
         setSelectedDistricts(e.value);
@@ -40,7 +50,7 @@ export const SendMessage: React.FC<SendMessageProps> = ({ userInfo }) => {
         const districts = new Map();
         recipients.forEach(r => {
             let userMahuz = r.mahoz || "";
-            
+
             let mahoz = districts.get(userMahuz);
             if (!mahoz) {
                 mahoz = {
@@ -82,15 +92,15 @@ export const SendMessage: React.FC<SendMessageProps> = ({ userInfo }) => {
                 <AutoComplete
                     inputClassName="w-17rem md:w-20rem flex flex-row flex-wrap"
                     multiple
-                    placeholder={!recipient || recipient.length < 0 ? "חיפוש לפי שם פרטי או משפחה":undefined}
+                    placeholder={!recipients || recipients.length < 0 ? "חיפוש לפי שם פרטי או משפחה" : undefined}
                     delay={500}
-                    value={recipient}
+                    value={recipients}
                     field="name"
                     optionGroupLabel="districtName"
                     optionGroupChildren="users"
                     suggestions={filteredUsers}
                     completeMethod={handleSearchUsers}
-                    onChange={(e) => setRecipient(e.value)} />
+                    onChange={(e) => setRecipients(e.value)} />
 
             </div>
             <div className="p-field m-2">
@@ -112,7 +122,9 @@ export const SendMessage: React.FC<SendMessageProps> = ({ userInfo }) => {
                     className="w-full"
                 />
             </div>
-            <Button label="שלח" className="m-2" disabled={!(title && body && (recipient || selectedDistricts.length > 0))} onClick={handleSend} />
+            {inProgress && <InProgress/>}
+            <Button label="שלח" className="m-2 ml-4" icon="pi pi-send" disabled={inProgress || !(title && (recipients || selectedDistricts.length > 0))} onClick={handleSend} />
+            <Button label="נקה" className="m-2" icon="pi pi-times-circle"  onClick={handleClear} />
         </div>
     );
 };

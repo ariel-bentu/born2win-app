@@ -10,10 +10,9 @@ import 'primeflex/primeflex.css';
 import './App.css';
 import * as api from './api';
 import { NextOrObserver, User } from 'firebase/auth';
-import { Cached, UserInfo } from './types';
+import { Cached, ShowToast, UserInfo } from './types';
 import { ClientJS } from 'clientjs';
 import NotificationsComponent from './notifications-component';
-import { getDB } from './db';
 import { countUnreadNotifications } from './notifications';
 import RegistrationComponent from './registration';
 import header from "./media/header.png";
@@ -90,12 +89,13 @@ function App() {
     const [reloadNotifications, setReloadNotifications] = useState(0);
     const [requestWebTokenInprogress, setRequestWebTokenInprogress] = useState<boolean>(false);
     const toast = useRef<Toast>(null);
+    const [activeIndex, setActiveIndex] = useState(0);
 
     const onAuth: NextOrObserver<User> = (user: User | null) => {
         setUser(user);
     }
 
-    const showToast = (severity: "error" | "success" | "info" | "warn" | "secondary" | "contrast" | undefined, summary: string, detail: string) => {
+    const showToast: ShowToast = (severity, summary, detail) => {
         if (toast.current) {
             toast.current.show({ severity, summary, detail });
         }
@@ -259,10 +259,10 @@ function App() {
         </div>
     </div>
 
-    console.log(userInfo)
     const appReady = (isPWA || isDev) && isNotEmpty(volunteerId);
     const rejected = !isPWA && !isNotEmpty(userPairingRequest) && !isDev;
     const showProgress = requestWebTokenInprogress || !appReady && !rejected && !(readyToInstall && !isDev);
+    const isAdmin = userInfo?.isAdmin && userInfo?.districts?.length;
     return (
         <div className="App">
             <Toast ref={toast} />
@@ -276,26 +276,27 @@ function App() {
             {rejected && <div>זיהוי נכשל - צור קשר עם העמותה</div>}
             {showProgress && <InProgress />}
             {appReady && userInfo && !userInfo?.notificationToken && <RegisterToNotification onClick={requestWebTokenInprogress ? undefined : onAllowNotification} />}
-            {appReady && <TabView dir='rtl'>
-                <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
-                    <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />
-                </TabPanel>
-                <TabPanel headerStyle={{ fontSize: 20 }} header="רישום">
-                    <RegistrationComponent getCachedMealRequest={getCachedMealRequest} />
-                </TabPanel>
-                <TabPanel headerStyle={{ fontSize: 20 }} header="התחייבויות">
-                    <ExistingRegistrationsComponent />
-                </TabPanel>
-                {userInfo?.isAdmin && userInfo?.districts?.length &&
-                    <TabPanel headerStyle={{ fontSize: 20 }} header="שליחה">
-                        <SendMessage userInfo={userInfo} />
-                    </TabPanel>}
-                {userInfo?.isAdmin && userInfo?.districts?.length &&
-                    <TabPanel headerStyle={{ fontSize: 20 }} header="גרפים">
-                        <Stats userInfo={userInfo} />
+            {appReady &&
+                <TabView dir='rtl' renderActiveOnly={false}  activeIndex={activeIndex} onTabChange={(e) => setActiveIndex(e.index)}>
+                    <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
+                        <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />
                     </TabPanel>
-                }
-            </TabView>}
+                    <TabPanel headerStyle={{ fontSize: 20 }} header="רישום">
+                        {activeIndex == 1 && <RegistrationComponent getCachedMealRequest={getCachedMealRequest} />}
+                    </TabPanel>
+                    <TabPanel headerStyle={{ fontSize: 20 }} header="התחייבויות">
+                        {activeIndex == 2 && <ExistingRegistrationsComponent />}
+                    </TabPanel>
+                    {isAdmin &&
+                        <TabPanel headerStyle={{ fontSize: 20 }} header="שליחה">
+                            {isAdmin && <SendMessage userInfo={userInfo} showToast={showToast} />}
+                        </TabPanel>}
+                    {isAdmin &&
+                        <TabPanel headerStyle={{ fontSize: 20 }} header="גרפים">
+                            {isAdmin && <Stats userInfo={userInfo} />}
+                        </TabPanel>
+                    }
+                </TabView>}
         </div >
     );
 

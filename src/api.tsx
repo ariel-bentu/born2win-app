@@ -227,11 +227,11 @@ export async function getDemandStats(dateRange: [Date | null, Date | null], dist
     return getDemandStatsFunc(payload).then(res => res.data as StatsData);
 }
 
-export async function sendMessage(districts: string[], recipient: Recipient | Recipient[] | undefined, title: string, body: string) {
+export async function sendMessage(districts: string[], recipient: Recipient[] | undefined, title: string, body: string) {
     const sendMessageFunc = httpsCallable(functions, 'SendMessage');
     const payload = {
         toDistricts: districts,
-        toRecipient: Array.isArray(recipient) ? recipient.length > 0 ? recipient[0].id : "" : recipient?.id,
+        toRecipients: recipient && recipient.length > 0 ? recipient.map(r => r.id) : [],
         title,
         body
     } as SendMessagePayload;

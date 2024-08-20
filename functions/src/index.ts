@@ -13,10 +13,11 @@ import dayjs = require("dayjs");
 import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
-import { Collections, FamilityIDPayload, GetDemandStatPayload, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord } from "../../src/types";
+import { Collections, FamilityIDPayload, GetDemandStatPayload, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord } from "../../src/types";
 import axios from "axios";
 import express = require("express");
 import crypto = require("crypto");
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 
 // [END Imports]
 
@@ -28,7 +29,7 @@ admin.initializeApp();
 dayjs.extend(utc);
 dayjs.extend(timezone);
 const JERUSALEM = "Asia/Jerusalem";
-
+const DATE_TIME = "YYYY-MM-DD HH:mm";
 const db = getFirestore();
 
 const born2winApiKey = defineString("BORN2WIN_API_KEY");
@@ -214,19 +215,14 @@ async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
 exports.TestNotification = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);
     if (doc) {
-        return getWebTokens([doc.id]).then(devices => {
-            const displayName = doc.data().firstName + " " + doc.data().lastName;
-            logger.info("Test notification for: ", doc.id, displayName, "tokens: ", devices);
-
-            return sendNotification("Born2Win", "הודעת בדיקה ל:\n" + displayName, {
-                navigateTo: "/#2",
-            }, devices);
-        });
+        const displayName = doc.data().firstName + " " + doc.data().lastName;
+        return addNotificationToQueue("הודעת בדיקה", "הודעת בדיקה ל:\n" + displayName, {}, [doc.id], []);
     }
+
     return;
 });
 
-exports.SearchUsers = onCall({ cors: true }, async (request):Promise<Recipient[]> => {
+exports.SearchUsers = onCall({ cors: true }, async (request): Promise<Recipient[]> => {
     const userInfo = await getUserInfo(request);
     if (userInfo.isAdmin) {
         const sup = request.data as SearchUsersPayload;
@@ -238,11 +234,11 @@ exports.SearchUsers = onCall({ cors: true }, async (request):Promise<Recipient[]
         const baseQuery = db.collection(Collections.Users).where("active", "==", true);
         const firstNameQuery = baseQuery
             .where("firstName", ">=", query)
-            .where("firstName", "<", query + '\uf8ff'); // The \uf8ff character is the last character in the Unicode range
+            .where("firstName", "<", query + "\uf8ff"); // The \uf8ff character is the last character in the Unicode range
 
         const lastNameQuery = baseQuery
             .where("lastName", ">=", query)
-            .where("lastName", "<", query + '\uf8ff');
+            .where("lastName", "<", query + "\uf8ff");
 
         const [firstNameSnapshot, lastNameSnapshot] = await Promise.all([firstNameQuery.get(), lastNameQuery.get()]);
 
@@ -251,7 +247,7 @@ exports.SearchUsers = onCall({ cors: true }, async (request):Promise<Recipient[]
         firstNameSnapshot.forEach(doc => users.set(doc.id, doc));
         lastNameSnapshot.forEach(doc => users.set(doc.id, doc));
 
-        return Array.from(users.values()).map(u=> ({
+        return Array.from(users.values()).map(u => ({
             name: u.data().firstName + " " + u.data().lastName,
             id: u.id,
             mahoz: u.data().mahoz,
@@ -260,26 +256,63 @@ exports.SearchUsers = onCall({ cors: true }, async (request):Promise<Recipient[]
     throw new HttpsError("unauthenticated", "Only admin can send message.");
 });
 
+async function addNotificationToQueue(title: string, body: string, data: any, toDistricts: string[], toRecipients: string[]) {
+    const docRef = db.collection(Collections.Notifications).doc();
+    return docRef.create({
+        title,
+        body,
+        data: JSON.stringify(data),
+        toDistricts,
+        toRecipients,
+        created: dayjs().format(DATE_TIME),
+    }).then(() => docRef.id);
+}
+
+exports.OnNotificationAdded = onDocumentCreated(`${Collections.Notifications}/{docId}`, async (event) => {
+    if (event.data) {
+        const { title, body, data, toRecipients, toDistricts } = event.data.data();
+        const dataObj = JSON.parse(data);
+
+        const waitFor = [];
+        if (toRecipients && toRecipients.length > 0) {
+            const devices = await getWebTokens(toRecipients);
+            waitFor.push(sendNotification(title, body, dataObj, devices));
+        }
+
+        if (toDistricts && toDistricts.length > 0) {
+            for (let i = 0; i < toDistricts.length; i++) {
+                const devices = await getWebTokens(`district:${toDistricts[i]}`);
+                waitFor.push(sendNotification(title, body, {}, devices));
+            }
+        }
+
+        const results = await Promise.all(waitFor);
+
+        const delivery = {
+            successCount: 0,
+            errorCount: 0,
+        } as SendNotificationStats;
+
+        results.forEach(r => {
+            delivery.errorCount += r.errorCount;
+            delivery.successCount += r.successCount;
+        });
+
+        await event.data?.ref.update({
+            delivery,
+        });
+    } else {
+        logger.info("OnNotificationAdded missing. id=", event.params.docId);
+    }
+    return;
+});
 
 exports.SendMessage = onCall({ cors: true }, async (request) => {
     const userInfo = await getUserInfo(request);
     if (userInfo.isAdmin) {
         const smp = request.data as SendMessagePayload;
-        const waitFor = [];
-        if (smp.toRecipient && smp.toRecipient.length > 0) {
-            // send to one person
-            const devices = await getWebTokens([smp.toRecipient]);
-            waitFor.push(sendNotification(smp.title, smp.body, {}, devices));
-        }
 
-        if (smp.toDistricts && smp.toDistricts.length > 0) {
-            for (let i = 0; i < smp.toDistricts.length; i++) {
-                const devices = await getWebTokens(`district:${smp.toDistricts[i]}`);
-                waitFor.push(sendNotification(smp.title, smp.body, {}, devices));
-            }
-        }
-
-        return Promise.all(waitFor);
+        return addNotificationToQueue(smp.title, smp.body, {}, smp.toDistricts, smp.toRecipients);
     }
 
     throw new HttpsError("unauthenticated", "Only admin can send message.");
@@ -376,7 +409,7 @@ function chunkArray(array: any[], chunkSize: number) {
     return chunks;
 }
 
-const sendNotification = (title: string, body: string, data: any, devices: DeviceInfo[]) => {
+const sendNotification = (title: string, body: string, data: any, devices: DeviceInfo[]): Promise<SendNotificationStats> => {
     const imageUrl = "https://born2win-prod.web.app/favicon.ico";
     const actionUrl = "https://born2win-prod.web.app";
     const message = {
@@ -402,6 +435,7 @@ const sendNotification = (title: string, body: string, data: any, devices: Devic
 
     const waitFor = [] as Promise<void>[];
     const updates = [] as DeviceInfoUpdate[];
+    let successCount = 0;
 
     devices.forEach(device => {
         const deviceMessage = {
@@ -411,6 +445,7 @@ const sendNotification = (title: string, body: string, data: any, devices: Devic
         waitFor.push(
             admin.messaging().send(deviceMessage)
                 .then(() => {
+                    successCount++;
                     let userUpdates = updates.find(u => u.ownerId === device.ownerId);
                     if (!userUpdates) {
                         userUpdates = {
@@ -419,7 +454,7 @@ const sendNotification = (title: string, body: string, data: any, devices: Devic
                         } as DeviceInfoUpdate;
                         updates.push(userUpdates);
                     }
-                    userUpdates.tokensInfos.push({ ...device.tokenInfo, lastMessageDate: dayjs().format("YYYY-MM-DD HH:mm") });
+                    userUpdates.tokensInfos.push({ ...device.tokenInfo, lastMessageDate: dayjs().format(DATE_TIME) });
                 })
                 .catch(error => {
                     let userUpdate = updates.find(u => u.ownerId === device.ownerId);
@@ -440,7 +475,7 @@ const sendNotification = (title: string, body: string, data: any, devices: Devic
         );
     });
 
-    return Promise.all(waitFor).finally(() => {
+    return Promise.all(waitFor).then(() => {
         // update the devices
         const batch = db.batch();
         updates.forEach(update => {
@@ -450,7 +485,7 @@ const sendNotification = (title: string, body: string, data: any, devices: Devic
             });
         });
         return batch.commit();
-    });
+    }).then(() => ({ successCount, errorCount: devices.length - successCount }));
 };
 
 async function authenticate(request: CallableRequest<any>): Promise<QueryDocumentSnapshot> {
@@ -463,7 +498,7 @@ async function authenticate(request: CallableRequest<any>): Promise<QueryDocumen
     }
 
     const doc = await findUserByUID(uid);
-    if (!doc) {
+    if (!doc || !doc.data().active) {
         throw new HttpsError("unauthenticated", "unauthorized user");
     }
     return doc;
@@ -786,16 +821,16 @@ async function syncBorn2WinUsers(sinceDate?: any) {
         }
     } while (offset);
 
-    return batch.commit().then(() => {
+    return batch.commit().then(async () => {
         logger.info("Sync Users: obsered modified:", count, "observed Active", countActive, "registrationLinks", newLinksToAdmin, "duplicates:", duplicates);
         if (notifyForNewUsers && newLinksToAdmin.length > 0) {
-            return getWebTokens(["arielb"]).then(tokens => {
-                // send a notification for each new user
-                return Promise.all(newLinksToAdmin.map(link => sendNotification("לינק למשתמש", `שם: ${link.name}
+            const admins = await db.collection(Collections.Admins).get();
+            const adminsIds = admins.docs.map(doc => doc.id);
+
+            await Promise.all(newLinksToAdmin.map(link => addNotificationToQueue("לינק למשתמש", `שם: ${link.name}
 טלפון: ${link.phone}
 לינק לשליחה למשתמש: ${link.link}
-`, undefined, tokens)));
-            });
+`, {}, [], adminsIds)));
         }
         return;
     });

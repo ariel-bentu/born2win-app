@@ -1,6 +1,8 @@
 {
-  "short_name": "born2win",
-  "name": "Born to Win",
+  "short_name": "נולדת לנצח",
+  "name": "נולדת לנצח",
+  "id":"born2win",
+  "description":"האפליקציה של עמותת לנצח נולדת",
   "icons": [
     {
       "src": "favicon.ico",

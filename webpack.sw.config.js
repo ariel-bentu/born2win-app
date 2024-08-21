@@ -4,7 +4,7 @@ module.exports = {
     mode: 'production',
     entry: './sw-src/firebase-messaging-sw.ts',
     output: {
-        filename: 'firebase-messaging-sw.js',  // Output filename for the service worker
+        filename: 'service-worker.js',  // Output filename for the service worker
         path: path.resolve(__dirname, 'public'),  // Output directory
     },
     resolve: {

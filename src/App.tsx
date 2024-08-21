@@ -143,7 +143,7 @@ function App() {
                 if (isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
                     if (isNotEmpty(currentVolId) && currentVolId !== userPairingRequest) {
                         console.log("vol ID already paired- ignored", currentVolId, "vs. requested: ", userPairingRequest);
-                        setError("תקלה באתחול  (1) - פנה לעזרה.");
+                        setError("תקלה באתחול (1) - פנה לעזרה.");
                     } else if (!isNotEmpty(currentVolId)) {
                         api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, isIOS).then(() => {
                             setVolunteerId(userPairingRequest);
@@ -157,7 +157,7 @@ function App() {
                             }
                             setReadyToInstall(true);
                         })
-                            .catch((err: Error) => setError("תקלה באתחול  (2). " + err.message));
+                            .catch((err: Error) => setError("תקלה באתחול (2). " + err.message));
                     } else {
                         setVolunteerId(currentVolId);
                         setReadyToInstall(true);
@@ -168,7 +168,7 @@ function App() {
                 if (!isNotEmpty(currentVolId)) {
                     if (!isIOS) {
                         // NOT EXPECTED!!! Andoid should have already volunteerId stored in localStorage
-                        setError("תקלה באתחול  (5) - פנה לעזרה");
+                        setError("תקלה באתחול (5) - פנה לעזרה");
                         return;
                     }
                     // an unpaired PWA - first time - load the volunteerId based on finger print
@@ -177,7 +177,7 @@ function App() {
                         localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
                     }).catch((err: Error) => {
                         console.log("Failed to fetch volunteerId based on fingerprint", err);
-                        setError(" .תקלה באתחול  (6) - פנה לעזרה" + err.message);
+                        setError(" .תקלה באתחול (6) - פנה לעזרה" + err.message);
                     });
                 } else {
                     setVolunteerId(currentVolId)

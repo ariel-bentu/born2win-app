@@ -169,7 +169,7 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
                 loginInfo: FieldValue.arrayUnion({ uid, createdAt: now.format(DATE_TIME), isIOS: uulp.isIOS } as LoginInfo),
             };
 
-        if (devOtp && !doc.data()?.loginInfo?.find((li:LoginInfo)=>li.uid === uid)) {
+        if (devOtp && !doc.data()?.loginInfo?.find((li: LoginInfo) => li.uid === uid)) {
             update.uid = FieldValue.arrayUnion(uid);
             update.loginInfo = FieldValue.arrayUnion({ uid, createdAt: now.format(DATE_TIME), isIOS: uulp.isIOS } as LoginInfo);
         }
@@ -185,19 +185,24 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
         if (!doc) {
             throw new HttpsError("not-found", "Fingerprint not found");
         }
+        const devOtp = doc.data()?.devOtp;
 
         const fpValid = validateOTPOrFingerprint(uulp.fingerprint, doc.data()?.fingerprint, doc.data()?.otpCreatedAt, 1);
         if (!fpValid) {
             throw new HttpsError("invalid-argument", "Invalid or expired Fingerpring");
         }
         // Update UID based on fingerprint (iOS Phase 2)
-        await doc.ref.update({
+        const update: any = {
             uid: FieldValue.arrayUnion(uid),
-            fingerprint: FieldValue.delete(),
             otp: FieldValue.delete(),
-            otpCreatedAt: FieldValue.delete(),
             loginInfo: FieldValue.arrayUnion({ uid, createdAt: now.format(DATE_TIME), isIOS: true }),
-        });
+        };
+        if (!devOtp) {
+            update.fingerprint = FieldValue.delete();
+            update.otpCreatedAt = FieldValue.delete();
+        }
+
+        await doc.ref.update(update);
 
         // Return volunteerID for Phase 2
         return doc.id;
@@ -494,6 +499,8 @@ function chunkArray(array: any[], chunkSize: number) {
 }
 
 const sendNotification = (title: string, body: string, data: any, devices: DeviceInfo[]): Promise<SendNotificationStats> => {
+    // logger.info("sendNotification", title, body, data, devices);
+
     const imageUrl = "https://born2win-prod.web.app/favicon.ico";
     const actionUrl = "https://born2win-prod.web.app";
     const message = {

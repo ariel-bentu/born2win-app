@@ -37,6 +37,7 @@ let app: FirebaseApp;
 let db: Firestore;
 let auth: Auth;
 let functions: Functions;
+let serviceWorkerRegistration: any;
 
 export function init(onAuth: NextOrObserver<User>) {
     if (!app) {
@@ -45,6 +46,16 @@ export function init(onAuth: NextOrObserver<User>) {
         // workaround
         let m_any: any = messaging;
         m_any.vapidKey = VAPID_KEY;
+
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("service-worker.js").then((swReg) => {
+                serviceWorkerRegistration = swReg;
+            });
+            window.addEventListener('beforeinstallprompt', (e) => {
+              e.preventDefault();
+              (window as any).deferredInstallPrompt = e;
+            });
+          }
 
         db = getFirestore(app);
         auth = getAuth(app);
@@ -88,7 +99,7 @@ export function getUserInfo(): Promise<UserInfo> {
 
 export async function getFCMToken() {
     const messaging = getMessaging(app);
-    return getToken(messaging, { vapidKey: VAPID_KEY })
+    return getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration })
 }
 
 export async function requestWebPushToken() {
@@ -123,9 +134,9 @@ export async function sendTestNotification() {
     return testNotification();
 }
 
-export function updateLoginInfo(volunteerId: string | undefined, otp: string | undefined, fingerprint: string | undefined, isIOS:boolean): any {
+export function updateLoginInfo(volunteerId: string | undefined, otp: string | undefined, fingerprint: string | undefined, isIOS: boolean): any {
     const updateLoginInfoFunc = httpsCallable(functions, 'UpdateUserLogin');
-    const uulp = { fingerprint, otp , volunteerId, isIOS} as UpdateUserLoginPayload;
+    const uulp = { fingerprint, otp, volunteerId, isIOS } as UpdateUserLoginPayload;
 
     return updateLoginInfoFunc(uulp).then(res => res.data);
 }

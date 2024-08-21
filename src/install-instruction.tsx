@@ -5,22 +5,19 @@ import { Button } from 'primereact/button';
 import { InProgress } from './common-ui';
 import { isAndroid, isIOS } from './App';
 
-let deferredInstallPrompt: any = undefined;
-window.addEventListener('beforeinstallprompt', (e) => {
-    deferredInstallPrompt = e;
-});
-
-
 
 const PWAInstructions: React.FC = () => {
     const [installComplete, setInstallComplete] = useState<boolean>(false);
     const [installInProgress, setInstallInProgress] = useState<boolean>(false);
-    
+    const deferredInstallPrompt = (window as any).deferredInstallPrompt;
+
     useEffect(() => {
-        window.addEventListener('appinstalled', () => {
+        const uninstall = () => {
             console.log('PWA was installed successfully!');
             setInstallComplete(true);
-        });
+        };
+        window.addEventListener('appinstalled', uninstall);
+        return () => window.removeEventListener('appinstalled', uninstall);
     }, []);
 
     if (installComplete) {
@@ -40,28 +37,31 @@ const PWAInstructions: React.FC = () => {
             <div style={{ textAlign: 'center' }}>
                 {isAndroid && (
                     <div>
-                        {deferredInstallPrompt && deferredInstallPrompt.prompt ? <Button label="התקנה למסך הבית" onClick={async () => {
-                            if (deferredInstallPrompt !== null && deferredInstallPrompt.prompt) {
-                                deferredInstallPrompt.prompt();
-                                const { outcome } = await deferredInstallPrompt.userChoice;
-                                if (outcome === 'accepted') {
-                                    deferredInstallPrompt = undefined;
-                                    setInstallInProgress(true);
-                                }
-                            } 
-                        }} />:
-                        <div>
+                        {deferredInstallPrompt ? <Button label="התקנה למסך הבית" onClick={async () => {
+                            deferredInstallPrompt.prompt();
+                            const { outcome } = await deferredInstallPrompt.userChoice;
+                            if (outcome === 'accepted') {
+                                setInstallInProgress(true);
+                            }
 
-                        <p>
-                            <strong>הוראות:</strong>
-                        </p>
-                        <ol style={{ textAlign: 'right' }}>
-                            <li>ודאו שפתחתם את האתר בדפדפן chrome</li>
-                            <li>פתחו את תפריט הדפדפן. איקון שלוש נקודות <Button unstyled icon="pi pi-ellipsis-v" className="three-dot-menu"/>  או איקון שלושה קווים אופקיים <Button unstyled icon="pi pi-bars" className="three-dot-menu"/></li>
-                            <li>בחרו "הוספה למסך הבית".</li>
-                        </ol>
-                    </div>
-                    }
+                        }} /> :
+                            <div>
+
+                                <p>
+                                    <strong>הוראות:</strong>
+                                </p>
+                                <ol style={{ textAlign: 'right' }}>
+                                    <li>פתחו את תפריט הדפדפן:</li>
+                                    <li><div className="flex flex-row"> <div className='ml-2'>לחיצה על</div> <Button unstyled icon="pi pi-ellipsis-v" className="three-dot-menu ml-2" /> <div>ובחירת "הוספה למסך הבית"</div></div> </li>
+                                    <li><div className="flex flex-row">
+                                        <div className='ml-2'>או איקון שלושה קווים אופקיים</div>
+                                        <Button unstyled icon="pi pi-bars" className="three-dot-menu ml-2" />
+                                        <div className='ml-2'>ובחירת "הוסף דף ל-"</div>
+                                        <div className='ml-2'>ובחירת "דף הבית"</div></div></li>
+                                    <li>בחרו "הוספה למסך הבית".</li>
+                                </ol>
+                            </div>
+                        }
                     </div>
                 )}
                 {isIOS && (

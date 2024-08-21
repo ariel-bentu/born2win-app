@@ -15,6 +15,12 @@ interface NotificationPayload {
 
 declare const clients: any; // Add this line to declare `clients`
 
+self.addEventListener("fetch", event => {
+    // This is a dummy event listener
+    // just to pass the PWA installation criteria on 
+    // some browsers
+  });
+
 self.addEventListener('push',  (event: any) => {
     event.stopImmediatePropagation();
     console.log('[Service Worker] Push Received.');

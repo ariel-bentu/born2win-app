@@ -5,6 +5,7 @@
 .env*
 #service-worker js - generated
 public/firebase-messaging-sw.js
+public/service-worker.js
 
 # dependencies
 /node_modules

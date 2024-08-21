@@ -149,3 +149,36 @@ async function testRegistrations() {
 }
 
 //testRegistrations();
+
+
+function sendNotification(title, body,data, token) {
+    const imageUrl = "https://born2win-prod.web.app/favicon.ico";
+    const actionUrl = "https://born2win-prod.web.app";
+    const message = {
+        token,
+        notification: {
+            title,
+            body,
+            imageUrl,
+            // TODO actions:Array<{ action: string; icon?: string; title: string; }> An array of notification actions representing the actions available to the user when the notification is presented.
+        },
+        data,
+        webpush: {
+            notification: {
+                title: title,
+                body: body,
+                icon: imageUrl,
+                click_action: actionUrl,
+            },
+            fcmOptions: {
+                link: actionUrl,
+            },
+        },
+    };
+    return admin.messaging().send(message).then(()=>{
+        console.log("success")
+    }).catch(err=>console.err(err.message))
+
+}
+
+//sendNotification("hi", "1", {},"")

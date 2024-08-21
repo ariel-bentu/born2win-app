@@ -12,9 +12,10 @@ interface HeaderProps {
     settingsComponent: JSX.Element;
     onRefreshTokenClick: onClickEvent;
     onSendTestNotificationClick?: onClickEvent;
+    onLogout: ()=>void
 }
 
-function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onSendTestNotificationClick }: HeaderProps) {
+function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onSendTestNotificationClick, onLogout }: HeaderProps) {
     const [sidebarVisible, setSidebarVisible] = useState(false);
 
     const items: MenuItem[] = [
@@ -30,6 +31,11 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
             icon: 'pi pi-envelope',
             disabled: !onSendTestNotificationClick,
             command:  onSendTestNotificationClick,
+        },
+        {
+            label: 'התנתק',
+            icon: 'pi pi-logout',
+            command:  onLogout,
         }
     ];
 

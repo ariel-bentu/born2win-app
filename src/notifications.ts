@@ -12,9 +12,9 @@ export const countUnreadNotifications = async () => {
         const store = tx.objectStore('notifications');
         const index = store.index('by-read');
 
-        console.log('Counting unread notifications...');
+        //console.log('Counting unread notifications...');
         const unreadCount = await index.count(IDBKeyRange.only(0)); // Use 0 for unread
-        console.log('Unread count:', unreadCount);
+        //console.log('Unread count:', unreadCount);
 
         return unreadCount;
     } catch (error) {

@@ -130,7 +130,6 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
     return (
         <div>
             <Toast ref={toast} />
-            <ConfirmPopup />
             <div className='flex flex-row relative'>
                 <SelectButton
                     pt={{ root: { className: "select-button-container" } }}

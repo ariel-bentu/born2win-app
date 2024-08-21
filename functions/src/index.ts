@@ -13,7 +13,7 @@ import dayjs = require("dayjs");
 import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
-import { Collections, FamilityIDPayload, GetDemandStatPayload, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord } from "../../src/types";
+import { Collections, FamilityIDPayload, GetDemandStatPayload, LoginInfo, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord } from "../../src/types";
 import axios from "axios";
 import express = require("express");
 import crypto = require("crypto");
@@ -64,15 +64,15 @@ function findUserByUID(uid: string): Promise<QueryDocumentSnapshot | null> {
     });
 }
 
-function findUserByFingerprint(fingerprint: string, since: string): Promise<QueryDocumentSnapshot | null> {
-    return db.collection(Collections.Users).where("fingerprint", "array-contains", fingerprint).get().then(res => {
+function findUserByFingerprint(fingerprint: string): Promise<QueryDocumentSnapshot | null> {
+    return db.collection(Collections.Users).where("fingerprint", "==", fingerprint).get().then(res => {
         if (res.empty) {
             // no matching users
             return null;
         }
         if (res.docs.length > 1) {
             // take the newest - todo
-            console.log("Warnning multiple matches to fingerpring", fingerprint, since);
+            console.log("Warnning multiple matches to fingerpring", fingerprint);
             return res.docs[0];
         }
         return res.docs[0];
@@ -87,47 +87,122 @@ function getUserByID(id: string): Promise<DocumentSnapshot | null> {
         return null;
     });
 }
-
+/**
+ * Associate a uid with user in the db
+ * uid is generated to the device, and persisted using anonymousLogin - so by itself cannot be trusted
+ * prerequisite: user with the volunteerId (as its id) already in the DB
+ * Association phases:
+ * Android:
+ *  in android the browser and PWA share the same storage space, so same uid. Thus, one phase is enough
+ *  - Browser with parameters vid=<xyz> and otp=<123> is opened
+ *  - browser does anonymousLogin and then calls UpdateUserLogin (containing uid (in auth), vid, otp, isIOS=false)
+ *    - the otp is validated: match vid in db, and no older than 30 days max
+ *    - if matches: otp is deleted and uid is associated with the user.
+ *    - user is set -  no otp or fingerpring is left.
+ *  - browser saves the volunteerId in localStoragethe and *does not* logout!
+ *  - PWA always expects to find the volunteerId and auth/uid and is ready to work
+ *
+ * iOS:
+ *  in iOS, the browser which starts the process does not share the same device storage space, thus we use fingerprint.
+ *  (see clientjs for info)
+ *  - Phase 1:
+ *    - Browser with parameters vid=<xyz> and otp=<123> is opened
+ *    - browser does anonymousLogin, calculates a fingerprint and then then calls UpdateUserLogin (containing uid (in auth), vid, otp, fingerpring, isIOS=true)
+ *    - the otp is validated: match vid in db, and no older than 30 days max
+ *    - fingerprint is associated with user
+ *    - otp is deleted (waiting for the iOS as PWA to come with fingerprint as otp)
+ *    - if success, browser logs out from firebase
+ *  - Phase 2:
+      - PWA was installed, it logs in (gets new uid) and calculates fingerprint
+      - PWA calls this function with fingerprint as otp (uid, fingerprint)
+      - a user with that fingerprint is searched. if found, validate: fingerprint was set not older than 1 day
+      - uid is associated with the user
+      - user is set - no otp or fingerpring is left
+      - PWA saves the volunteerId in localStorage, to know it is paired for future times
+ */
 exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError("unauthenticated", "Request had invalid credentials.");
     }
+
     const uid = request.auth.uid;
     if (!uid) {
         throw new HttpsError("unauthenticated", "Request is missing uid.");
     }
+
     const uulp = request.data as UpdateUserLoginPayload;
     const now = dayjs().utc().tz(JERUSALEM);
-    let doc;
-    if (uulp.volunteerID) {
-        doc = await getUserByID(uulp.volunteerID);
-    } else {
-        const since = now.subtract(3, "day");
-        doc = await findUserByFingerprint(uulp.fingerprint, since.format("YYYY-MM-DD"));
-    }
 
-    // todo - add OTP
-    if (doc) {
-        if (uulp.volunteerID) {
-            if (!(doc.data()?.uid?.find((u: string) => u == uid) && doc.data()?.fingerprint?.find((f: string) => f == uulp.fingerprint))) {
-                await doc.ref.update({
-                    uid: FieldValue.arrayUnion(uid),
-                    fingerprint: FieldValue.arrayUnion(uulp.fingerprint),
-                    loginInfo: FieldValue.arrayUnion({ uid, createdAt: now.format("YYYY-MM-DD HH:mm:ss"), fingerprint: uulp.fingerprint }),
-                });
-            }
-        } else {
-            await doc.ref.update({
-                uid: FieldValue.arrayUnion(uid),
-                loginInfo: FieldValue.arrayUnion({ uid, createdAt: now.format("YYYY-MM-DD HH:mm:ss"), fingerprint: uulp.fingerprint }),
-            });
+    let doc;
+
+    if (uulp.volunteerId) {
+        // Androing or iOS phase 1
+        // -----------------------
+        doc = await getUserByID(uulp.volunteerId);
+        if (!doc) {
+            throw new HttpsError("not-found", "Volunteer ID not found");
         }
-        // return the volunteerID
+
+        // Validate OTP (for Android and Phase 1 of iOS)
+        const otpValid = validateOTPOrFingerprint(uulp.otp, doc.data()?.otp, doc.data()?.otpCreatedAt, 30);
+        if (!otpValid) {
+            throw new HttpsError("invalid-argument", "Invalid or expired OTP");
+        }
+
+        if (uulp.isIOS && !uulp.fingerprint) {
+            throw new HttpsError("invalid-argument", "Missing fingerpring");
+        }
+        const update = uulp.isIOS ?
+            {
+                // leave otp for cases they refresh the browser
+                fingerprint: uulp.fingerprint,
+                otpCreatedAt: now.format(DATE_TIME),
+            } :
+            {
+                otp: FieldValue.delete(),
+                otpCreatedAt: FieldValue.delete(),
+                uid: FieldValue.arrayUnion(uid),
+                loginInfo: FieldValue.arrayUnion({ uid, createdAt: now.format(DATE_TIME), isIOS: uulp.isIOS } as LoginInfo),
+            };
+
+        await doc.ref.update(update);
+
+        // Return volunteerID
+        return doc.id;
+    } else if (uulp.fingerprint && uulp.isIOS) {
+        // Phase 2 of iOS
+        doc = await findUserByFingerprint(uulp.fingerprint);
+
+        if (!doc) {
+            throw new HttpsError("not-found", "Fingerprint not found");
+        }
+
+        const fpValid = validateOTPOrFingerprint(uulp.fingerprint, doc.data()?.fingerprint, doc.data()?.otpCreatedAt, 1);
+        if (!fpValid) {
+            throw new HttpsError("invalid-argument", "Invalid or expired Fingerpring");
+        }
+        // Update UID based on fingerprint (iOS Phase 2)
+        await doc.ref.update({
+            uid: FieldValue.arrayUnion(uid),
+            fingerprint: FieldValue.delete(),
+            otp: FieldValue.delete(),
+            otpCreatedAt: FieldValue.delete(),
+            loginInfo: FieldValue.arrayUnion({ uid, createdAt: now.format(DATE_TIME), isIOS: true }),
+        });
+
+        // Return volunteerID for Phase 2
         return doc.id;
     } else {
-        throw new HttpsError("not-found", uulp.volunteerID ? "Volunteer ID not found" : "Fingerprint not found");
+        throw new HttpsError("invalid-argument", "Missing volunteerID or fingerprint");
     }
 });
+
+function validateOTPOrFingerprint(token: string | undefined, savedToken: string | string, createdAt: string, validForDays: number): boolean {
+    logger.info("validate otp. token:", token, "savedToken:", savedToken, "ca", createdAt, "days", validForDays);
+    if (!token || !savedToken) return false;
+
+    return (token === savedToken && dayjs(createdAt).isAfter(dayjs().subtract(validForDays, "day")));
+}
 
 exports.UpdateNotification = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);
@@ -216,7 +291,7 @@ exports.TestNotification = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);
     if (doc) {
         const displayName = doc.data().firstName + " " + doc.data().lastName;
-        return addNotificationToQueue("הודעת בדיקה", "הודעת בדיקה ל:\n" + displayName, {}, [doc.id], []);
+        return addNotificationToQueue("הודעת בדיקה", "הודעת בדיקה ל:\n" + displayName, {}, [], [doc.id]);
     }
 
     return;
@@ -802,12 +877,14 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                 if (prevUserRecord && userRecord.active !== prevUserRecord.active && userRecord.active) {
                     // user has changed to active, add OTP and send it to admins
                     userRecord.otp = crypto.randomUUID();
+                    userRecord.otpCreatedAt = dayjs().format(DATE_TIME);
                 }
                 batch.update(userDoc.ref, userRecord as any);
             } else {
                 // create new
                 if (userRecord.active) {
                     userRecord.otp = crypto.randomUUID();
+                    userRecord.otpCreatedAt = dayjs().format(DATE_TIME);
                 }
                 batch.create(docRef, userRecord);
             }
@@ -837,7 +914,7 @@ async function syncBorn2WinUsers(sinceDate?: any) {
 }
 
 function getRegistrationLink(userId: string, otp: string): string {
-    return `https://born2win-prod.web.app?vol_id=${userId}&otp=${otp}`;
+    return `https://born2win-prod.web.app?vid=${userId}&otp=${otp}`;
 }
 
 // exports.TestSync = onCall({ cors: true }, async () => {

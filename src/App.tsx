@@ -24,6 +24,7 @@ import { Stats } from './charts';
 import { InProgress, RegisterToNotification } from './common-ui';
 import dayjs from 'dayjs';
 import { SendMessage } from './send-message';
+import { confirmPopup, ConfirmPopup } from 'primereact/confirmpopup';
 
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
@@ -46,11 +47,12 @@ export const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
-const userPairingRequest = urlParams.get('vol_id');
+const userPairingRequest = urlParams.get('vid');
+const otpPairingRequest = urlParams.get('otp');
 const isDev = !!urlParams.get('dev');
 const offline = !!urlParams.get('offline');
 const client = new ClientJS();
-const fingerprint = client.getFingerprint() + "";
+const fingerprint = isIOS ? client.getFingerprint() + "" : "";
 
 const isNotEmpty = (val: string | null | undefined): val is string => {
     return !!val && val.length > 0;
@@ -83,14 +85,15 @@ function App() {
     const [init, setInit] = useState<boolean>(false);
     const [readyToInstall, setReadyToInstall] = useState<boolean>(false);
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
-    const [volunteerId, setVolunteerId] = useState<string | null>(userPairingRequest);
+    const [volunteerId, setVolunteerId] = useState<string | null>();
     const [notificationPermission, setNotificationPermission] = useState<string>((typeof Notification !== 'undefined') && Notification && Notification.permission || "unsupported");
     const [unreadCount, setUnreadCount] = useState(0);
     const [reloadNotifications, setReloadNotifications] = useState(0);
     const [requestWebTokenInprogress, setRequestWebTokenInprogress] = useState<boolean>(false);
     const toast = useRef<Toast>(null);
     const [activeIndex, setActiveIndex] = useState(0);
-
+    const [error, setError] = useState<string | undefined>();
+    const [loggedOut, setLoggedOut] = useState<boolean>(false);
     const onAuth: NextOrObserver<User> = (user: User | null) => {
         setUser(user);
     }
@@ -113,7 +116,82 @@ function App() {
         }
     }, [])
 
+    // INIT Firebase
+    useEffect(() => {
+        if (!offline) {
+            api.init(onAuth).then(() => setInit(true));
+        }
+    }, []);
 
+    // LOGIN
+    useEffect(() => {
+        if (!loggedOut && init && !user && (isPWA || isNotEmpty(userPairingRequest))) {
+            // Logs in annonymously and then user is set with user.uid
+            api.login();
+        }
+    }, [init, user]);
+
+    useEffect(() => {
+        const currentVolId = localStorage.getItem(VOL_ID_STORAGE_KEY);
+        if (user && user.uid) {
+            if (!isPWA) {
+                // BROWSER flow
+                if (isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
+                    if (isNotEmpty(currentVolId) && currentVolId !== userPairingRequest) {
+                        console.log("vol ID already paired- ignored", currentVolId, "vs. requested: ", userPairingRequest);
+                        setError("תקלה באתחול  (1) - פנה לעזרה.");
+                    } else if (!isNotEmpty(currentVolId)) {
+                        api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, isIOS).then(() => {
+                            setVolunteerId(userPairingRequest);
+                            if (isAndroid) {
+                                localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
+                            } else {
+                                // Logout from Firebase
+                                setLoggedOut(true);
+                                api.logout();
+
+                            }
+                            setReadyToInstall(true);
+                        })
+                            .catch((err: Error) => setError("תקלה באתחול  (2). " + err.message));
+                    } else {
+                        setVolunteerId(currentVolId);
+                        setReadyToInstall(true);
+                    }
+                }
+            } else {
+                // PDA flow
+                if (!isNotEmpty(currentVolId)) {
+                    if (!isIOS) {
+                        // NOT EXPECTED!!! Andoid should have already volunteerId stored in localStorage
+                        setError("תקלה באתחול  (5) - פנה לעזרה");
+                        return;
+                    }
+                    // an unpaired PWA - first time - load the volunteerId based on finger print
+                    api.updateLoginInfo(undefined, undefined, fingerprint, true).then((retVolId: string) => {
+                        setVolunteerId(retVolId);
+                        localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
+                    }).catch((err: Error) => {
+                        console.log("Failed to fetch volunteerId based on fingerprint", err);
+                        setError(" .תקלה באתחול  (6) - פנה לעזרה" + err.message);
+                    });
+                } else {
+                    setVolunteerId(currentVolId)
+                }
+            }
+        }
+
+    }, [user]);
+
+    useEffect(() => {
+        if (!offline && isPWA && user && isNotEmpty(volunteerId)) {
+            api.getUserInfo().then((uInfo) => {
+                setUserInfo(uInfo);
+            });
+        }
+    }, [user, volunteerId]);
+
+    // NOTIFICATIONS:
     useEffect(() => {
         const onPostMessage = (payload: any) => {
             console.log("Recieved Message", payload)
@@ -144,68 +222,8 @@ function App() {
     }, []);
 
     useEffect(() => {
-        if (user && user.uid) {
-            const currentVolId = isPWA ? localStorage.getItem(VOL_ID_STORAGE_KEY) : undefined;
-
-            if (!isPWA) {
-                if (isNotEmpty(userPairingRequest)) {
-                    // this is a non-pwa flow
-                    if (userPairingRequest !== currentVolId && !offline) {
-                        if (isNotEmpty(currentVolId)) {
-                            console.log("Change of vol ID - ignored", currentVolId, "to", userPairingRequest);
-                        } else {
-                            api.updateLoginInfo(userPairingRequest, fingerprint).then(() => {
-                                setReadyToInstall(true);
-                                if (isAndroid) {
-                                    localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
-                                }
-                            });
-                        }
-                    }
-                    setVolunteerId(userPairingRequest);
-                }
-            } else {
-                if (isNotEmpty(currentVolId)) {
-                    setVolunteerId(currentVolId);
-                } else {
-                    // first time as PWA - load the volunteerId based on finger print
-                    api.updateLoginInfo(undefined, fingerprint).then((retVolId: string) => {
-                        setVolunteerId(retVolId);
-                        localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
-                    }).catch((err: Error) => {
-                        console.log("Failed to fetch volunteerId based on fingerprint", err);
-                    });
-                }
-            }
-        }
-    }, [user, userPairingRequest]);
-
-    useEffect(() => {
-        if (user && isNotEmpty(volunteerId) && !offline) {
-            api.getUserInfo().then((uInfo) => {
-                setUserInfo(uInfo);
-            });
-        }
-    }, [user, volunteerId]);
-
-    useEffect(() => {
-        if (!offline) {
-            api.init(onAuth).then(() => setInit(true));
-        }
-    }, []);
-
-    useEffect(() => {
         countUnreadNotifications().then(updateUnreadCount);
     }, [reloadNotifications])
-
-    useEffect(() => {
-        if (init && !user) {
-            if (isPWA || isNotEmpty(volunteerId)) {
-                !offline && api.login();
-            }
-        }
-    }, [init, volunteerId, user]);
-
 
     const updateUnreadCount = (count: number) => {
         setUnreadCount(count);
@@ -229,6 +247,22 @@ function App() {
         })
             .catch((err) => showToast('error', 'תקלה ברישום להודעות', err.message))
             .finally(() => setRequestWebTokenInprogress(false));
+    }
+
+    const handleLogout = () => {
+        confirmPopup({
+            message: 'האם להתנתק לגמרי - חיבור חדש יחייב קשר עם העמותה?',
+            icon: 'pi pi-exclamation-triangle',
+            accept: async () => {
+                try {
+                    setLoggedOut(true);
+                    api.logout();
+                    localStorage.removeItem(VOL_ID_STORAGE_KEY);
+                } catch (error) {
+                    console.error('Error logging out', error);
+                }
+            }
+        });
     }
 
     const settings = <div style={{ display: "flex", flexDirection: "column", textAlign: "left", alignItems: "flex-start" }}>
@@ -259,25 +293,27 @@ function App() {
         </div>
     </div>
 
-    const appReady = (isPWA || isDev) && isNotEmpty(volunteerId);
-    const rejected = !isPWA && !isNotEmpty(userPairingRequest) && !isDev;
-    const showProgress = requestWebTokenInprogress || !appReady && !rejected && !(readyToInstall && !isDev);
+    const appReady = (isPWA || isDev) && isNotEmpty(volunteerId) && !error;
+    //    const rejected = !isPWA && !isNotEmpty(userPairingRequest) && !isDev;
+    const showProgress = requestWebTokenInprogress || !appReady && !error && !(readyToInstall && !isDev);
     const isAdmin = userInfo?.isAdmin && userInfo?.districts?.length;
     return (
         <div className="App">
+            <ConfirmPopup />
             <Toast ref={toast} />
             <Header userName={userInfo ? userInfo.firstName : ""}
                 logoSrc={header}
+                onLogout={handleLogout}
                 settingsComponent={settings}
                 onRefreshTokenClick={onAllowNotification}
                 onSendTestNotificationClick={userInfo?.notificationToken ? api.sendTestNotification : undefined}
             />
             {readyToInstall && !isDev && <PWAInstructions />}
-            {rejected && <div>זיהוי נכשל - צור קשר עם העמותה</div>}
+            {error && <div>{error}</div>}
             {showProgress && <InProgress />}
             {appReady && userInfo && !userInfo?.notificationToken && <RegisterToNotification onClick={requestWebTokenInprogress ? undefined : onAllowNotification} />}
             {appReady &&
-                <TabView dir='rtl' renderActiveOnly={false}  activeIndex={activeIndex} onTabChange={(e) => setActiveIndex(e.index)}>
+                <TabView dir='rtl' renderActiveOnly={false} activeIndex={activeIndex} onTabChange={(e) => setActiveIndex(e.index)}>
                     <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
                         <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />
                     </TabPanel>

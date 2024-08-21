@@ -67,6 +67,19 @@ export function login() {
         });
 }
 
+export function logout() {
+    signOut(auth)
+        .then((u) => {
+            // signOut in..
+            console.log("User is Now logged out");
+        })
+        .catch((error) => {
+            const errorCode = error.code;
+            const errorMessage = error.message;
+            // ...
+        });
+}
+
 export function getUserInfo(): Promise<UserInfo> {
     const getUserInfoFunc = httpsCallable(functions, 'GetUserInfo');
     return getUserInfoFunc().then(res => res.data as UserInfo);
@@ -110,12 +123,9 @@ export async function sendTestNotification() {
     return testNotification();
 }
 
-export function updateLoginInfo(volunteerId: string | undefined, fingerprint: string): any {
+export function updateLoginInfo(volunteerId: string | undefined, otp: string | undefined, fingerprint: string | undefined, isIOS:boolean): any {
     const updateLoginInfoFunc = httpsCallable(functions, 'UpdateUserLogin');
-    const uulp = { fingerprint } as UpdateUserLoginPayload;
-    if (volunteerId && fingerprint.length > 0) {
-        uulp.volunteerID = volunteerId;
-    }
+    const uulp = { fingerprint, otp , volunteerId, isIOS} as UpdateUserLoginPayload;
 
     return updateLoginInfoFunc(uulp).then(res => res.data);
 }

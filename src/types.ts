@@ -28,9 +28,10 @@ export interface TokenInfo {
 }
 
 export interface UpdateUserLoginPayload {
-    volunteerID?: string;
-    fingerprint: string;
-    otp: string;
+    volunteerId?: string;
+    fingerprint?: string;
+    otp?: string;
+    isIOS: boolean;
 }
 
 export interface UserInfo {
@@ -46,6 +47,7 @@ export interface LoginInfo {
     uid: string;
     fingerprint: string;
     createdAt: string;
+    isIOS: boolean;
 }
 
 export interface UserRecord {
@@ -59,6 +61,7 @@ export interface UserRecord {
     notificationTokens?: TokenInfo[];
     lastModified: string;
     otp?: string;
+    otpCreatedAt?:string;
 }
 
 export interface RegistrationRecord {

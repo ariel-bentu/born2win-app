@@ -144,7 +144,11 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
         }
 
         // Validate OTP (for Android and Phase 1 of iOS)
-        const otpValid = validateOTPOrFingerprint(uulp.otp, doc.data()?.otp, doc.data()?.otpCreatedAt, 30);
+        const devOtp = doc.data()?.devOtp;
+        const otpValid = devOtp ?
+            uulp.otp === devOtp :
+            validateOTPOrFingerprint(uulp.otp, doc.data()?.otp, doc.data()?.otpCreatedAt, 30);
+
         if (!otpValid) {
             throw new HttpsError("invalid-argument", "Invalid or expired OTP");
         }
@@ -164,6 +168,11 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
                 uid: FieldValue.arrayUnion(uid),
                 loginInfo: FieldValue.arrayUnion({ uid, createdAt: now.format(DATE_TIME), isIOS: uulp.isIOS } as LoginInfo),
             };
+
+        if (devOtp && !doc.data()?.loginInfo?.find((li:LoginInfo)=>li.uid === uid)) {
+            update.uid = FieldValue.arrayUnion(uid);
+            update.loginInfo = FieldValue.arrayUnion({ uid, createdAt: now.format(DATE_TIME), isIOS: uulp.isIOS } as LoginInfo);
+        }
 
         await doc.ref.update(update);
 

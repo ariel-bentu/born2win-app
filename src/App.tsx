@@ -125,9 +125,13 @@ function App() {
 
     // LOGIN
     useEffect(() => {
-        if (!loggedOut && init && !user && (isPWA || isNotEmpty(userPairingRequest))) {
-            // Logs in annonymously and then user is set with user.uid
-            api.login();
+        if (!loggedOut && init && !user) {
+            if (isPWA || isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
+                // Logs in annonymously and then user is set with user.uid
+                api.login();
+            } else {
+                setError("תקלת אתחול (3) - חסר פרמטרים");
+            }
         }
     }, [init, user]);
 
@@ -145,7 +149,7 @@ function App() {
                             setVolunteerId(userPairingRequest);
                             if (isAndroid) {
                                 localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
-                            } else {
+                            } else if (!isDev) {
                                 // Logout from Firebase
                                 setLoggedOut(true);
                                 api.logout();
@@ -184,7 +188,7 @@ function App() {
     }, [user]);
 
     useEffect(() => {
-        if (!offline && isPWA && user && isNotEmpty(volunteerId)) {
+        if (!offline && (isPWA || isDev) && user && isNotEmpty(volunteerId)) {
             api.getUserInfo().then((uInfo) => {
                 setUserInfo(uInfo);
             });
@@ -295,7 +299,7 @@ function App() {
 
     const appReady = (isPWA || isDev) && isNotEmpty(volunteerId) && !error;
     //    const rejected = !isPWA && !isNotEmpty(userPairingRequest) && !isDev;
-    const showProgress = requestWebTokenInprogress || !appReady && !error && !(readyToInstall && !isDev);
+    const showProgress = requestWebTokenInprogress || !appReady && !error && !(readyToInstall);
     const isAdmin = userInfo?.isAdmin && userInfo?.districts?.length;
     return (
         <div className="App">

@@ -25,7 +25,7 @@ BORM2WIN_AT_WEBHOOK_USERS_MAC=<webhook secret>
 # Development Instructions
 ## Run locally 
 - run `npm start`
-- open chrome on `http://localhost:3000?vol_id=<volunteerId>&dev=true`
+- open chrome on `http://localhost:3000?vid=<volunteerId>&otp=<devOtp in DB>&dev=true`
 
 ## Deploy UI
 - You need permission to the born2win firebase project and need to be logged in to firebase `firebase login`

@@ -13,7 +13,7 @@ import dayjs = require("dayjs");
 import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
-import { Collections, FamilityIDPayload, GetDemandStatPayload, LoginInfo, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord } from "../../src/types";
+import { AirTableRecord, Collections, FamilityIDPayload, FamilyDemand, GetDemandStatPayload, LoginInfo, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord } from "../../src/types";
 import axios from "axios";
 import express = require("express");
 import crypto = require("crypto");
@@ -649,6 +649,32 @@ exports.GetMealRequests = onCall({ cors: true }, async (request) => {
 });
 
 
+async function getOpenDemands(district: string, daysAhead: number): Promise<FamilyDemand[]> {
+    const apiKey = born2winApiKey.value();
+    const headers = {
+        "Authorization": `Bearer ${apiKey}`,
+    };
+    const mahuzRec = (await getDestricts()).find((d: any) => d.id === district);
+    if (mahuzRec) {
+        const baseId = mahuzRec.base_id;
+        const formula = encodeURIComponent(`AND(({זמינות שיבוץ}='זמין'),IS_AFTER({תאריך},TODAY()),IS_BEFORE({תאריך},DATEADD(TODAY(),${daysAhead},'days')))`);
+        const query = `https://api.airtable.com/v0/${baseId}/דרישות לשיבוצים?filterByFormula=${formula}`;
+        const demands = await axios.get(query, {
+            headers,
+        });
+        if (demands.data.records) {
+            return demands.data.records.map((demand: AirTableRecord) => ({
+                city: demand.fields["עיר"][0],
+                name: demand.fields.Name,
+                district: district,
+                date: demand.fields["תאריך"],
+                id: demand.fields.id,
+            }));
+        }
+    }
+    return [];
+}
+
 exports.GetFamilityAvailability = onCall({ cors: true }, async (request) => {
     await authenticate(request);
     const gfp = request.data as FamilityIDPayload;
@@ -770,6 +796,7 @@ const schedules = [
     { desc: "Reminder on Sunday at 18:00", min: 0, hour: [18], weekDay: 1, callback: remindVolunteersToRegister },
     { desc: "Refresh webhook registration", min: 0, hour: [0], weekDay: "*", callback: refreshWebhookToken },
     { desc: "Sync Born2Win users daily", min: 0, hour: [17], weekDay: "*", callback: syncBorn2WinUsers },
+    { desc: "Alert 5 days ahead open demand", min: 40, hour: [13], weekDay: "*", callback: alertOpenDemands },
 ];
 
 function check(obj: any, fieldName: string, value: any) {
@@ -806,6 +833,26 @@ exports.doSchedule = onSchedule({
 
 async function remindVolunteersToRegister() {
     // TODO
+}
+
+async function alertOpenDemands() {
+    const districts = await getDestricts();
+    const admins = await db.collection(Collections.Admins).get();
+    const adminsIds = admins.docs.map(doc => doc.id);
+    const waitFor = [];
+
+    for (let i = 0; i < districts.length; i++) {
+        const openDemands = await getOpenDemands(districts[i].id, 5);
+        let msgBody = "מחוז: " + districts[i].name + "\n";
+        if (openDemands.length > 0) {
+            openDemands.forEach(od => {
+                const daysLeft = dayjs().diff(od.date, "days");
+                msgBody += `- ${od.name} (עוד ${daysLeft} ימים)` + "\n";
+            });
+            waitFor.push(addNotificationToQueue("שיבוצים חסרים - 5 ימים קרובים", msgBody, {}, [], adminsIds));
+        }
+    }
+    Promise.all(waitFor);
 }
 
 async function refreshWebhookToken() {

@@ -61,9 +61,15 @@ export interface UserRecord {
     notificationTokens?: TokenInfo[];
     lastModified: string;
     otp?: string;
-    otpCreatedAt?:string;
+    otpCreatedAt?: string;
 }
 
+
+export interface AirTableRecord {
+    id: string;
+    createdTime: string;
+    fields: { [key: string]: any };
+}
 export interface RegistrationRecord {
     id: string;
     date: string;
@@ -110,8 +116,29 @@ export interface SearchUsersPayload {
 }
 
 export interface SendNotificationStats {
-    successCount:number;
-    errorCount:number;
+    successCount: number;
+    errorCount: number;
 }
 
-export type ShowToast = (severity: "error" | "success" | "info" | "warn" | "secondary" | "contrast" | undefined, summary: string, detail: string)=>void;
+export type ShowToast = (severity: "error" | "success" | "info" | "warn" | "secondary" | "contrast" | undefined, summary: string, detail: string) => void;
+
+export interface Family2 {
+    city: string;
+    name: string;
+    patientAge: number;
+    prefferedMeal: string[];
+    kosherLevel: string;
+    favoriteFood: string;
+    alergies: string;
+    adultsCount: number;
+    familyMembersAge: string;
+    floor: string;
+    district: string;
+}
+
+export interface FamilyDemand {
+    city: string;
+    name: string;
+    date: string;
+    id: string;
+}

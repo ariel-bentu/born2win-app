@@ -105,6 +105,7 @@ function App() {
     };
 
     // hack until Apple fix the postMessage not recieved when app is openned
+    // Poll every 10 seconds the local indexDB
     useEffect(() => {
         if (isIOS) {
             const interval = setInterval(() => {
@@ -184,7 +185,6 @@ function App() {
                 }
             }
         }
-
     }, [user]);
 
     useEffect(() => {
@@ -272,6 +272,7 @@ function App() {
     const settings = <div style={{ display: "flex", flexDirection: "column", textAlign: "left", alignItems: "flex-start" }}>
         <div><strong>Technical Status:</strong></div>
         <div>Environment: {isPWA ? "PWA" : "Browser: " + navigator.userAgent}</div>
+        <div>UserAgent: {navigator.userAgent}</div>
         <div>isAndroid: {isAndroid ? "Yes" : "No: "}</div>
         <div>isIOS: {isIOS ? "Yes" : "No: "}</div>
         <div>isChrome: {isChrome ? "Yes" : "No: "}</div>
@@ -298,7 +299,6 @@ function App() {
     </div>
 
     const appReady = (isPWA || isDev) && isNotEmpty(volunteerId) && !error;
-    //    const rejected = !isPWA && !isNotEmpty(userPairingRequest) && !isDev;
     const showProgress = requestWebTokenInprogress || !appReady && !error && !(readyToInstall);
     const isAdmin = userInfo?.isAdmin && userInfo?.districts?.length;
     return (
@@ -317,7 +317,7 @@ function App() {
             {showProgress && <InProgress />}
             {appReady && userInfo && !userInfo?.notificationToken && <RegisterToNotification onClick={requestWebTokenInprogress ? undefined : onAllowNotification} />}
             {appReady &&
-                <TabView dir='rtl' renderActiveOnly={false} activeIndex={activeIndex} onTabChange={(e) => setActiveIndex(e.index)}>
+                <TabView  dir='rtl' renderActiveOnly={false} activeIndex={activeIndex} onTabChange={(e) => setActiveIndex(e.index)}>
                     <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
                         <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />
                     </TabPanel>

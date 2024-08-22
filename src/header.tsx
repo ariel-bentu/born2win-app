@@ -17,7 +17,10 @@ interface HeaderProps {
 
 function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onSendTestNotificationClick, onLogout }: HeaderProps) {
     const [sidebarVisible, setSidebarVisible] = useState(false);
-
+    const [showTechInfo, setShowTechInfo] = useState<boolean>(false);
+    const toggleText = () => {
+        setShowTechInfo(prev => !prev);
+    };
     const items: MenuItem[] = [
         {
             label: 'רענן טוקן הודעות',
@@ -34,8 +37,26 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
         },
         {
             label: 'התנתק',
-            icon: 'pi pi-logout',
+            icon: 'pi pi-sign-out',
             command:  onLogout,
+        },
+        {
+            label: 'פרטים טכנים',
+            icon: 'pi pi-microchip',
+            command: toggleText,
+            template: (item, options) => (
+                <div>
+                    <a className={options.className} onClick={options.onClick}>
+                        <span className={options.iconClassName}></span>
+                        <span className={options.labelClassName}>{item.label}</span>
+                    </a>
+                    {showTechInfo && (
+                        <div dir="ltr" className="text-align-left pl-3 mt-2">
+                            {settingsComponent}
+                        </div>
+                    )}
+                </div>
+            )
         }
     ];
 
@@ -59,9 +80,6 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
             >
                 <h2 className="settings-title">הגדרות</h2>
                 <PanelMenu model={items} className="settings-menu" />
-                <div className="p-3">
-                    {settingsComponent}
-                </div>
             </Sidebar>
 
         </header>

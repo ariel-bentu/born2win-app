@@ -1,17 +1,16 @@
-import React from 'react';
 import { Button } from 'primereact/button';
-import { ConfirmPopup, confirmPopup } from 'primereact/confirmpopup';
+import {  confirmPopup } from 'primereact/confirmpopup';
 
-interface OneNotificationProps {
+interface OneLineProps {
     title: string;
     body: string;
     unread: boolean;
     footer?: string;
-    onDelete?: () => void;
+    onDelete?: (event:any) => void;
     onRead: () => void;
 }
 
-const OneNotification: React.FC<OneNotificationProps> = ({ title, body, unread, footer, onDelete, onRead }) => {
+export default function OneLine({ title, body, unread, footer, onDelete, onRead }: OneLineProps) {
 
     const handleCopyLink = (link: string) => {
         navigator.clipboard.writeText(link);
@@ -19,26 +18,26 @@ const OneNotification: React.FC<OneNotificationProps> = ({ title, body, unread, 
 
     const renderMessagePart = (part: string, index: number) => {
         const colonIndex = part.indexOf(':');
-    
+
         if (colonIndex !== -1) {
             const value = part.slice(colonIndex + 1).trim();
             const isLink = value.startsWith('http://') || value.startsWith('https://');
-            const label = part.slice(0, colonIndex + (isLink?0:1));
+            const label = part.slice(0, colonIndex + (isLink ? 0 : 1));
             return (
                 <p className="flex align-items-center" key={index}>
-                    {isLink ?  <>
-                            <a href={value} target="_blank" rel="noopener noreferrer" className='ml-2'>
-                                {label}
-                            </a>
-                            <Button icon="pi pi-copy" label="העתק" className="p-button-text p-button-rounded" onClick={() => handleCopyLink(value)} style={{ marginLeft: '0.5rem' }} />
-                        </>:
-                    <>
-                    <strong className="pl-1">{label}</strong> <div>{value}</div>
-                    </>}
+                    {isLink ? <>
+                        <a href={value} target="_blank" rel="noopener noreferrer" className='ml-2'>
+                            {label}
+                        </a>
+                        <Button icon="pi pi-copy" label="העתק" className="p-button-text p-button-rounded" onClick={() => handleCopyLink(value)} style={{ marginLeft: '0.5rem' }} />
+                    </> :
+                        <>
+                            <strong className="pl-1">{label}</strong> <div>{value}</div>
+                        </>}
                 </p>
             );
         }
-    
+
         return <p key={index}>{part}</p>;
     };
 
@@ -60,14 +59,7 @@ const OneNotification: React.FC<OneNotificationProps> = ({ title, body, unread, 
                 <div className="flex flex-row align-items-end justify-content-between">
                     {footer && <span className="text-500">{footer}</span>}
                     {onDelete && <div className="flex justify-content-end mt-3">
-                        <Button unstyled icon="pi pi-trash" className='icon-btn' onClick={(event) => {
-                            confirmPopup({
-                                target: event.currentTarget,
-                                message: 'Are you sure you want to delete this notification?',
-                                icon: 'pi pi-exclamation-triangle',
-                                accept: onDelete,
-                            });
-                        }} />
+                        <Button unstyled icon="pi pi-trash" className='icon-btn' onClick={onDelete}/>
                     </div>}
                 </div>
             </div>
@@ -75,4 +67,3 @@ const OneNotification: React.FC<OneNotificationProps> = ({ title, body, unread, 
     );
 };
 
-export default OneNotification;

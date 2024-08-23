@@ -1,6 +1,5 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import  { useEffect, useState, useRef } from 'react';
 import { TabView, TabPanel } from 'primereact/tabview';
-import { Button } from 'primereact/button';
 import { Badge } from 'primereact/badge';
 import { Toast } from 'primereact/toast';
 import 'primereact/resources/themes/saga-blue/theme.css';
@@ -146,7 +145,7 @@ function App() {
                         console.log("vol ID already paired- ignored", currentVolId, "vs. requested: ", userPairingRequest);
                         setError("תקלה באתחול (1) - פנה לעזרה.");
                     } else if (!isNotEmpty(currentVolId)) {
-                        api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, isIOS).then(() => {
+                        api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, isDev?false:isIOS).then(() => {
                             setVolunteerId(userPairingRequest);
                             if (isAndroid) {
                                 localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
@@ -322,10 +321,10 @@ function App() {
                         <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="רישום">
-                        {activeIndex == 1 && <RegistrationComponent getCachedMealRequest={getCachedMealRequest} />}
+                        {activeIndex == 1 && <RegistrationComponent getCachedMealRequest={getCachedMealRequest} showToast={showToast}/>}
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="התחייבויות">
-                        {activeIndex == 2 && <ExistingRegistrationsComponent />}
+                        {activeIndex == 2 && <ExistingRegistrationsComponent showToast={showToast}/>}
                     </TabPanel>
                     {isAdmin &&
                         <TabPanel headerStyle={{ fontSize: 20 }} header="שליחה">

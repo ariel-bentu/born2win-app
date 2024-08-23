@@ -5,38 +5,13 @@ import { Family } from './api';
 import 'primereact/resources/themes/saga-blue/theme.css';
 import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
-import OneNotification from './one-notification';
 import "./registration.css";
 import { FamilyDetails } from './famility-registration-details';
 
 import { InProgress } from './common-ui';
+import { ShowToast } from './types';
+import OneLine from './one-line';
 
-interface CitySelectionProps {
-    cities: string[];
-    onCityChange: (selectedCities: string[]) => void;
-}
-
-const CitySelection: React.FC<CitySelectionProps> = ({ cities, onCityChange }) => {
-    const [selectedCities, setSelectedCities] = useState<string[]>([]);
-
-    const handleCityChange = (e: any) => {
-        setSelectedCities(e.value);
-        onCityChange(e.value);
-    };
-
-    return (
-        <div className="city-selection">
-            <MultiSelect
-                value={selectedCities}
-                options={cities.map(city => ({ label: city, value: city }))}
-                onChange={handleCityChange}
-                placeholder="בחר עיר"
-                className="w-full md:w-20rem"
-                display="chip"
-            />
-        </div>
-    );
-};
 
 interface FamilyListProps {
     families: Family[];
@@ -47,7 +22,7 @@ const FamilyList: React.FC<FamilyListProps> = ({ families, onFamilyClick }) => {
     return (
         <div className="family-list">
             {families.map((family) => (
-                <OneNotification
+                <OneLine
                     key={family.id}
                     title={family.fields.Name}
                     body={`עיר: ${family.fields['עיר']}, גיל: ${family.fields['גיל החולה']}`}
@@ -65,9 +40,10 @@ const FamilyList: React.FC<FamilyListProps> = ({ families, onFamilyClick }) => {
 
 interface RegistrationComponentProps {
     getCachedMealRequest: () => Promise<Family[]>;
+    showToast: ShowToast;
 }
 
-function RegistrationComponent({ getCachedMealRequest }: RegistrationComponentProps) {
+function RegistrationComponent({ getCachedMealRequest , showToast}: RegistrationComponentProps) {
     const [cities, setCities] = useState<string[]>([]);
     const [selectedCities, setSelectedCities] = useState<string[]>([]);
     const [families, setFamilies] = useState<Family[] | null>(null);
@@ -78,7 +54,12 @@ function RegistrationComponent({ getCachedMealRequest }: RegistrationComponentPr
     useEffect(() => {
         getCachedMealRequest().then((records: Family[]) => {
             setFamilies(records);
-            setCities(getUniqueCities(records));
+            const cities = getUniqueCities(records);
+            setCities(cities);
+            if (cities.length == 1) {
+                console.log("cities", cities)
+                setSelectedCities([cities[0]]);
+            }
         }).catch(err => setError(err));
     }, []);
 
@@ -115,13 +96,22 @@ function RegistrationComponent({ getCachedMealRequest }: RegistrationComponentPr
 
     if (selectedFamily) return (
         <div className="p-m-4">
-            <FamilyDetails family={selectedFamily} onClose={() => setSelectedFamily(null)} />
+            <FamilyDetails family={selectedFamily} onClose={() => setSelectedFamily(null)} showToast={showToast}/>
         </div>
     );
 
     return (
         <div className="registration-component">
-            <CitySelection cities={cities} onCityChange={setSelectedCities} />
+            <div className="city-selection">
+                <MultiSelect
+                    value={selectedCities}
+                    options={cities.map(city => ({ label: city, value: city }))}
+                    onChange={(e)=>setSelectedCities(e.value)}
+                    placeholder="בחר עיר"
+                    className="w-full md:w-20rem"
+                    display="chip"
+                />
+            </div>
             {filteredFamilies.length ?
                 <FamilyList families={filteredFamilies} onFamilyClick={setSelectedFamily} /> :
                 <div>בחר עיר תחילה...</div>}

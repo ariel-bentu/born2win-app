@@ -2,14 +2,17 @@ import { Button } from "primereact/button";
 import { Calendar, CalendarDateTemplateEvent } from "primereact/calendar";
 
 
-import { Availability, Family, getFamilyAvailability } from "./api";
+import { Availability, Family, getFamilyAvailability, updateFamilityDemand } from "./api";
 import { useEffect, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
+import { InProgress } from "./common-ui";
+import { ShowToast } from "./types";
 
 interface FamilyDetailsProps {
     family: Family | null;
     detailsOnly?: boolean;
+    showToast: ShowToast;
     onClose: () => void;
 }
 
@@ -20,16 +23,19 @@ function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
         d.getFullYear() === event.year;
 }
 
-export function FamilyDetails({ family, onClose, detailsOnly }: FamilyDetailsProps) {
+export function FamilyDetails({ family, onClose, detailsOnly, showToast }: FamilyDetailsProps) {
     const [availability, setAvailability] = useState<Availability[]>([]);
     const [selectedDate, setSelectedDate] = useState<Nullable<Date>>(null);
     const [error, setError] = useState<any>(undefined);
+    const [loading, setLoading] = useState<any>(undefined);
 
     useEffect(() => {
         if (family?.id && !detailsOnly) {
+            setLoading(true);
             getFamilyAvailability(family.id, family.fields.base_id)
                 .then(res => setAvailability(res))
-                .catch(err => setError(err));
+                .catch(err => setError(err))
+                .finally(() => setLoading(false));
         }
     }, [family, detailsOnly]);
 
@@ -82,6 +88,8 @@ export function FamilyDetails({ family, onClose, detailsOnly }: FamilyDetailsPro
             {!detailsOnly && <>
                 <div className="flex flex-column">
                     <h3>לבחירת תאריך:</h3>
+                    {loading && <InProgress />}
+                    {!loading && availability.length == 0 && <div>אין תאריכים זמינים</div>}
                     <Calendar
                         value={selectedDate}
                         enabledDates={availableDates}
@@ -104,7 +112,13 @@ export function FamilyDetails({ family, onClose, detailsOnly }: FamilyDetailsPro
                         disabled={!selectedDate}
                         label="שבצו אותי"
                         onClick={() => {
-                            alert("not implemented yet")
+                            const availabilityRecord = availability.find(a => dayjs(a.fields["תאריך"]).diff(selectedDate, "days") === 0);
+                            if (availabilityRecord) {
+                                updateFamilityDemand(availabilityRecord.id, true).then(() => {
+                                    showToast("success", "שיבוץ נקלט בהצלחה", "");
+                                    console.log("register success");
+                                }).catch((err) => showToast("error", "תקלה ברישום (1) - ", err.message));
+                            }
                         }} className="mt-3" />
                 </div>
             </>}

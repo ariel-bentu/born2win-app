@@ -1,16 +1,13 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Button } from 'primereact/button';
-import { Toast } from 'primereact/toast';
-import OneNotification from './one-notification';
-import { Menu } from 'primereact/menu';
-import { MenuItem } from 'primereact/menuitem';
+import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
-import { Family, getFamilyDetails, getUserRegistrations } from './api';
+import { Family, getFamilyDetails, getUserRegistrations, updateFamilityDemand } from './api';
 import { SelectButton } from 'primereact/selectbutton';
-import { RegistrationRecord } from './types';
+import { RegistrationRecord, ShowToast } from './types';
 
 import { FamilyDetails } from './famility-registration-details';
 import { InProgress } from './common-ui';
+import OneLine from './one-line';
+import { confirmPopup } from 'primereact/confirmpopup';
 
 const Filters = {
     ALL: 1,
@@ -20,7 +17,11 @@ const Filters = {
         { name: 'עתידי', value: 2 },
     ]
 }
-export function ExistingRegistrationsComponent() {
+interface ExistingRegistrationsComponentProps {
+    showToast: ShowToast;
+}
+
+export function ExistingRegistrationsComponent({ showToast }: ExistingRegistrationsComponentProps) {
     const [registrations, setRegistrations] = useState<RegistrationRecord[] | undefined>(undefined);
     const [filter, setFilter] = useState(Filters.ALL);
     const [error, setError] = useState<any>(undefined);
@@ -36,7 +37,7 @@ export function ExistingRegistrationsComponent() {
     useEffect(() => {
         if (showFamilyId) {
             setShowProgress(true);
-            getFamilyDetails(showFamilyId, "todo").then((f) => setCurrentFamily(f))
+            getFamilyDetails(showFamilyId).then((f) => setCurrentFamily(f))
                 .catch(err => setError(err))
                 .finally(() => setShowProgress(false));
         } else {
@@ -64,14 +65,13 @@ export function ExistingRegistrationsComponent() {
     )
 
     if (currentFamily) {
-        return <FamilyDetails detailsOnly={true} family={currentFamily} onClose={() => setShowFamilyId(undefined)} />
+        return <FamilyDetails detailsOnly={true} family={currentFamily} onClose={() => setShowFamilyId(undefined)} showToast={showToast} />
     }
 
     const registrationsToShow = registrations?.filter(r => filter === Filters.ALL || filter === Filters.FUTURE && isInFuture(r.date));
     console.log(registrationsToShow)
     return (
         <div>
-            נתוני דמה
             <div className='flex flex-row relative'>
                 <SelectButton
                     pt={{ root: { className: "select-button-container" } }}
@@ -85,12 +85,12 @@ export function ExistingRegistrationsComponent() {
                 />
             </div>
 
-            {showProgress && <InProgress/>}
+            {showProgress && <InProgress />}
             <div className="surface-ground px-4 py-5 md:px-6 lg:px-8">
                 <div className="grid">
                     {registrationsToShow?.length ?
                         registrationsToShow.map(reg => (
-                            <OneNotification
+                            <OneLine
                                 key={reg.id}
                                 title={reg.familyLastName}
                                 body={reg.city}
@@ -98,6 +98,19 @@ export function ExistingRegistrationsComponent() {
                                 unread={isInFuture(reg.date)}
                                 onRead={() => {
                                     setShowFamilyId(reg.familyId);
+                                }}
+                                onDelete={(event) => {
+                                    confirmPopup({
+                                        target: event.currentTarget as any,
+                                        message: 'האם לבטל שיבוץ נוכחי?',
+                                        icon: 'pi pi-exclamation-triangle',
+                                        accept: () => {
+                                            updateFamilityDemand(reg.id, false).then(() => {
+                                                showToast("success", "ביטול נקלט", "")
+                                            })
+                                                .catch((err) => showToast("error", "תקלה ברישום הביטול (2) - ", err.message));
+                                        }
+                                    });
                                 }}
                             />
                         )) :

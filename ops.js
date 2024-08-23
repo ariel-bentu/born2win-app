@@ -31,7 +31,7 @@ const apiKey = process.env.BORN2WIN_API_KEY;
 
 const manualUsers = require(manualUsersPath);
 
-async function fetchAllUsers() {
+async function updateAllUsers() {
     let offset = null;
     let count = 0;
     let countActive = 0
@@ -76,27 +76,27 @@ async function fetchAllUsers() {
 
             //console.log("add", userId, userRecord);
             const docRef = db.collection("users").doc(userId);
-            batch.create(docRef, userRecord);
+            batch.update(docRef, userRecord);
         })
 
 
 
     } while (offset);
 
-    // Add manual users
-    manualUsers.forEach(mu => {
-        const userRecord = {
-            active: true,
-            firstName: mu.firstName,
-            lastName: mu.lastName,
-            mahoz: mu.mahoz,
-            phone: mu.phone,
-            volId: mu.id,
-        }
-        //console.log("add", userId, userRecord);
-        const docRef = db.collection("users").doc(mu.id);
-        batch.create(docRef, userRecord);
-    });
+    // // Add manual users
+    // manualUsers.forEach(mu => {
+    //     const userRecord = {
+    //         active: true,
+    //         firstName: mu.firstName,
+    //         lastName: mu.lastName,
+    //         mahoz: mu.mahoz,
+    //         phone: mu.phone,
+    //         volId: mu.id,
+    //     }
+    //     //console.log("add", userId, userRecord);
+    //     const docRef = db.collection("users").doc(mu.id);
+    //     batch.create(docRef, userRecord);
+    // });
 
 
 
@@ -107,7 +107,7 @@ async function fetchAllUsers() {
 }
 
 
-//fetchAllUsers();
+//updateAllUsers();
 
 
 let districts
@@ -149,6 +149,7 @@ async function testRegistrations() {
 }
 
 //testRegistrations();
+
 
 
 function sendNotification(title, body,data, token) {

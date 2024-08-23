@@ -13,7 +13,7 @@ import dayjs = require("dayjs");
 import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
-import { AirTableRecord, Collections, FamilityIDPayload, FamilyDemand, GetDemandStatPayload, LoginInfo, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord } from "../../src/types";
+import { AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilityIDPayload, FamilyDemand, GetDemandStatPayload, LoginInfo, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord } from "../../src/types";
 import axios from "axios";
 import express = require("express");
 import crypto = require("crypto");
@@ -676,8 +676,14 @@ async function getOpenDemands(district: string, daysAhead: number): Promise<Fami
 }
 
 exports.GetFamilityAvailability = onCall({ cors: true }, async (request) => {
-    await authenticate(request);
+    const doc = await authenticate(request);
     const gfp = request.data as FamilityIDPayload;
+
+    const mahoz = doc.data().mahoz;
+
+    const districts = await getDestricts();
+    const district = districts.find(d => d.id == mahoz);
+    if (!district) throw new HttpsError("not-found", "District " + mahoz + " not found");
 
     // TODO: verify user is the same mahuz
     const apiKey = born2winApiKey.value();
@@ -685,7 +691,7 @@ exports.GetFamilityAvailability = onCall({ cors: true }, async (request) => {
         "Authorization": `Bearer ${apiKey}`,
     };
     const formula = encodeURIComponent(`AND((FIND("${gfp.familyId}",  ARRAYJOIN({record_id (from משפחה)}))>0),AND(({זמינות שיבוץ}='זמין'),IS_AFTER({תאריך},TODAY()),IS_BEFORE({תאריך},DATEADD(TODAY(),45,'days'))))`);
-    const query = `https://api.airtable.com/v0/${gfp.baseId}/דרישות לשיבוצים?filterByFormula=${formula}`;
+    const query = `https://api.airtable.com/v0/${district.base_id}/דרישות לשיבוצים?filterByFormula=${formula}`;
 
     console.log("Availability Query:", query);
     const response = await axios.get(query, {
@@ -694,15 +700,38 @@ exports.GetFamilityAvailability = onCall({ cors: true }, async (request) => {
     return response.data;
 });
 
+exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
+    const doc = await authenticate(request);
+    const mahoz = doc.data().mahoz;
+
+    const districts = await getDestricts();
+    const district = districts.find(d => d.id == mahoz);
+    if (!district) throw new HttpsError("not-found", "District " + mahoz + " not found");
+
+    const fdup = request.data as FamilityDemandUpdatePayload;
+    const apiKey = born2winApiKey.value();
+
+    const updatedFields = {
+        fields: {
+            "זמינות שיבוץ": fdup.isRegistering ? "תפוס" : "זמין",
+            "volunteer_id": fdup.isRegistering ? doc.id : null,
+        },
+    };
+    const url = `https://api.airtable.com/v0/${district.base_id}/${district.demandsTable}/${fdup.demandId}`;
+
+    return axios.patch(url, updatedFields, {
+        headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        },
+    })
+        .then(response => response.data);
+});
 
 exports.GetUserRegistrations = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);
-    let mahoz = doc.data().mahoz;
-    let volunteerId = doc.id;
-
-    // todo temp fixed dummie data
-    volunteerId = "recpvp2E7B5yEywPi";
-    mahoz = "recP17rsfOseG3Frx";
+    const mahoz = doc.data().mahoz;
+    const volunteerId = doc.id;
 
     if (mahoz && mahoz.length > 0) {
         const apiKey = born2winApiKey.value();
@@ -725,10 +754,7 @@ exports.GetUserRegistrations = onCall({ cors: true }, async (request) => {
 exports.GetFamilyDetails = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);
     const gfp = request.data as FamilityIDPayload;
-    let mahoz = doc.data().mahoz;
-
-    // todo - fix the mahoz for dummie data
-    mahoz = "recP17rsfOseG3Frx";
+    const mahoz = doc.data().mahoz;
 
     const mahuzRec = (await getDestricts()).find((d: any) => d.id === mahoz);
     if (mahuzRec) {
@@ -846,7 +872,7 @@ async function alertOpenDemands() {
         let msgBody = "מחוז: " + districts[i].name + "\n";
         if (openDemands.length > 0) {
             openDemands.forEach(od => {
-                const daysLeft = dayjs().diff(od.date, "days");
+                const daysLeft = Math.abs(dayjs().diff(od.date, "days"));
                 msgBody += `- ${od.name} (עוד ${daysLeft} ימים)` + "\n";
             });
             waitFor.push(addNotificationToQueue("שיבוצים חסרים - 5 ימים קרובים", msgBody, {}, [], adminsIds));
@@ -923,6 +949,8 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                 lastName: user.fields["שם משפחה"],
                 lastModified: now,
                 phone: user.fields["טלפון"],
+                mahoz: user.fields["מחוז"][0],
+                volId: user.id,
             } as UserRecord;
 
             if (userDoc && userDoc.exists) {

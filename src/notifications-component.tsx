@@ -9,8 +9,7 @@ import {
 import { Button } from 'primereact/button';
 import { Toast } from 'primereact/toast';
 import { NotificationRecord, NotificationStatus } from './db';
-import OneNotification from './one-notification';
-import { confirmPopup, ConfirmPopup } from 'primereact/confirmpopup';
+import { confirmPopup } from 'primereact/confirmpopup';
 import { SelectButton } from 'primereact/selectbutton';
 import "./notifications-component.css";
 import { Menu } from 'primereact/menu';
@@ -18,6 +17,7 @@ import { MenuItem } from 'primereact/menuitem';
 import dayjs from 'dayjs';
 import isToday from 'dayjs/plugin/isToday';
 import isYesterday from 'dayjs/plugin/isYesterday';
+import OneLine from './one-line';
 
 dayjs.extend(isToday);
 dayjs.extend(isYesterday);
@@ -149,13 +149,20 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                 <div className="grid">
                     {notificationToShow?.length ?
                         notificationToShow.map(notification => (
-                            <OneNotification
+                            <OneLine
                                 key={notification.id}
                                 title={notification.title}
                                 body={notification.body}
                                 footer={getNiceDateTime(notification.timestamp)}
                                 unread={notification.read == NotificationStatus.Unread}
-                                onDelete={() => deleteOne(notification.id)}
+                                onDelete={(event) => {
+                                    confirmPopup({
+                                        target: event.currentTarget,
+                                        message: "האם למחוק הודעה זו?",
+                                        icon: 'pi pi-exclamation-triangle',
+                                        accept: ()=>deleteOne(notification.id),
+                                    });
+                                }}
                                 onRead={() => markAsRead(notification.id)}
                             />
                         )) :

@@ -19,7 +19,7 @@ import {
 import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
-import { GetDemandStatPayload, NotificationUpdatePayload, Recipient, RegistrationRecord, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
+import { FamilityDemandUpdatePayload, FamilityIDPayload, GetDemandStatPayload, NotificationUpdatePayload, Recipient, RegistrationRecord, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
 
 
 const firebaseConfig = {
@@ -209,12 +209,21 @@ export function getFamilyAvailability(familyId: string, baseId: string): Promise
     });
 }
 
-export function getFamilyDetails(familyId: string, baseId: string) {
+export function updateFamilityDemand(demandId: string, isRegistering:boolean) {
+    const UpdateFamilityDemandFunc = httpsCallable(functions, 'UpdateFamilityDemand');
+    const payload = {
+        demandId,
+        isRegistering,
+    } as FamilityDemandUpdatePayload;
+
+    return UpdateFamilityDemandFunc(payload)
+}
+
+export function getFamilyDetails(familyId: string) {
     const getFamilyDetailsFunc = httpsCallable(functions, 'GetFamilyDetails');
     const payload = {
-        familyId,
-        baseId,
-    };
+        familyId
+    } as FamilityIDPayload;
 
     return getFamilyDetailsFunc(payload).then((res: any) => {
         return res.data as Family;
@@ -228,8 +237,7 @@ export function getUserRegistrations(): Promise<RegistrationRecord[]> {
             id: rec.id,
             date: rec.fields["תאריך"],
             city: rec.fields["עיר"][0],
-            familyLastName: rec.fields["שם משפחה של החולה"],
-            weekday: rec.fields["יום בשבוע1"],
+            familyLastName: rec.fields.Name,
             familyId: rec.fields["משפחה"][0],
         } as RegistrationRecord;
     }));

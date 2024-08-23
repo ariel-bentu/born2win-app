@@ -15,9 +15,12 @@ export interface NotificationUpdatePayload {
 
 export interface FamilityIDPayload {
     familyId: string;
-    baseId: string;
 }
 
+export interface FamilityDemandUpdatePayload {
+    demandId: string;
+    isRegistering: boolean; // true means register, false mean unregister
+}
 
 export interface TokenInfo {
     token: string;

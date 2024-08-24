@@ -4,7 +4,13 @@ export const Collections = {
     Users: "users",
     Admins: "admins",
     Notifications: "notifications",
+    Cancellations: "cancellations",
 };
+
+export const NotificationActions = {
+    RegistrationDetails: "registration-details",
+    StartConversation: "start-conversation"
+}
 
 export type onClickEvent = (e: any) => void;
 
@@ -27,6 +33,7 @@ export interface FamilityDemandUpdatePayload {
     familyId: string;
     cityId: string;
     isRegistering: boolean; // true means register, false mean unregister
+    reason?: string;
 }
 
 export interface TokenInfo {
@@ -152,4 +159,5 @@ export interface FamilyDemand {
     name: string;
     date: string;
     id: string;
+    volunteerId: string;
 }

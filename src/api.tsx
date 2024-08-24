@@ -209,13 +209,14 @@ export function getFamilyAvailability(familyId: string, baseId: string): Promise
     });
 }
 
-export function updateFamilityDemand(demandId: string, familyId:string,  cityId:string, isRegistering:boolean) {
+export function updateFamilityDemand(demandId: string, familyId:string,  cityId:string, isRegistering:boolean, reason?:string) {
     const UpdateFamilityDemandFunc = httpsCallable(functions, 'UpdateFamilityDemand');
     const payload = {
         demandId,
         familyId,
         isRegistering,
         cityId,
+        reason,
     } as FamilityDemandUpdatePayload;
 
     return UpdateFamilityDemandFunc(payload)

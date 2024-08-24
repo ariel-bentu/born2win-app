@@ -41,6 +41,13 @@
   height: 20px;
 }
 
+.icon-btn-withLabel {
+  width: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem; /* Add space between the icon and the label */
+}
 .red-dot {
   position: absolute;
   left: 5px;

@@ -13,11 +13,13 @@ import dayjs = require("dayjs");
 import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
-import { AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilityIDPayload, FamilyDemand, GetDemandStatPayload, LoginInfo, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord } from "../../src/types";
+import { AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilityIDPayload, FamilyDemand, GetDemandStatPayload, LoginInfo, NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord } from "../../src/types";
 import axios from "axios";
 import express = require("express");
 import crypto = require("crypto");
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { IL_DATE } from "../../src/utils";
+import localeData = require("dayjs/plugin/localeData");
 
 // [END Imports]
 
@@ -28,6 +30,12 @@ admin.initializeApp();
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
+require("dayjs/locale/he");
+
+
+dayjs.extend(localeData);
+dayjs.locale("he");
+
 const JERUSALEM = "Asia/Jerusalem";
 const DATE_TIME = "YYYY-MM-DD HH:mm";
 const db = getFirestore();
@@ -305,7 +313,7 @@ exports.TestNotification = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);
     if (doc) {
         const displayName = doc.data().firstName + " " + doc.data().lastName;
-        return addNotificationToQueue("הודעת בדיקה", "הודעת בדיקה ל:\n" + displayName, {}, [], [doc.id]);
+        return addNotificationToQueue("הודעת בדיקה", "הודעת בדיקה ל:\n" + displayName, [], [doc.id]);
     }
 
     return;
@@ -345,12 +353,12 @@ exports.SearchUsers = onCall({ cors: true }, async (request): Promise<Recipient[
     throw new HttpsError("unauthenticated", "Only admin can send message.");
 });
 
-async function addNotificationToQueue(title: string, body: string, data: any, toDistricts: string[], toRecipients: string[]) {
+async function addNotificationToQueue(title: string, body: string, toDistricts: string[], toRecipients: string[], data?: { [key: string]: string }) {
     const docRef = db.collection(Collections.Notifications).doc();
     return docRef.create({
         title,
         body,
-        data: JSON.stringify(data),
+        ...(data && { data: JSON.stringify(data) }),
         toDistricts,
         toRecipients,
         created: dayjs().format(DATE_TIME),
@@ -359,19 +367,20 @@ async function addNotificationToQueue(title: string, body: string, data: any, to
 
 exports.OnNotificationAdded = onDocumentCreated(`${Collections.Notifications}/{docId}`, async (event) => {
     if (event.data) {
-        const { title, body, data, toRecipients, toDistricts } = event.data.data();
-        const dataObj = JSON.parse(data);
+        const payloadData = event.data.data();
+        const { title, body, toRecipients, toDistricts } = payloadData;
+        const data = payloadData.data ? JSON.parse(payloadData.data) : undefined;
 
         const waitFor = [];
         if (toRecipients && toRecipients.length > 0) {
             const devices = await getWebTokens(toRecipients);
-            waitFor.push(sendNotification(title, body, dataObj, devices));
+            waitFor.push(sendNotification(title, body, devices, data));
         }
 
         if (toDistricts && toDistricts.length > 0) {
             for (let i = 0; i < toDistricts.length; i++) {
                 const devices = await getWebTokens(`district:${toDistricts[i]}`);
-                waitFor.push(sendNotification(title, body, {}, devices));
+                waitFor.push(sendNotification(title, body, devices, data));
             }
         }
 
@@ -401,7 +410,7 @@ exports.SendMessage = onCall({ cors: true }, async (request) => {
     if (userInfo.isAdmin) {
         const smp = request.data as SendMessagePayload;
 
-        return addNotificationToQueue(smp.title, smp.body, {}, smp.toDistricts, smp.toRecipients);
+        return addNotificationToQueue(smp.title, smp.body, smp.toDistricts, smp.toRecipients);
     }
 
     throw new HttpsError("unauthenticated", "Only admin can send message.");
@@ -498,25 +507,25 @@ function chunkArray(array: any[], chunkSize: number) {
     return chunks;
 }
 
-const sendNotification = (title: string, body: string, data: any, devices: DeviceInfo[]): Promise<SendNotificationStats> => {
+const sendNotification = (title: string, body: string, devices: DeviceInfo[], data?: { [key: string]: string },): Promise<SendNotificationStats> => {
     // logger.info("sendNotification", title, body, data, devices);
 
     const imageUrl = "https://born2win-prod.web.app/favicon.ico";
     const actionUrl = "https://born2win-prod.web.app";
-    const message = {
+    const message: any = {
         notification: {
             title,
             body,
             imageUrl,
             // TODO actions:Array<{ action: string; icon?: string; title: string; }> An array of notification actions representing the actions available to the user when the notification is presented.
         },
-        data,
         webpush: {
             notification: {
                 title: title,
                 body: body,
                 icon: imageUrl,
                 click_action: actionUrl,
+                data,
             },
             fcmOptions: {
                 link: actionUrl,
@@ -649,7 +658,7 @@ exports.GetMealRequests = onCall({ cors: true }, async (request) => {
 });
 
 
-async function getOpenDemands(district: string, daysAhead: number): Promise<FamilyDemand[]> {
+async function getDemands(district: string, status: "תפוס" | "זמין", daysAhead: number): Promise<FamilyDemand[]> {
     const apiKey = born2winApiKey.value();
     const headers = {
         "Authorization": `Bearer ${apiKey}`,
@@ -657,7 +666,7 @@ async function getOpenDemands(district: string, daysAhead: number): Promise<Fami
     const mahuzRec = (await getDestricts()).find((d: any) => d.id === district);
     if (mahuzRec) {
         const baseId = mahuzRec.base_id;
-        const formula = encodeURIComponent(`AND(({זמינות שיבוץ}='זמין'),IS_AFTER({תאריך},TODAY()),IS_BEFORE({תאריך},DATEADD(TODAY(),${daysAhead},'days')))`);
+        const formula = encodeURIComponent(`AND(({זמינות שיבוץ}='${status}'),IS_AFTER({תאריך},TODAY()),IS_BEFORE({תאריך},DATEADD(TODAY(),${daysAhead + 2},'days')))`);
         const query = `https://api.airtable.com/v0/${baseId}/דרישות לשיבוצים?filterByFormula=${formula}`;
         const demands = await axios.get(query, {
             headers,
@@ -669,6 +678,7 @@ async function getOpenDemands(district: string, daysAhead: number): Promise<Fami
                 district: district,
                 date: demand.fields["תאריך"],
                 id: demand.fields.id,
+                volunteerId: demand.fields.volunteer_id,
             }));
         }
     }
@@ -711,6 +721,10 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
 
     const fdup = request.data as FamilityDemandUpdatePayload;
     const apiKey = born2winApiKey.value();
+
+    if (!fdup.isRegistering && !(fdup.reason && fdup.reason.trim().length > 0)) {
+        throw new HttpsError("invalid-argument", "Missing reason to cancellation");
+    }
 
     const updatedFields = {
         fields: {
@@ -761,7 +775,7 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
 משפחה: ${updatedRecord.fields.Name}
 מתנדב: ${doc.data().firstName + " " + doc.data().lastName}
 עיר: ${updatedRecord.fields["עיר"]}
-`, {}, [], adminsIds);
+`, [], adminsIds);
 
             logger.info("New registration added", response.data);
         });
@@ -783,6 +797,17 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
                 await axios.delete(deleteUrl, httpOptions);
                 logger.info("Existing registration removed", rec.id, "family", fdup.familyId, "vid", volunteerId);
 
+                // Add cancellation record
+                const cancallationRec = await db.collection(Collections.Cancellations).doc();
+                await cancallationRec.create({
+                    cancelledAt: dayjs().utc().tz(JERUSALEM).format(DATE_TIME),
+                    demandDate: demandDate,
+                    reason: fdup.reason,
+                    demandId: rec.id,
+                    volunteerId,
+                    familyId: fdup.familyId,
+                });
+
                 // send notification to admins
                 const admins = await db.collection(Collections.Admins).get();
                 const adminsIds = admins.docs.map(doc => doc.id);
@@ -791,7 +816,7 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
 משפחה: ${updatedRecord.fields.Name}
 מתנדב: ${doc.data().firstName + " " + doc.data().lastName}
 עיר: ${updatedRecord.fields["עיר"]}
-`, {}, [], adminsIds);
+`, [], adminsIds);
 
                 return;
             }
@@ -895,6 +920,7 @@ const schedules = [
     { desc: "Refresh webhook registration", min: 0, hour: [0], weekDay: "*", callback: refreshWebhookToken },
     { desc: "Sync Born2Win users daily", min: 0, hour: [17], weekDay: "*", callback: syncBorn2WinUsers },
     { desc: "Alert 5 days ahead open demand", min: 40, hour: [13], weekDay: "*", callback: alertOpenDemands },
+    { desc: "Alert 72 hours before cooking", min: 0, hour: [16], weekDay: "*", callback: alertUpcomingCooking },
 ];
 
 function check(obj: any, fieldName: string, value: any) {
@@ -940,17 +966,47 @@ async function alertOpenDemands() {
     const waitFor = [];
 
     for (let i = 0; i < districts.length; i++) {
-        const openDemands = await getOpenDemands(districts[i].id, 5);
+        const openDemands = await getDemands(districts[i].id, "זמין", 5);
         let msgBody = "מחוז: " + districts[i].name + "\n";
         if (openDemands.length > 0) {
             openDemands.forEach(od => {
                 const daysLeft = Math.abs(dayjs().diff(od.date, "days"));
                 msgBody += `- ${od.name} (עוד ${daysLeft} ימים)` + "\n";
             });
-            waitFor.push(addNotificationToQueue("שיבוצים חסרים - 5 ימים קרובים", msgBody, {}, [], adminsIds));
+            waitFor.push(addNotificationToQueue("שיבוצים חסרים - 5 ימים קרובים", msgBody, [], adminsIds));
         }
     }
     Promise.all(waitFor);
+}
+
+async function alertUpcomingCooking() {
+    const districts = await getDestricts();
+    const daysBefore = 3;
+    for (let i = 0; i < districts.length; i++) {
+        if (districts[i].id !== "recxuE1Cwav0kfA7g") continue; // only in test for now
+        const upcomingDemands = await getDemands(districts[i].id, "תפוס", daysBefore);
+        for (let j = 0; j < upcomingDemands.length; j++) {
+            const demand = upcomingDemands[j];
+            const daysLeft = -dayjs().diff(demand.date, "days");
+
+            if (daysLeft === daysBefore) {
+                const msgBody = `תאריך הבישול: ${dayjs(demand.date).format(IL_DATE)}
+עוד: ${daysBefore} ימים
+משפחה: ${demand.name}
+עיר: ${demand.city}
+לא לשכוח לתאם עוד היום בשיחה או הודעה את שעת מסירת האוכל.
+אם אין באפשרותך לבשל יש לבטל באפליקציה, או ליצור קשר.`;
+                await addNotificationToQueue("תזכורת לבישול!", msgBody, [], [demand.volunteerId], {
+                    buttons: JSON.stringify([
+                        { label: "צפה בפרטים", action: NotificationActions.RegistrationDetails, params: [demand.id] },
+                        { label: "צור קשר עם עמותה", action: NotificationActions.StartConversation },
+                    ]),
+                }
+                );
+            }
+        }
+        // TODO send summary notification to admin?
+    }
 }
 
 async function refreshWebhookToken() {
@@ -1070,7 +1126,7 @@ async function syncBorn2WinUsers(sinceDate?: any) {
             await Promise.all(newLinksToAdmin.map(link => addNotificationToQueue("לינק למשתמש", `שם: ${link.name}
 טלפון: ${link.phone}
 לינק לשליחה למשתמש: ${link.link}
-`, {}, [], adminsIds)));
+`, [], adminsIds)));
         }
         return;
     });

@@ -30,7 +30,7 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
             
         },
         {
-            label: 'שלח הודעות בדיקה',
+            label: 'שלח הודעת בדיקה',
             icon: 'pi pi-envelope',
             disabled: !onSendTestNotificationClick,
             command:  onSendTestNotificationClick,

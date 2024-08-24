@@ -42,6 +42,7 @@ self.addEventListener('push',  (event: any) => {
                     title: notificationTitle,
                     body: payload.notification.body || "",
                     read: NotificationStatus.Unread,
+                    data: payload.notification.data,
                     timestamp: Date.now(),
                 });
 
@@ -50,7 +51,7 @@ self.addEventListener('push',  (event: any) => {
                     requireInteraction: true,
                     ...payload.notification,
                     data: {
-                        ...payload.data,
+                        // ...payload.data,
                         click_url: payload.notification.click_action,
                     },
                 };

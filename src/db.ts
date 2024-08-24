@@ -14,6 +14,7 @@ export interface NotificationRecord {
     title: string;
     body: string;
     read: number; // 0 for unread, 1 for read
+    data?: { [key: string]: string };
     timestamp: number;
 };
 

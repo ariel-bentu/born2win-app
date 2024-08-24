@@ -8,6 +8,8 @@ import { FamilyDetails } from './famility-registration-details';
 import { InProgress } from './common-ui';
 import OneLine from './one-line';
 import { confirmPopup } from 'primereact/confirmpopup';
+import RegistrationCancellation from './registration-cancellation';
+import { NICE_DATE } from './utils';
 
 const Filters = {
     ALL: 1,
@@ -29,6 +31,7 @@ export function ExistingRegistrationsComponent({ showToast }: ExistingRegistrati
     const [currentFamily, setCurrentFamily] = useState<Family | undefined>();
     const [showProgress, setShowProgress] = useState<boolean>(false);
     const [reload, setReload] = useState<number>(0);
+    const [showCancellationDialog, setShowCancellationDialog] = useState<RegistrationRecord | null>(null);
 
     useEffect(() => {
         getUserRegistrations().then((regs) => {
@@ -72,6 +75,20 @@ export function ExistingRegistrationsComponent({ showToast }: ExistingRegistrati
         return <FamilyDetails detailsOnly={true} family={currentFamily} onClose={() => setShowFamilyId(undefined)} showToast={showToast} cityId={currentFamily.fields.city_id_1} />
     }
 
+    if (showCancellationDialog) {
+        return <RegistrationCancellation
+            onClose={() => setShowCancellationDialog(null)}
+            onCancellationPerformed={() => {
+                setShowCancellationDialog(null);
+                showToast("success", "ביטול נקלט", "");
+                setShowFamilyId(undefined);
+                setReload(prev => prev + 1);
+            }}
+            onError={(err)=>showToast("error", "ביטול רישום נכשל", err.message)}
+            registration={showCancellationDialog}
+        />;
+    }
+
     const registrationsToShow = registrations?.filter(r => filter === Filters.ALL || filter === Filters.FUTURE && isInFuture(r.date));
     console.log(registrationsToShow)
     return (
@@ -97,30 +114,16 @@ export function ExistingRegistrationsComponent({ showToast }: ExistingRegistrati
                             <OneLine
                                 key={reg.id}
                                 title={reg.familyLastName}
-                                body={reg.city}
-                                footer={dayjs(reg.date).format("[יום ]dddd, D [ב]MMMM")}
+                                body={`עיר: ${reg.city}`}
+                                footer={dayjs(reg.date).format(NICE_DATE)}
                                 unread={isInFuture(reg.date)}
                                 onRead={() => {
                                     setShowFamilyId(reg.familyRecordId);
                                 }}
-                                onDelete={dayjs(reg.date).isBefore(dayjs()) ? undefined : // only allow deleting future commitments
-                                    (event) => {
-                                        confirmPopup({
-                                            target: event.currentTarget as any,
-                                            message: 'האם לבטל שיבוץ נוכחי?',
-                                            icon: 'pi pi-exclamation-triangle',
-                                            accept: () => {
-                                                updateFamilityDemand(reg.id, reg.familyId, "cityId(unknown)", false).then(() => {
-                                                    showToast("success", "ביטול נקלט", "")
-                                                })
-                                                    .catch((err) => showToast("error", "תקלה ברישום הביטול (2) - ", err.message))
-                                                    .finally(() => {
-                                                        setShowFamilyId(undefined);
-                                                        setReload(prev => prev + 1);
-                                                    });
-                                            }
-                                        });
-                                    }}
+                                onDelete={dayjs(reg.date).isBefore(dayjs()) ?
+                                    undefined : // only allow deleting future commitments
+                                    () => setShowCancellationDialog(reg)}
+                                deleteLabel={"ביטול שיבוץ"}
                             />
                         )) :
                         <div className='no-messages'>אין רישומים</div>

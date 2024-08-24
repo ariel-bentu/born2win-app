@@ -9,7 +9,7 @@ import 'primeflex/primeflex.css';
 import './App.css';
 import * as api from './api';
 import { NextOrObserver, User } from 'firebase/auth';
-import { Cached, ShowToast, UserInfo } from './types';
+import { Cached, NotificationActions, ShowToast, UserInfo } from './types';
 import { ClientJS } from 'clientjs';
 import NotificationsComponent from './notifications-component';
 import { countUnreadNotifications } from './notifications';
@@ -25,6 +25,8 @@ import dayjs from 'dayjs';
 import { SendMessage } from './send-message';
 import { confirmPopup, ConfirmPopup } from 'primereact/confirmpopup';
 import { isNotEmpty } from './utils';
+// import { Button } from 'primereact/button';
+// import { getDB } from './db';
 
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
@@ -285,9 +287,20 @@ function App() {
             {/* <Button onClick={async () => {
                 const db = await getDB();
                 await db.put('notifications', {
-                    id: Date.now() + "",
-                    title: "ממתינים שיבוצים",
-                    body: "יש עוד 5 משפחות שטרם שובצו להם מבשלים.ות",
+id: Date.now() + "",
+title: "תזכורת",
+body: `תאריך הבישול: 2024-18-28
+עוד: 3 ימים
+משפחה: yyy
+עיר: xxx
+לא לשכוח לתאם עוד היום בשיחה או הודעה את שעת מסירת האוכל.
+אם אין באפשרותך לבשל יש לבטל באפליקציה, או ליצור קשר.`,
+                    data: JSON.stringify({
+                                        buttons: [
+                                            { label: "צפה בפרטים", action: NotificationActions.RegistrationDetails, params: ["1234"] },
+                                            { label: "צור קשר עם עמותה", action: NotificationActions.StartConversation },
+                                        ],
+                                    }),
                     read: 0,
                     timestamp: Date.now(),
                 });

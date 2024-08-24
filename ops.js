@@ -11,7 +11,8 @@ const serviceAccountPath = path.join(homeDirectory, 'Library', 'CloudStorage', '
 const manualUsersPath = path.join(homeDirectory, 'Library', 'CloudStorage', 'OneDrive-SAPSE', 'Documents', 'born2win', 'users.json');
 
 var admin = require("firebase-admin");
-
+const NICE_DATE = "[יום ]dddd, D [ב]MMMM";
+const IL_DATE = "DD-MM-YYYY";
 const {
     FieldPath,
     FieldValue,
@@ -30,6 +31,19 @@ const apiKey = process.env.BORN2WIN_API_KEY;
 
 
 const manualUsers = require(manualUsersPath);
+
+
+async function addNotificationToQueue(title, body, toDistricts, toRecipients, data) {
+    const docRef = db.collection("notifications").doc();
+    return docRef.create({
+        title,
+        body,
+        data: JSON.stringify(data),
+        toDistricts,
+        toRecipients,
+        created: dayjs().format("YYYY-MM-DD HH:mm"),
+    }).then(() => docRef.id);
+}
 
 async function updateAllUsers() {
     let offset = null;
@@ -152,7 +166,7 @@ async function testRegistrations() {
 
 
 
-function sendNotification(title, body,data, token) {
+function sendNotification(title, body, data, token) {
     const imageUrl = "https://born2win-prod.web.app/favicon.ico";
     const actionUrl = "https://born2win-prod.web.app";
     const message = {
@@ -163,22 +177,23 @@ function sendNotification(title, body,data, token) {
             imageUrl,
             // TODO actions:Array<{ action: string; icon?: string; title: string; }> An array of notification actions representing the actions available to the user when the notification is presented.
         },
-        data,
+        // data,
         webpush: {
             notification: {
                 title: title,
                 body: body,
                 icon: imageUrl,
                 click_action: actionUrl,
+                data,
             },
             fcmOptions: {
                 link: actionUrl,
             },
         },
     };
-    return admin.messaging().send(message).then(()=>{
+    return admin.messaging().send(message).then(() => {
         console.log("success")
-    }).catch(err=>console.err(err.message))
+    }).catch(err => console.log("error", err.message))
 
 }
 
@@ -194,11 +209,11 @@ async function searchMeals() {
         },
     };
     const filterFormula = `DATETIME_FORMAT({DATE}, 'YYYY-MM-DD')="2024-09-24"`;
-        // AND(
-        // FIND("${fdup.familyId}", ARRAYJOIN({משפחה})),
-        // FIND("${volunteerId}", ARRAYJOIN({מתנדב})),
-        // DATESTR({DATE})="${updatedRecord.fields["תאריך"]}"
-        // )`;
+    // AND(
+    // FIND("${fdup.familyId}", ARRAYJOIN({משפחה})),
+    // FIND("${volunteerId}", ARRAYJOIN({מתנדב})),
+    // DATESTR({DATE})="${updatedRecord.fields["תאריך"]}"
+    // )`;
 
     const findResult = await axios.get(urlMainBase, {
         ...httpOptions,
@@ -209,10 +224,73 @@ async function searchMeals() {
     });
 
     if (findResult.data.records.length > 0) {
-        const rec = findResult.data.records.find(r=>r.fields["משפחה"][0] == "recwVL742srgkzO0u" && r.fields["מתנדב"][0] == "recqAUvw8rqaiMiX4");
+        const rec = findResult.data.records.find(r => r.fields["משפחה"][0] == "recwVL742srgkzO0u" && r.fields["מתנדב"][0] == "recqAUvw8rqaiMiX4");
         if (rec) {
             console.log("id", rec.id);
         }
     }
 }
 //searchMeals()
+
+
+async function alertUpcomingCooking() {
+    const districts = await getDestricts();
+    const daysBefore = 9;
+    for (let i = 0; i < districts.length; i++) {
+        if (districts[i].id !== "recxuE1Cwav0kfA7g") continue; // only in test for now
+        const upcomingDemands = await getDemands(districts[i].id, "תפוס", daysBefore);
+        for (let j = 0; j < upcomingDemands.length; j++) {
+            const demand = upcomingDemands[j];
+            const daysLeft = -dayjs().diff(demand.date, "days");
+
+            if (daysLeft === daysBefore) {
+                const msgBody = `תאריך הבישול: ${dayjs(demand.date).format(IL_DATE)}
+עוד: ${daysBefore} ימים
+משפחה: ${demand.name}
+עיר: ${demand.city}
+לא לשכוח לתאם עוד היום בשיחה או הודעה את שעת מסירת האוכל.
+אם אין באפשרותך לבשל יש לבטל באפליקציה, או ליצור קשר.`;
+
+
+                await addNotificationToQueue("תזכורת לבישול!", msgBody, [], [demand.volunteerId], {
+                    buttons: JSON.stringify([
+                        { label: "צפה בפרטים", action: "registration-details", params: [demand.id] },
+                        { label: "צור קשר עם עמותה", action: "start-conversation" },
+                    ]),
+                }
+                );
+            }
+        }
+        // TODO send summary notification to admin?
+    }
+}
+
+async function getDemands(district, status, daysAhead) {
+    const headers = {
+        "Authorization": `Bearer ${apiKey}`,
+    };
+    const mahuzRec = (await getDestricts()).find((d) => d.id === district);
+    if (mahuzRec) {
+        const baseId = mahuzRec.base_id;
+        const formula = encodeURIComponent(`AND(({זמינות שיבוץ}='${status}'),IS_AFTER({תאריך},TODAY()),IS_BEFORE({תאריך},DATEADD(TODAY(),${daysAhead+2},'days')))`);
+        const query = `https://api.airtable.com/v0/${baseId}/דרישות לשיבוצים?filterByFormula=${formula}`;
+        const demands = await axios.get(query, {
+            headers,
+        });
+        if (demands.data.records) {
+            return demands.data.records.map((demand) => ({
+                city: demand.fields["עיר"][0],
+                name: demand.fields.Name,
+                district: district,
+                date: demand.fields["תאריך"],
+                id: demand.fields.id,
+                volunteerId: demand.fields.volunteer_id,
+            }));
+        }
+    }
+    return [];
+}
+
+alertUpcomingCooking()
+
+//sendNotification("hi", "2", { "a": "b" }, "")

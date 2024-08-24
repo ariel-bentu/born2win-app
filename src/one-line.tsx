@@ -1,16 +1,24 @@
 import { Button } from 'primereact/button';
-import {  confirmPopup } from 'primereact/confirmpopup';
+import { confirmPopup } from 'primereact/confirmpopup';
+
+interface LineButton {
+    label: string;
+    action: string;
+    param: string[];
+}
 
 interface OneLineProps {
     title: string;
     body: string;
     unread: boolean;
     footer?: string;
-    onDelete?: (event:any) => void;
+    onDelete?: (event: any) => void;
     onRead: () => void;
+    deleteLabel?: string;
+    buttons?: LineButton[];
 }
 
-export default function OneLine({ title, body, unread, footer, onDelete, onRead }: OneLineProps) {
+export default function OneLine({ title, body, unread, footer, onDelete, onRead, deleteLabel, buttons }: OneLineProps) {
 
     const handleCopyLink = (link: string) => {
         navigator.clipboard.writeText(link);
@@ -56,10 +64,17 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead 
                         {unread && <div className='red-dot' />}
                     </div>
                 </div>
+
+                {buttons?.length && <div className="flex flex-row align-items-end justify-content-between">
+                    {buttons.map(btn=> (<Button label={btn.label} />))}
+                </div>}
                 <div className="flex flex-row align-items-end justify-content-between">
-                    {footer && <span className="text-500">{footer}</span>}
+                    {footer && <span className="text-400">{footer}</span>}
                     {onDelete && <div className="flex justify-content-end mt-3">
-                        <Button unstyled icon="pi pi-trash" className='icon-btn' onClick={onDelete}/>
+                        <Button unstyled label={deleteLabel} icon="pi pi-trash" className={"icon-btn " + (deleteLabel ? "icon-btn-withLabel" : "")} onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(e);
+                        }} />
                     </div>}
                 </div>
             </div>

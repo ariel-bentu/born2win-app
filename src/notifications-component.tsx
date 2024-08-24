@@ -148,8 +148,9 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
             <div className="surface-ground px-4 py-5 md:px-6 lg:px-8">
                 <div className="grid">
                     {notificationToShow?.length ?
-                        notificationToShow.map(notification => (
-                            <OneLine
+                        notificationToShow.map(notification => {
+                            (notification as any)?.data && console.log(JSON.parse((notification as any)?.data?.buttons))
+                            return <OneLine
                                 key={notification.id}
                                 title={notification.title}
                                 body={notification.body}
@@ -160,13 +161,15 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                                         target: event.currentTarget,
                                         message: "האם למחוק הודעה זו?",
                                         icon: 'pi pi-exclamation-triangle',
-                                        accept: ()=>deleteOne(notification.id),
+                                        accept: () => deleteOne(notification.id),
                                     });
                                 }}
+                                deleteLabel="מחק"
+                                buttons={notification.data?.buttons && JSON.parse(notification.data?.buttons)}
                                 onRead={() => markAsRead(notification.id)}
                             />
-                        )) :
-                        <div className='no-messages'>אין הודעות</div>
+                        }) :
+                    <div className='no-messages'>אין הודעות</div>
                     }
 
                 </div>

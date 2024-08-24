@@ -254,7 +254,7 @@ async function alertUpcomingCooking() {
 
                 await addNotificationToQueue("תזכורת לבישול!", msgBody, [], [demand.volunteerId], {
                     buttons: JSON.stringify([
-                        { label: "צפה בפרטים", action: "registration-details", params: [demand.id] },
+                        { label: "צפה בפרטים", action: "registration-details", params: [demand.familyId] },
                         { label: "צור קשר עם עמותה", action: "start-conversation" },
                     ]),
                 }
@@ -284,6 +284,7 @@ async function getDemands(district, status, daysAhead) {
                 district: district,
                 date: demand.fields["תאריך"],
                 id: demand.fields.id,
+                familyId: demand.fields["משפחה"][0],
                 volunteerId: demand.fields.volunteer_id,
             }));
         }
@@ -291,6 +292,6 @@ async function getDemands(district, status, daysAhead) {
     return [];
 }
 
-alertUpcomingCooking()
+//alertUpcomingCooking()
 
 //sendNotification("hi", "2", { "a": "b" }, "")

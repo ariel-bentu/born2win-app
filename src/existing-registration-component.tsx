@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import { Family, getFamilyDetails, getUserRegistrations, updateFamilityDemand } from './api';
 import { SelectButton } from 'primereact/selectbutton';
-import { RegistrationRecord, ShowToast } from './types';
+import { NavigationStep, RegistrationRecord, ShowToast } from './types';
 
 import { FamilyDetails } from './famility-registration-details';
 import { InProgress } from './common-ui';
@@ -21,13 +21,14 @@ const Filters = {
 }
 interface ExistingRegistrationsComponentProps {
     showToast: ShowToast;
+    navigationRequest?: NavigationStep,
 }
 
-export function ExistingRegistrationsComponent({ showToast }: ExistingRegistrationsComponentProps) {
-    const [registrations, setRegistrations] = useState<RegistrationRecord[] | undefined>(undefined);
+export function ExistingRegistrationsComponent({ showToast, navigationRequest }: ExistingRegistrationsComponentProps) {
+    const [registrations, setRegistrations] = useState<RegistrationRecord[] | undefined>();
     const [filter, setFilter] = useState(Filters.ALL);
     const [error, setError] = useState<any>(undefined);
-    const [showFamilyId, setShowFamilyId] = useState<string | undefined>();
+    const [showFamilyId, setShowFamilyId] = useState<string | undefined>(navigationRequest && navigationRequest.params && navigationRequest.params.length > 0 ? navigationRequest.params[0] : undefined);
     const [currentFamily, setCurrentFamily] = useState<Family | undefined>();
     const [showProgress, setShowProgress] = useState<boolean>(false);
     const [reload, setReload] = useState<number>(0);
@@ -36,21 +37,26 @@ export function ExistingRegistrationsComponent({ showToast }: ExistingRegistrati
     useEffect(() => {
         getUserRegistrations().then((regs) => {
             regs.sort((a, b) => a.date > b.date ? 1 : -1);
+            console.log("registrations loaded", regs?.length)
             setRegistrations(regs);
         })
             .catch(err => setError(err));
     }, [reload]);
 
     useEffect(() => {
-        if (showFamilyId) {
+        if (showFamilyId && registrations && registrations.length > 0) {
+            console.log("Loading family details", showFamilyId);
             setShowProgress(true);
-            getFamilyDetails(showFamilyId).then((f) => setCurrentFamily(f))
+            getFamilyDetails(showFamilyId).then((f) => {
+                console.log(" family details", f);
+                setCurrentFamily(f)
+            })
                 .catch(err => setError(err))
                 .finally(() => setShowProgress(false));
         } else {
             setCurrentFamily(undefined);
         }
-    }, [showFamilyId]);
+    }, [showFamilyId, registrations]);
 
     const isInFuture = (date: string) => {
         return dayjs().diff(dayjs(date)) <= 0;
@@ -84,13 +90,12 @@ export function ExistingRegistrationsComponent({ showToast }: ExistingRegistrati
                 setShowFamilyId(undefined);
                 setReload(prev => prev + 1);
             }}
-            onError={(err)=>showToast("error", "ביטול רישום נכשל", err.message)}
+            onError={(err) => showToast("error", "ביטול רישום נכשל", err.message)}
             registration={showCancellationDialog}
         />;
     }
 
     const registrationsToShow = registrations?.filter(r => filter === Filters.ALL || filter === Filters.FUTURE && isInFuture(r.date));
-    console.log(registrationsToShow)
     return (
         <div>
             <div className='flex flex-row relative'>

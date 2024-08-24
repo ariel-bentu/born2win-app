@@ -18,6 +18,7 @@ import dayjs from 'dayjs';
 import isToday from 'dayjs/plugin/isToday';
 import isYesterday from 'dayjs/plugin/isYesterday';
 import OneLine from './one-line';
+import { NotificationActionHandler } from './notification-actions';
 
 dayjs.extend(isToday);
 dayjs.extend(isYesterday);
@@ -148,28 +149,27 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
             <div className="surface-ground px-4 py-5 md:px-6 lg:px-8">
                 <div className="grid">
                     {notificationToShow?.length ?
-                        notificationToShow.map(notification => {
-                            (notification as any)?.data && console.log(JSON.parse((notification as any)?.data?.buttons))
-                            return <OneLine
-                                key={notification.id}
-                                title={notification.title}
-                                body={notification.body}
-                                footer={getNiceDateTime(notification.timestamp)}
-                                unread={notification.read == NotificationStatus.Unread}
-                                onDelete={(event) => {
-                                    confirmPopup({
-                                        target: event.currentTarget,
-                                        message: "האם למחוק הודעה זו?",
-                                        icon: 'pi pi-exclamation-triangle',
-                                        accept: () => deleteOne(notification.id),
-                                    });
-                                }}
-                                deleteLabel="מחק"
-                                buttons={notification.data?.buttons && JSON.parse(notification.data?.buttons)}
-                                onRead={() => markAsRead(notification.id)}
-                            />
-                        }) :
-                    <div className='no-messages'>אין הודעות</div>
+                        notificationToShow.map(notification => <OneLine
+                            key={notification.id}
+                            title={notification.title}
+                            body={notification.body}
+                            footer={getNiceDateTime(notification.timestamp)}
+                            unread={notification.read == NotificationStatus.Unread}
+                            onDelete={(event) => {
+                                confirmPopup({
+                                    target: event.currentTarget,
+                                    message: "האם למחוק הודעה זו?",
+                                    icon: 'pi pi-exclamation-triangle',
+                                    accept: () => deleteOne(notification.id),
+                                });
+                            }}
+                            deleteLabel="מחק"
+                            buttons={notification.data?.buttons && JSON.parse(notification.data?.buttons)}
+                            onLineButtonPressed={NotificationActionHandler}
+                            onRead={() => markAsRead(notification.id)}
+                        />
+                        ) :
+                        <div className='no-messages'>אין הודעות</div>
                     }
 
                 </div>

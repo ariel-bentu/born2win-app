@@ -4,7 +4,7 @@ import { confirmPopup } from 'primereact/confirmpopup';
 interface LineButton {
     label: string;
     action: string;
-    param: string[];
+    params: string[];
 }
 
 interface OneLineProps {
@@ -16,9 +16,10 @@ interface OneLineProps {
     onRead: () => void;
     deleteLabel?: string;
     buttons?: LineButton[];
+    onLineButtonPressed?: (action: string, params: string[]) => void;
 }
 
-export default function OneLine({ title, body, unread, footer, onDelete, onRead, deleteLabel, buttons }: OneLineProps) {
+export default function OneLine({ title, body, unread, footer, onDelete, onRead, deleteLabel, buttons, onLineButtonPressed }: OneLineProps) {
 
     const handleCopyLink = (link: string) => {
         navigator.clipboard.writeText(link);
@@ -65,8 +66,10 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
                     </div>
                 </div>
 
-                {buttons?.length && <div className="flex flex-row align-items-end justify-content-between">
-                    {buttons.map(btn=> (<Button label={btn.label} />))}
+                {buttons?.length && onLineButtonPressed && <div className="flex flex-row align-items-end justify-content-between">
+                    {buttons.map(btn => (<Button label={btn.label} onClick={() => {
+                        onLineButtonPressed(btn.action, btn.params);
+                    }} />))}
                 </div>}
                 <div className="flex flex-row align-items-end justify-content-between">
                     {footer && <span className="text-400">{footer}</span>}

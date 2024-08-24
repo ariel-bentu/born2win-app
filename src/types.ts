@@ -123,6 +123,11 @@ export interface Cached<T> {
     inProgress?: Promise<T>;
 }
 
+export interface NavigationStep {
+    tab: number,
+    params?: string[],
+}
+
 export interface Recipient {
     name: string;
     id: string;
@@ -160,4 +165,5 @@ export interface FamilyDemand {
     date: string;
     id: string;
     volunteerId: string;
+    familyId: string;
 }

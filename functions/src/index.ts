@@ -164,7 +164,7 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
         if (uulp.isIOS && !uulp.fingerprint) {
             throw new HttpsError("invalid-argument", "Missing fingerpring");
         }
-        const update = uulp.isIOS ?
+        const update:any = uulp.isIOS ?
             {
                 // leave otp for cases they refresh the browser
                 fingerprint: uulp.fingerprint,
@@ -173,11 +173,9 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
             {
                 otp: FieldValue.delete(),
                 otpCreatedAt: FieldValue.delete(),
-                uid: FieldValue.arrayUnion(uid),
-                loginInfo: FieldValue.arrayUnion({ uid, createdAt: now.format(DATE_TIME), isIOS: uulp.isIOS } as LoginInfo),
             };
 
-        if (devOtp && !doc.data()?.loginInfo?.find((li: LoginInfo) => li.uid === uid)) {
+        if ((devOtp || !uulp.isIOS) && !doc.data()?.loginInfo?.find((li: LoginInfo) => li.uid === uid)) {
             update.uid = FieldValue.arrayUnion(uid);
             update.loginInfo = FieldValue.arrayUnion({ uid, createdAt: now.format(DATE_TIME), isIOS: uulp.isIOS } as LoginInfo);
         }
@@ -678,6 +676,7 @@ async function getDemands(district: string, status: "תפוס" | "זמין", day
                 district: district,
                 date: demand.fields["תאריך"],
                 id: demand.fields.id,
+                familyId: demand.fields["משפחה"][0],
                 volunteerId: demand.fields.volunteer_id,
             }));
         }
@@ -998,7 +997,7 @@ async function alertUpcomingCooking() {
 אם אין באפשרותך לבשל יש לבטל באפליקציה, או ליצור קשר.`;
                 await addNotificationToQueue("תזכורת לבישול!", msgBody, [], [demand.volunteerId], {
                     buttons: JSON.stringify([
-                        { label: "צפה בפרטים", action: NotificationActions.RegistrationDetails, params: [demand.id] },
+                        { label: "צפה בפרטים", action: NotificationActions.RegistrationDetails, params: [demand.familyId] },
                         { label: "צור קשר עם עמותה", action: NotificationActions.StartConversation },
                     ]),
                 }

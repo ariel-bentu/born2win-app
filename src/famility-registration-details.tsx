@@ -98,7 +98,7 @@ export function FamilyDetails({ family, onClose, detailsOnly, showToast, cityId 
                     {isNotEmpty(alergies) ? <div className="alergies">נא לשים לב לאלרגיה! {alergies}</div> :
                         <div><strong>אלרגיות:</strong> אין</div>}
                 </li>
-                <li><strong>שימו לב! ימי הבישול הם:</strong> {family.fields['ימים'].join(", ")}</li>
+                <li><strong>שימו לב! ימי הבישול הם:</strong> {family.fields['ימים']?.join(", ") || ""}</li>
 
             </ul>
             {error && <div>תקלה בקריאת זמינות</div>}

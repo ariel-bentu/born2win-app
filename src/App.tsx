@@ -1,4 +1,4 @@
-import  { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { TabView, TabPanel } from 'primereact/tabview';
 import { Badge } from 'primereact/badge';
 import { Toast } from 'primereact/toast';
@@ -9,7 +9,7 @@ import 'primeflex/primeflex.css';
 import './App.css';
 import * as api from './api';
 import { NextOrObserver, User } from 'firebase/auth';
-import { Cached, NotificationActions, ShowToast, UserInfo } from './types';
+import { Cached, NavigationStep, NotificationActions, ShowToast, UserInfo } from './types';
 import { ClientJS } from 'clientjs';
 import NotificationsComponent from './notifications-component';
 import { countUnreadNotifications } from './notifications';
@@ -25,6 +25,7 @@ import dayjs from 'dayjs';
 import { SendMessage } from './send-message';
 import { confirmPopup, ConfirmPopup } from 'primereact/confirmpopup';
 import { isNotEmpty } from './utils';
+import { DisposeNavigationRequester, initializeNavigationRequester } from './notification-actions';
 // import { Button } from 'primereact/button';
 // import { getDB } from './db';
 
@@ -98,11 +99,31 @@ function App() {
         setUser(user);
     }
 
+    const [navigationRequest, setNavigationRequest] = useState<NavigationStep | undefined>(undefined)
+
+
+    useEffect(() => {
+        initializeNavigationRequester(setNavigationRequest);
+        return () => DisposeNavigationRequester();
+    }, []);
+
+    useEffect(()=>{
+        if (navigationRequest) {
+            setActiveIndex(navigationRequest.tab);
+
+            // reset it
+            setTimeout(()=>setNavigationRequest(undefined), 2000);
+        }
+    },
+    [navigationRequest]);
+
     const showToast: ShowToast = (severity, summary, detail) => {
         if (toast.current) {
             toast.current.show({ severity, summary, detail });
         }
     };
+
+
 
     // hack until Apple fix the postMessage not recieved when app is openned
     // Poll every 10 seconds the local indexDB
@@ -146,7 +167,7 @@ function App() {
                         console.log("vol ID already paired- ignored", currentVolId, "vs. requested: ", userPairingRequest);
                         setError("תקלה באתחול (1) - פנה לעזרה.");
                     } else if (!isNotEmpty(currentVolId)) {
-                        api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, isDev?false:isIOS).then(() => {
+                        api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, isDev ? false : isIOS).then(() => {
                             setVolunteerId(userPairingRequest);
                             if (isAndroid) {
                                 localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
@@ -328,15 +349,15 @@ body: `תאריך הבישול: 2024-18-28
             {showProgress && <InProgress />}
             {appReady && userInfo && !userInfo?.notificationToken && <RegisterToNotification onClick={requestWebTokenInprogress ? undefined : onAllowNotification} />}
             {appReady &&
-                <TabView  dir='rtl' renderActiveOnly={false} activeIndex={activeIndex} onTabChange={(e) => setActiveIndex(e.index)}>
+                <TabView dir='rtl' renderActiveOnly={false} activeIndex={activeIndex} onTabChange={(e) => setActiveIndex(e.index)}>
                     <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
                         <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="רישום">
-                        {activeIndex == 1 && <RegistrationComponent getCachedMealRequest={getCachedMealRequest} showToast={showToast}/>}
+                        {activeIndex == 1 && <RegistrationComponent getCachedMealRequest={getCachedMealRequest} showToast={showToast} />}
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="התחייבויות">
-                        {activeIndex == 2 && <ExistingRegistrationsComponent showToast={showToast}/>}
+                        {activeIndex == 2 && <ExistingRegistrationsComponent showToast={showToast} navigationRequest={navigationRequest}/>}
                     </TabPanel>
                     {isAdmin &&
                         <TabPanel headerStyle={{ fontSize: 20 }} header="שליחה">

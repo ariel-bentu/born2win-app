@@ -164,7 +164,7 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
         if (uulp.isIOS && !uulp.fingerprint) {
             throw new HttpsError("invalid-argument", "Missing fingerpring");
         }
-        const update:any = uulp.isIOS ?
+        const update: any = uulp.isIOS ?
             {
                 // leave otp for cases they refresh the browser
                 fingerprint: uulp.fingerprint,
@@ -598,6 +598,23 @@ async function authenticate(request: CallableRequest<any>): Promise<QueryDocumen
     const doc = await findUserByUID(uid);
     if (!doc || !doc.data().active) {
         throw new HttpsError("unauthenticated", "unauthorized user");
+    }
+    if (request.data && request.data.impersonateUser) {
+        const adminDoc = await db.collection(Collections.Admins).doc(doc.id).get();
+        if (!adminDoc.exists) {
+            throw new HttpsError("permission-denied", "not authorized to impersonate");
+        }
+
+        // Admin can impersonate to another user
+        const impersonateDoc = await getUserByID(request.data.impersonateUser);
+        if (!impersonateDoc) {
+            throw new HttpsError("not-found", "impersonated user not found");
+        }
+        if (impersonateDoc && !impersonateDoc.data()?.active) {
+            throw new HttpsError("permission-denied", "Inactive impersonated user");
+        }
+        // for change of type, as we only use id and data() - hack
+        return impersonateDoc as QueryDocumentSnapshot;
     }
     return doc;
 }

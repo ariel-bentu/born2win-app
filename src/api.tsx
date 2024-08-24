@@ -20,6 +20,7 @@ import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
 import { FamilityDemandUpdatePayload, FamilityIDPayload, GetDemandStatPayload, NotificationUpdatePayload, Recipient, RegistrationRecord, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
+import { userInfo } from "os";
 
 
 const firebaseConfig = {
@@ -39,6 +40,11 @@ let auth: Auth;
 let functions: Functions;
 let serviceWorkerRegistration: any;
 
+export let impersonateUser: {
+    id: string;
+    name: string;
+} | undefined = undefined;
+
 export function init(onAuth: NextOrObserver<User>) {
     if (!app) {
         app = initializeApp(firebaseConfig);
@@ -52,10 +58,10 @@ export function init(onAuth: NextOrObserver<User>) {
                 serviceWorkerRegistration = swReg;
             });
             window.addEventListener('beforeinstallprompt', (e) => {
-              e.preventDefault();
-              (window as any).deferredInstallPrompt = e;
+                e.preventDefault();
+                (window as any).deferredInstallPrompt = e;
             });
-          }
+        }
 
         db = getFirestore(app);
         auth = getAuth(app);
@@ -89,6 +95,13 @@ export function logout() {
             const errorMessage = error.message;
             // ...
         });
+}
+
+export function impersonate(id: string, name: string) {
+    impersonateUser = { id, name };
+}
+export function resetImpersonation() {
+    impersonateUser = undefined;
 }
 
 export function getUserInfo(): Promise<UserInfo> {
@@ -128,6 +141,7 @@ export async function requestWebPushToken() {
 }
 
 export async function sendTestNotification() {
+    // no impersonation
     const testNotification = httpsCallable(functions, 'TestNotification');
     console.log("Send test notification")
 
@@ -135,6 +149,7 @@ export async function sendTestNotification() {
 }
 
 export function updateLoginInfo(volunteerId: string | undefined, otp: string | undefined, fingerprint: string | undefined, isIOS: boolean): any {
+    // no impersonation
     const updateLoginInfoFunc = httpsCallable(functions, 'UpdateUserLogin');
     const uulp = { fingerprint, otp, volunteerId, isIOS } as UpdateUserLoginPayload;
 
@@ -142,6 +157,7 @@ export function updateLoginInfo(volunteerId: string | undefined, otp: string | u
 }
 
 export async function updateUserNotification(notificationOn: boolean | undefined, token: string, isSafari: boolean) {
+    // no impersonation
     const updateNotification = httpsCallable(functions, 'UpdateNotification');
 
     const payload = {} as NotificationUpdatePayload;
@@ -159,6 +175,21 @@ export async function updateUserNotification(notificationOn: boolean | undefined
 
     return updateNotification(payload);
 }
+
+function callFunctionWithImpersonation(functionName: string, payload?: any) {
+    const func = httpsCallable(functions, functionName);
+
+    if (impersonateUser) {
+        if (payload) {
+            payload.impersonateUser = impersonateUser.id;
+        } else {
+            payload = { impersonateUser: impersonateUser.id };
+        }
+    }
+
+    return func(payload);
+}
+
 
 export interface Family {
     id: string;
@@ -180,8 +211,7 @@ export interface Family {
 }
 
 export function getMealRequests(): Promise<Family[]> {
-    const getMealRequestsFunc = httpsCallable(functions, 'GetMealRequests');
-    return getMealRequestsFunc().then((res: any) => res.data.records as Family[]);
+    return callFunctionWithImpersonation('GetMealRequests').then((res: any) => res.data.records as Family[]);
 }
 
 
@@ -198,19 +228,16 @@ export interface Availability {
 }
 
 export function getFamilyAvailability(familyId: string, baseId: string): Promise<Availability[]> {
-    const GetFamilityAvailabilityFunc = httpsCallable(functions, 'GetFamilityAvailability');
     const payload = {
         familyId,
-        baseId,
-    };
+    } as FamilityIDPayload;
 
-    return GetFamilityAvailabilityFunc(payload).then((res: any) => {
+    return callFunctionWithImpersonation('GetFamilityAvailability', payload).then((res: any) => {
         return res.data.records as Availability[];
     });
 }
 
-export function updateFamilityDemand(demandId: string, familyId:string,  cityId:string, isRegistering:boolean, reason?:string) {
-    const UpdateFamilityDemandFunc = httpsCallable(functions, 'UpdateFamilityDemand');
+export function updateFamilityDemand(demandId: string, familyId: string, cityId: string, isRegistering: boolean, reason?: string) {
     const payload = {
         demandId,
         familyId,
@@ -219,38 +246,39 @@ export function updateFamilityDemand(demandId: string, familyId:string,  cityId:
         reason,
     } as FamilityDemandUpdatePayload;
 
-    return UpdateFamilityDemandFunc(payload)
+    return callFunctionWithImpersonation('UpdateFamilityDemand', payload);
 }
 
 export function getFamilyDetails(familyId: string) {
-    const getFamilyDetailsFunc = httpsCallable(functions, 'GetFamilyDetails');
     const payload = {
         familyId
     } as FamilityIDPayload;
 
-    return getFamilyDetailsFunc(payload).then((res: any) => {
-        return res.data as Family;
-    });
+    return callFunctionWithImpersonation('GetFamilyDetails', payload)
+        .then((res: any) => {
+            return res.data as Family;
+        });
 }
 
 export function getUserRegistrations(): Promise<RegistrationRecord[]> {
-    const getUserRegistrationsFunc = httpsCallable(functions, 'GetUserRegistrations');
-    return getUserRegistrationsFunc().then((res: any) => res.data.records.map((rec: any) => {
-        return {
-            id: rec.id,
-            date: rec.fields["תאריך"],
-            city: rec.fields["עיר"][0],
-            familyLastName: rec.fields.Name,
-            familyId: rec.fields.Family_id,
-            familyRecordId: rec.fields["משפחה"][0],
-        } as RegistrationRecord;
-    }));
+    return callFunctionWithImpersonation('GetUserRegistrations')
+        .then((res: any) => res.data.records.map((rec: any) => {
+            return {
+                id: rec.id,
+                date: rec.fields["תאריך"],
+                city: rec.fields["עיר"][0],
+                familyLastName: rec.fields.Name,
+                familyId: rec.fields.Family_id,
+                familyRecordId: rec.fields["משפחה"][0],
+            } as RegistrationRecord;
+        }));
 }
 
 
 export async function getDemandStats(dateRange: [Date | null, Date | null], districts: string[]): Promise<StatsData> {
     if (!dateRange[0] || !dateRange[1]) return { totalDemands: [0], fulfilledDemands: [0], labels: [""] }
 
+    // No impersonation
     const getDemandStatsFunc = httpsCallable(functions, 'GetDemandStats');
     const payload = {
         from: dateRange[0].toUTCString(),
@@ -261,6 +289,7 @@ export async function getDemandStats(dateRange: [Date | null, Date | null], dist
 }
 
 export async function sendMessage(districts: string[], recipient: Recipient[] | undefined, title: string, body: string) {
+    // no impersonation
     const sendMessageFunc = httpsCallable(functions, 'SendMessage');
     const payload = {
         toDistricts: districts,
@@ -272,6 +301,7 @@ export async function sendMessage(districts: string[], recipient: Recipient[] | 
 }
 
 export async function searchUsers(query: string): Promise<Recipient[]> {
+    // no impersonation
     const searchUsersFunc = httpsCallable(functions, 'SearchUsers');
     const payload = {
         query
@@ -279,4 +309,29 @@ export async function searchUsers(query: string): Promise<Recipient[]> {
 
     return searchUsersFunc(payload).then(res => res.data as Recipient[]);
 }
+export const handleSearchUsers = async (userInfo: UserInfo, query:string) => {
+    // Timeout to emulate a network connection
+    console.log("query", query)
+    const recipients = await searchUsers(query);
+    const districts = new Map();
+    recipients.forEach(r => {
+        let userMahuz = r.mahoz || "";
 
+        let mahoz = districts.get(userMahuz);
+        if (!mahoz) {
+            mahoz = {
+                districtName: userInfo.districts?.find(d => d.id == userMahuz)?.name || "אחר",
+                id: userMahuz,
+                users: [],
+            }
+            districts.set(userMahuz, mahoz);
+        }
+
+        mahoz.users.push({
+            name: r.name,
+            id: r.id
+        });
+    });
+
+    return Array.from(districts.values());
+}

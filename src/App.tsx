@@ -337,12 +337,14 @@ body: `תאריך הבישול: 2024-18-28
         <div className="App">
             <ConfirmPopup />
             <Toast ref={toast} />
-            <Header userName={userInfo ? userInfo.firstName : ""}
+            <Header 
+                userName={userInfo ? userInfo.firstName : ""}
                 logoSrc={header}
                 onLogout={handleLogout}
                 settingsComponent={settings}
                 onRefreshTokenClick={onAllowNotification}
                 onSendTestNotificationClick={userInfo?.notificationToken ? api.sendTestNotification : undefined}
+                userInfo={userInfo}
             />
             {readyToInstall && !isDev && <PWAInstructions />}
             {error && <div>{error}</div>}

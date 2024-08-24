@@ -5,7 +5,7 @@ import { Dropdown } from 'primereact/dropdown';
 import { Button } from 'primereact/button';
 import { MultiSelect } from 'primereact/multiselect';
 import { Recipient, ShowToast, UserInfo } from './types';
-import { searchUsers, sendMessage } from './api';
+import { handleSearchUsers, searchUsers, sendMessage } from './api';
 import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete';
 import { getByDisplayValue } from '@testing-library/react';
 import { Toast } from 'primereact/toast';
@@ -43,34 +43,35 @@ export const SendMessage: React.FC<SendMessageProps> = ({ userInfo, showToast })
         setSelectedDistricts(e.value);
     };
 
-    const handleSearchUsers = async (event: AutoCompleteCompleteEvent) => {
-        // Timeout to emulate a network connection
-        console.log("query", event.query)
-        const recipients = await searchUsers(event.query);
-        const districts = new Map();
-        recipients.forEach(r => {
-            let userMahuz = r.mahoz || "";
+    // const handleSearchUsers = async (event: AutoCompleteCompleteEvent) => {
 
-            let mahoz = districts.get(userMahuz);
-            if (!mahoz) {
-                mahoz = {
-                    districtName: userInfo.districts?.find(d => d.id == userMahuz)?.name || "אחר",
-                    id: userMahuz,
-                    users: [],
-                }
-                districts.set(userMahuz, mahoz);
-            }
+    //     // Timeout to emulate a network connection
+    //     console.log("query", event.query)
+    //     const recipients = await searchUsers(event.query);
+    //     const districts = new Map();
+    //     recipients.forEach(r => {
+    //         let userMahuz = r.mahoz || "";
 
-            mahoz.users.push({
-                name: r.name,
-                id: r.id
-            });
-        });
+    //         let mahoz = districts.get(userMahuz);
+    //         if (!mahoz) {
+    //             mahoz = {
+    //                 districtName: userInfo.districts?.find(d => d.id == userMahuz)?.name || "אחר",
+    //                 id: userMahuz,
+    //                 users: [],
+    //             }
+    //             districts.set(userMahuz, mahoz);
+    //         }
+
+    //         mahoz.users.push({
+    //             name: r.name,
+    //             id: r.id
+    //         });
+    //     });
 
 
 
-        setFilteredUsers(Array.from(districts.values()));
-    }
+    //     setFilteredUsers(Array.from(districts.values()));
+    // }
 
     return (
         <div className="card">
@@ -99,7 +100,10 @@ export const SendMessage: React.FC<SendMessageProps> = ({ userInfo, showToast })
                     optionGroupLabel="districtName"
                     optionGroupChildren="users"
                     suggestions={filteredUsers}
-                    completeMethod={handleSearchUsers}
+                    completeMethod={ async (event: AutoCompleteCompleteEvent) => {
+                        const newFilter = await handleSearchUsers(userInfo, event.query);
+                        setFilteredUsers(newFilter);
+                    }}
                     onChange={(e) => setRecipients(e.value)} />
 
             </div>

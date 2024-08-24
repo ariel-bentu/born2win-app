@@ -29,6 +29,20 @@
     height: 100%;
     border-radius: 50%;
 }
+
+/* Remove background and border specifically for today's date cell */
+/* Target the td element for today's date and remove background and border */
+.p-datepicker-calendar td.p-datepicker-today {
+    background-color: transparent;
+    border-color: transparent;
+}
+
+/* Target the span inside the td element to reset its style */
+.p-datepicker-calendar td.p-datepicker-today span {
+    background-color: transparent;
+    color: inherit;
+}
+
 .selected-day {
     border: orange 4px solid;
 }
@@ -36,4 +50,30 @@
 .alergies {
     font-weight: bold;
     color: #A94442;
+}
+
+.calendar-container {
+    position: relative;
+}
+
+.watermarked-no-dates .p-datepicker-calendar {
+    position: relative;
+}
+
+.watermarked-no-dates::before {
+    content: "אין תאריכים פנויים בחודש זה";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2rem;
+    color: rgba(0, 0, 0, 0.5);
+    z-index: 1;
+    pointer-events: none;
+}
+
+.watermarked-no-dates td,
+.watermarked-no-dates th {
+    position: relative;
+    z-index: 2; 
 }

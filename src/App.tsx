@@ -24,6 +24,7 @@ import { InProgress, RegisterToNotification } from './common-ui';
 import dayjs from 'dayjs';
 import { SendMessage } from './send-message';
 import { confirmPopup, ConfirmPopup } from 'primereact/confirmpopup';
+import { isNotEmpty } from './utils';
 
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
@@ -53,9 +54,7 @@ const offline = !!urlParams.get('offline');
 const client = new ClientJS();
 const fingerprint = isIOS ? client.getFingerprint() + "" : "";
 
-const isNotEmpty = (val: string | null | undefined): val is string => {
-    return !!val && val.length > 0;
-};
+
 
 let mealRequests = { fetchedTS: dayjs() } as Cached<api.Family[]>;
 

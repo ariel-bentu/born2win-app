@@ -17,8 +17,15 @@ export interface FamilityIDPayload {
     familyId: string;
 }
 
+export interface City {
+    id: string;
+    name: string;
+}
+
 export interface FamilityDemandUpdatePayload {
     demandId: string;
+    familyId: string;
+    cityId: string;
     isRegistering: boolean; // true means register, false mean unregister
 }
 
@@ -80,6 +87,7 @@ export interface RegistrationRecord {
     familyLastName: string;
     weekday: string;
     familyId: string;
+    familyRecordId: string;
 }
 
 

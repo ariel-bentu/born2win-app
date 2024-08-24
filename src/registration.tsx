@@ -9,7 +9,7 @@ import "./registration.css";
 import { FamilyDetails } from './famility-registration-details';
 
 import { InProgress } from './common-ui';
-import { ShowToast } from './types';
+import { City, ShowToast } from './types';
 import OneLine from './one-line';
 
 
@@ -43,9 +43,9 @@ interface RegistrationComponentProps {
     showToast: ShowToast;
 }
 
-function RegistrationComponent({ getCachedMealRequest , showToast}: RegistrationComponentProps) {
-    const [cities, setCities] = useState<string[]>([]);
-    const [selectedCities, setSelectedCities] = useState<string[]>([]);
+function RegistrationComponent({ getCachedMealRequest, showToast }: RegistrationComponentProps) {
+    const [cities, setCities] = useState<City[]>([]);
+    const [selectedCities, setSelectedCities] = useState<City[]>([]);
     const [families, setFamilies] = useState<Family[] | null>(null);
     const [filteredFamilies, setFilteredFamilies] = useState<Family[]>([]);
     const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
@@ -68,14 +68,14 @@ function RegistrationComponent({ getCachedMealRequest , showToast}: Registration
             setFilteredFamilies([]);
         } else {
             if (families) {
-                setFilteredFamilies(families.filter(family => selectedCities.includes(family.fields['עיר'])));
+                setFilteredFamilies(families.filter(family => selectedCities.some(sc=>sc.name == (family.fields['עיר']))));
             }
         }
     }, [selectedCities, families]);
 
 
-    const getUniqueCities = (records: Family[]): string[] => {
-        const cities = new Set(records.map(record => record.fields['עיר']));
+    const getUniqueCities = (records: Family[]): City[] => {
+        const cities = new Set(records.map(record => ({ name: record.fields['עיר'], id: record.fields.city_id_1 })));
         return Array.from(cities);
     };
 
@@ -96,7 +96,7 @@ function RegistrationComponent({ getCachedMealRequest , showToast}: Registration
 
     if (selectedFamily) return (
         <div className="p-m-4">
-            <FamilyDetails family={selectedFamily} onClose={() => setSelectedFamily(null)} showToast={showToast}/>
+            <FamilyDetails family={selectedFamily} onClose={() => setSelectedFamily(null)} showToast={showToast} cityId={selectedFamily.fields.city_id_1}/>
         </div>
     );
 
@@ -105,8 +105,8 @@ function RegistrationComponent({ getCachedMealRequest , showToast}: Registration
             <div className="city-selection">
                 <MultiSelect
                     value={selectedCities}
-                    options={cities.map(city => ({ label: city, value: city }))}
-                    onChange={(e)=>setSelectedCities(e.value)}
+                    options={cities.map(city => ({ label: city.name, value: city }))}
+                    onChange={(e) => setSelectedCities(e.value)}
                     placeholder="בחר עיר"
                     className="w-full md:w-20rem"
                     display="chip"

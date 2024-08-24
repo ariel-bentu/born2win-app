@@ -209,11 +209,13 @@ export function getFamilyAvailability(familyId: string, baseId: string): Promise
     });
 }
 
-export function updateFamilityDemand(demandId: string, isRegistering:boolean) {
+export function updateFamilityDemand(demandId: string, familyId:string,  cityId:string, isRegistering:boolean) {
     const UpdateFamilityDemandFunc = httpsCallable(functions, 'UpdateFamilityDemand');
     const payload = {
         demandId,
+        familyId,
         isRegistering,
+        cityId,
     } as FamilityDemandUpdatePayload;
 
     return UpdateFamilityDemandFunc(payload)
@@ -238,7 +240,8 @@ export function getUserRegistrations(): Promise<RegistrationRecord[]> {
             date: rec.fields["תאריך"],
             city: rec.fields["עיר"][0],
             familyLastName: rec.fields.Name,
-            familyId: rec.fields["משפחה"][0],
+            familyId: rec.fields.Family_id,
+            familyRecordId: rec.fields["משפחה"][0],
         } as RegistrationRecord;
     }));
 }

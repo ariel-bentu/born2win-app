@@ -703,6 +703,7 @@ exports.GetFamilityAvailability = onCall({ cors: true }, async (request) => {
 exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);
     const mahoz = doc.data().mahoz;
+    const volunteerId = doc.id;
 
     const districts = await getDestricts();
     const district = districts.find(d => d.id == mahoz);
@@ -714,18 +715,89 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
     const updatedFields = {
         fields: {
             "זמינות שיבוץ": fdup.isRegistering ? "תפוס" : "זמין",
-            "volunteer_id": fdup.isRegistering ? doc.id : null,
+            "volunteer_id": fdup.isRegistering ? volunteerId : null,
         },
     };
     const url = `https://api.airtable.com/v0/${district.base_id}/${district.demandsTable}/${fdup.demandId}`;
-
-    return axios.patch(url, updatedFields, {
+    const httpOptions = {
         headers: {
             "Authorization": `Bearer ${apiKey}`,
             "Content-Type": "application/json",
         },
-    })
-        .then(response => response.data);
+    };
+    const updatedRecord = await axios.patch(url, updatedFields, httpOptions).then(response => response.data);
+
+    // Update main base
+    const airTableMainBase = mainBase.value();
+    const demandDate = updatedRecord.fields["תאריך"];
+    const urlMainBase = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("ארוחות")}`;
+
+    if (fdup.isRegistering) {
+        const newRegistrationRec = {
+            "records": [
+                {
+                    "fields": {
+                        "משפחה": [
+                            fdup.familyId,
+                        ],
+                        "מתנדב": [
+                            volunteerId,
+                        ],
+                        "עיר": [
+                            fdup.cityId,
+                        ],
+                        "DATE": updatedRecord.fields["תאריך"],
+                    },
+                },
+            ],
+        };
+
+        await axios.post(urlMainBase, newRegistrationRec, httpOptions).then(async (response) => {
+            // send notification to admins
+            const admins = await db.collection(Collections.Admins).get();
+            const adminsIds = admins.docs.map(doc => doc.id);
+
+            await addNotificationToQueue("שיבוץ חדש", `תאריך: ${demandDate}
+משפחה: ${updatedRecord.fields.Name}
+מתנדב: ${doc.data().firstName + " " + doc.data().lastName}
+עיר: ${updatedRecord.fields["עיר"]}
+`, {}, [], adminsIds);
+
+            logger.info("New registration added", response.data);
+        });
+    } else {
+        // Need to find the record:
+        const filterFormula = `DATETIME_FORMAT({DATE}, 'YYYY-MM-DD')="${demandDate}"`;
+        const findResult = await axios.get(urlMainBase, {
+            ...httpOptions,
+            params: {
+                filterByFormula: filterFormula,
+                maxRecords: 1000, // Just in case there are multiple, get only the first match
+            },
+        });
+        if (findResult.data.records.length > 0) {
+            const rec = findResult.data.records.find((r: AirTableRecord) => r.fields["משפחה"][0] == fdup.familyId && r.fields["מתנדב"][0] == volunteerId);
+            if (rec) {
+                // Delete the records
+                const deleteUrl = `${urlMainBase}/${rec.id}`;
+                await axios.delete(deleteUrl, httpOptions);
+                logger.info("Existing registration removed", rec.id, "family", fdup.familyId, "vid", volunteerId);
+
+                // send notification to admins
+                const admins = await db.collection(Collections.Admins).get();
+                const adminsIds = admins.docs.map(doc => doc.id);
+
+                await addNotificationToQueue("שיבוץ בוטל!", `תאריך: ${demandDate}
+משפחה: ${updatedRecord.fields.Name}
+מתנדב: ${doc.data().firstName + " " + doc.data().lastName}
+עיר: ${updatedRecord.fields["עיר"]}
+`, {}, [], adminsIds);
+
+                return;
+            }
+        }
+        logger.info("Unable to find registration id in main base", filterFormula);
+    }
 });
 
 exports.GetUserRegistrations = onCall({ cors: true }, async (request) => {

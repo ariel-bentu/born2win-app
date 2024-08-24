@@ -183,3 +183,36 @@ function sendNotification(title, body,data, token) {
 }
 
 //sendNotification("hi", "1", {},"")
+
+async function searchMeals() {
+    const urlMainBase = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent("ארוחות")}`;
+
+    const httpOptions = {
+        headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        },
+    };
+    const filterFormula = `DATETIME_FORMAT({DATE}, 'YYYY-MM-DD')="2024-09-24"`;
+        // AND(
+        // FIND("${fdup.familyId}", ARRAYJOIN({משפחה})),
+        // FIND("${volunteerId}", ARRAYJOIN({מתנדב})),
+        // DATESTR({DATE})="${updatedRecord.fields["תאריך"]}"
+        // )`;
+
+    const findResult = await axios.get(urlMainBase, {
+        ...httpOptions,
+        params: {
+            filterByFormula: filterFormula,
+            maxRecords: 1000,
+        },
+    });
+
+    if (findResult.data.records.length > 0) {
+        const rec = findResult.data.records.find(r=>r.fields["משפחה"][0] == "recwVL742srgkzO0u" && r.fields["מתנדב"][0] == "recqAUvw8rqaiMiX4");
+        if (rec) {
+            console.log("id", rec.id);
+        }
+    }
+}
+//searchMeals()

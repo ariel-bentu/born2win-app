@@ -1,5 +1,6 @@
 import { Button } from "primereact/button";
-import { Calendar, CalendarDateTemplateEvent } from "primereact/calendar";
+import { Calendar, CalendarDateTemplateEvent, CalendarMonthChangeEvent, CalendarViewChangeEvent } from "primereact/calendar";
+import "./registration.css";
 
 
 import { Availability, Family, getFamilyAvailability, updateFamilityDemand } from "./api";
@@ -8,9 +9,11 @@ import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
 import { InProgress } from "./common-ui";
 import { ShowToast } from "./types";
+import { isNotEmpty } from "./utils";
 
 interface FamilyDetailsProps {
     family: Family | null;
+    cityId: string;
     detailsOnly?: boolean;
     showToast: ShowToast;
     onClose: () => void;
@@ -23,11 +26,18 @@ function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
         d.getFullYear() === event.year;
 }
 
-export function FamilyDetails({ family, onClose, detailsOnly, showToast }: FamilyDetailsProps) {
+export function FamilyDetails({ family, onClose, detailsOnly, showToast, cityId }: FamilyDetailsProps) {
     const [availability, setAvailability] = useState<Availability[]>([]);
     const [selectedDate, setSelectedDate] = useState<Nullable<Date>>(null);
     const [error, setError] = useState<any>(undefined);
     const [loading, setLoading] = useState<any>(undefined);
+    const [reload, setReload] = useState<number>(0);
+
+    const [viewVisibleMonth, setViewVisibleMonth] = useState<CalendarMonthChangeEvent | null>(null);
+
+    const handleMonthChange = (e: CalendarMonthChangeEvent) => {
+        setViewVisibleMonth(e);
+    };
 
     useEffect(() => {
         if (family?.id && !detailsOnly) {
@@ -37,7 +47,7 @@ export function FamilyDetails({ family, onClose, detailsOnly, showToast }: Famil
                 .catch(err => setError(err))
                 .finally(() => setLoading(false));
         }
-    }, [family, detailsOnly]);
+    }, [family, detailsOnly, reload]);
 
     if (!family) return null;
 
@@ -64,13 +74,17 @@ export function FamilyDetails({ family, onClose, detailsOnly, showToast }: Famil
     const minDate = dayjs();
     const alergies = family.fields['רגישויות ואלרגיות (from בדיקת ההתאמה)'];
 
+    const isAvailableDatesVisible = availability.some(av => {
+        const availableDate = dayjs(av.fields["תאריך"]);
+        return availableDate.year() === viewVisibleMonth?.year && availableDate.month() - 1 == viewVisibleMonth?.month;
+    });
+
     return (
         <div className="surface-card shadow-2 p-3 border-round relative">
             <Button label="סגור" onClick={onClose} className="mt-3" style={{ position: "absolute", left: 20, top: 0 }} />
 
-            <strong>{family.fields.Name}</strong>
             <ul className="pl-4 list-disc text-right">
-
+                <div className="pb-3 underline text-lg">{family.fields.Name}</div>
                 <li>המשפחה בת <strong> {family.fields['נפשות מבוגרים בבית']}</strong> נפשות</li>
                 <li><strong>הרכב בני המשפחה:</strong> {family.fields['הרכב הורים']}</li>
                 <li><strong>גילאי בני המשפחה:</strong> {family.fields['גילאים של הרכב המשפחה']},{family.fields['גיל החולה']}</li>
@@ -78,11 +92,14 @@ export function FamilyDetails({ family, onClose, detailsOnly, showToast }: Famil
                 <li><strong>העדפה לסוג ארוחה:</strong> {family.fields['העדפה לסוג ארוחה']}</li>
                 <li><strong>העדפות בשר:</strong> {family.fields['העדפות בשר']}</li>
                 <li><strong>העדפות דגים:</strong> {family.fields['העדפות דגים']}</li>
+                <li><strong>לא אוכלים:</strong> {isNotEmpty(family.fields['לא אוכלים']) ? family.fields['לא אוכלים'] : "אין העדפה"}</li>
                 <li><strong>תוספות:</strong> {family.fields['תוספות']}</li>
                 <li>
-                    {alergies?.length ? <div className="alergies">נא לשים לב לאלרגיה! {family.fields['רגישויות ואלרגיות (from בדיקת ההתאמה)']}</div> :
+                    {isNotEmpty(alergies) ? <div className="alergies">נא לשים לב לאלרגיה! {alergies}</div> :
                         <div><strong>אלרגיות:</strong> אין</div>}
                 </li>
+                <li><strong>שימו לב! ימי הבישול הם:</strong> {family.fields['ימים'].join(", ")}</li>
+
             </ul>
             {error && <div>תקלה בקריאת זמינות</div>}
             {!detailsOnly && <>
@@ -91,6 +108,8 @@ export function FamilyDetails({ family, onClose, detailsOnly, showToast }: Famil
                     {loading && <InProgress />}
                     {!loading && availability.length == 0 && <div>אין תאריכים זמינים</div>}
                     <Calendar
+                        onMonthChange={handleMonthChange}
+                        className={!loading && !isAvailableDatesVisible ? 'watermarked-no-dates' : ''}
                         value={selectedDate}
                         enabledDates={availableDates}
                         onChange={(e) => {
@@ -114,9 +133,9 @@ export function FamilyDetails({ family, onClose, detailsOnly, showToast }: Famil
                         onClick={() => {
                             const availabilityRecord = availability.find(a => dayjs(a.fields["תאריך"]).diff(selectedDate, "days") === 0);
                             if (availabilityRecord) {
-                                updateFamilityDemand(availabilityRecord.id, true).then(() => {
+                                updateFamilityDemand(availabilityRecord.id, family.fields.familyid, cityId, true).then(() => {
                                     showToast("success", "שיבוץ נקלט בהצלחה", "");
-                                    console.log("register success");
+                                    setReload(prev => prev + 1);
                                 }).catch((err) => showToast("error", "תקלה ברישום (1) - ", err.message));
                             }
                         }} className="mt-3" />

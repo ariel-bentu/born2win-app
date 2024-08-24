@@ -28,11 +28,15 @@ export function ExistingRegistrationsComponent({ showToast }: ExistingRegistrati
     const [showFamilyId, setShowFamilyId] = useState<string | undefined>();
     const [currentFamily, setCurrentFamily] = useState<Family | undefined>();
     const [showProgress, setShowProgress] = useState<boolean>(false);
+    const [reload, setReload] = useState<number>(0);
 
     useEffect(() => {
-        getUserRegistrations().then((regs) => setRegistrations(regs))
+        getUserRegistrations().then((regs) => {
+            regs.sort((a, b) => a.date > b.date ? 1 : -1);
+            setRegistrations(regs);
+        })
             .catch(err => setError(err));
-    }, []);
+    }, [reload]);
 
     useEffect(() => {
         if (showFamilyId) {
@@ -65,7 +69,7 @@ export function ExistingRegistrationsComponent({ showToast }: ExistingRegistrati
     )
 
     if (currentFamily) {
-        return <FamilyDetails detailsOnly={true} family={currentFamily} onClose={() => setShowFamilyId(undefined)} showToast={showToast} />
+        return <FamilyDetails detailsOnly={true} family={currentFamily} onClose={() => setShowFamilyId(undefined)} showToast={showToast} cityId={currentFamily.fields.city_id_1} />
     }
 
     const registrationsToShow = registrations?.filter(r => filter === Filters.ALL || filter === Filters.FUTURE && isInFuture(r.date));
@@ -97,26 +101,30 @@ export function ExistingRegistrationsComponent({ showToast }: ExistingRegistrati
                                 footer={dayjs(reg.date).format("[יום ]dddd, D [ב]MMMM")}
                                 unread={isInFuture(reg.date)}
                                 onRead={() => {
-                                    setShowFamilyId(reg.familyId);
+                                    setShowFamilyId(reg.familyRecordId);
                                 }}
-                                onDelete={(event) => {
-                                    confirmPopup({
-                                        target: event.currentTarget as any,
-                                        message: 'האם לבטל שיבוץ נוכחי?',
-                                        icon: 'pi pi-exclamation-triangle',
-                                        accept: () => {
-                                            updateFamilityDemand(reg.id, false).then(() => {
-                                                showToast("success", "ביטול נקלט", "")
-                                            })
-                                                .catch((err) => showToast("error", "תקלה ברישום הביטול (2) - ", err.message));
-                                        }
-                                    });
-                                }}
+                                onDelete={dayjs(reg.date).isBefore(dayjs()) ? undefined : // only allow deleting future commitments
+                                    (event) => {
+                                        confirmPopup({
+                                            target: event.currentTarget as any,
+                                            message: 'האם לבטל שיבוץ נוכחי?',
+                                            icon: 'pi pi-exclamation-triangle',
+                                            accept: () => {
+                                                updateFamilityDemand(reg.id, reg.familyId, "cityId(unknown)", false).then(() => {
+                                                    showToast("success", "ביטול נקלט", "")
+                                                })
+                                                    .catch((err) => showToast("error", "תקלה ברישום הביטול (2) - ", err.message))
+                                                    .finally(() => {
+                                                        setShowFamilyId(undefined);
+                                                        setReload(prev => prev + 1);
+                                                    });
+                                            }
+                                        });
+                                    }}
                             />
                         )) :
                         <div className='no-messages'>אין רישומים</div>
                     }
-
                 </div>
             </div>
         </div>

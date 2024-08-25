@@ -120,6 +120,7 @@ export interface SendMessagePayload {
 }
 
 export interface Cached<T> {
+    userId: string;
     data: T | undefined;
     fetchedTS: Dayjs;
     inProgress?: Promise<T>;

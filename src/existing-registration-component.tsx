@@ -22,9 +22,10 @@ const Filters = {
 interface ExistingRegistrationsComponentProps {
     showToast: ShowToast;
     navigationRequest?: NavigationStep,
+    actualUserId: string
 }
 
-export function ExistingRegistrationsComponent({ showToast, navigationRequest }: ExistingRegistrationsComponentProps) {
+export function ExistingRegistrationsComponent({ showToast, navigationRequest, actualUserId }: ExistingRegistrationsComponentProps) {
     const [registrations, setRegistrations] = useState<FamilyDemand[] | undefined>();
     const [filter, setFilter] = useState(Filters.ALL);
     const [error, setError] = useState<any>(undefined);
@@ -41,7 +42,7 @@ export function ExistingRegistrationsComponent({ showToast, navigationRequest }:
             setRegistrations(regs);
         })
             .catch(err => setError(err));
-    }, [reload]);
+    }, [reload, actualUserId]);
 
     useEffect(() => {
         if (showFamilyId && registrations && registrations.length > 0) {

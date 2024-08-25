@@ -6,19 +6,22 @@ import { MenuItem } from "primereact/menuitem";
 import { PanelMenu } from "primereact/panelmenu";
 import "./header.css";
 import Impersonate from "./impersonate";
-import { impersonateUser } from "./api";
+import { impersonate, impersonateUser, resetImpersonation } from "./api";
 
 interface HeaderProps {
     userName: string;
+    volunteerId: string;
     userInfo: UserInfo | null,
     logoSrc: string;
     settingsComponent: JSX.Element;
     onRefreshTokenClick: onClickEvent;
     onSendTestNotificationClick?: onClickEvent;
-    onLogout: () => void
+    onLogout: () => void;
+    setActualUserId: (newUserId: string) => void;
 }
 
-function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onSendTestNotificationClick, onLogout, userInfo }: HeaderProps) {
+function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onSendTestNotificationClick, 
+    onLogout, userInfo, setActualUserId, volunteerId }: HeaderProps) {
     const [sidebarVisible, setSidebarVisible] = useState(false);
     const [showTechInfo, setShowTechInfo] = useState<boolean>(false);
     const toggleText = () => {
@@ -85,7 +88,15 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
                     <h2 className="settings-title">הגדרות</h2>
                     <PanelMenu model={items} className="settings-menu" />
                     {userInfo?.isAdmin && <div dir="rtl" className="m-2">פעל בשם:</div>}
-                    <Impersonate userInfo={userInfo} />
+                    <Impersonate userInfo={userInfo} onChange={(userId, name) => {
+                        if (userId && name) {
+                            impersonate(userId, name);
+                            setActualUserId(userId);
+                        } else if (!userId) {
+                            resetImpersonation();
+                            setActualUserId(volunteerId);
+                        }
+                    }} />
                 </Sidebar>
 
             </header>

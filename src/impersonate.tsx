@@ -3,13 +3,14 @@ import { useState } from "react";
 import { isNotEmpty } from "./utils";
 import { UserInfo } from "./types";
 import { Button } from "primereact/button";
-import { handleSearchUsers, impersonate, resetImpersonation } from "./api";
+import { handleSearchUsers } from "./api";
 
 interface ImpersonateProps {
     userInfo: UserInfo | null;
+    onChange:(userId: string | undefined, name?:string)=>void;
 }
 
-export default function Impersonate({ userInfo }: ImpersonateProps) {
+export default function Impersonate({ userInfo, onChange }: ImpersonateProps) {
     const [selectedUser, setSelectedUser] = useState<any | undefined>();
     const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
 
@@ -30,7 +31,7 @@ export default function Impersonate({ userInfo }: ImpersonateProps) {
         }}
 
         onChange={(e) => setSelectedUser(e.value)} />
-        <Button disabled={!selectedUser} label="שנה למשתמש" onClick={() => impersonate(selectedUser.id, selectedUser.name)} />
-        <Button label="ביטול" onClick={() => resetImpersonation()} />
+        <Button disabled={!selectedUser} label="שנה למשתמש" onClick={() => onChange(selectedUser.id, selectedUser.name)} />
+        <Button label="ביטול" onClick={() =>  onChange(undefined)} />
     </div>
 }

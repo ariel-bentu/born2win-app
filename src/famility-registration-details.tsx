@@ -3,7 +3,7 @@ import { Calendar, CalendarDateTemplateEvent, CalendarMonthChangeEvent, Calendar
 import "./registration.css";
 
 
-import {  Family, getFamilyAvailability, updateFamilityDemand } from "./api";
+import { Family, getFamilyAvailability, updateFamilityDemand } from "./api";
 import { useEffect, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
@@ -37,6 +37,7 @@ export function FamilyDetails({ family, onClose, detailsOnly, showToast, cityId 
     const [viewVisibleMonth, setViewVisibleMonth] = useState<CalendarMonthChangeEvent | null>(null);
 
     const handleMonthChange = (e: CalendarMonthChangeEvent) => {
+        console.log("Month changed", e)
         setViewVisibleMonth(e);
     };
 
@@ -77,7 +78,7 @@ export function FamilyDetails({ family, onClose, detailsOnly, showToast, cityId 
 
     const isAvailableDatesVisible = availability.some(av => {
         const availableDate = dayjs(av.date);
-        return availableDate.year() === viewVisibleMonth?.year && availableDate.month() - 1 == viewVisibleMonth?.month;
+        return availableDate.year() === viewVisibleMonth?.year && availableDate.month() == viewVisibleMonth?.month;
     });
 
     return (
@@ -127,7 +128,7 @@ export function FamilyDetails({ family, onClose, detailsOnly, showToast, cityId 
                     //yearNavigator 
                     //yearRange="2020:2030" 
                     />
-{saving && <InProgress />}
+                    {saving && <InProgress />}
                     <Button
                         disabled={!selectedDate || saving}
                         label="שבצו אותי"
@@ -141,7 +142,7 @@ export function FamilyDetails({ family, onClose, detailsOnly, showToast, cityId 
                                     showToast("success", "שיבוץ נקלט בהצלחה", "");
                                     setReload(prev => prev + 1);
                                 }).catch((err) => showToast("error", "תקלה ברישום (1) - ", err.message))
-                                .finally(()=>setSaving(false));
+                                    .finally(() => setSaving(false));
                             }
                         }} className="mt-3" />
                 </div>

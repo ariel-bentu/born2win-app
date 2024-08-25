@@ -26,6 +26,7 @@ import { SendMessage } from './send-message';
 import { confirmPopup, ConfirmPopup } from 'primereact/confirmpopup';
 import { isNotEmpty } from './utils';
 import { DisposeNavigationRequester, initializeNavigationRequester } from './notification-actions';
+import { userInfo } from 'os';
 // import { Button } from 'primereact/button';
 // import { getDB } from './db';
 
@@ -61,18 +62,19 @@ const fingerprint = isIOS ? client.getFingerprint() + "" : "";
 
 let mealRequests = { fetchedTS: dayjs() } as Cached<api.Family[]>;
 
-const getCachedMealRequest = async (): Promise<api.Family[]> => {
+const getCachedMealRequest = async (userId: string): Promise<api.Family[]> => {
     if (mealRequests.inProgress) {
         await mealRequests.inProgress;
     }
 
     // allow cache of 10 minutes
-    if (!mealRequests.data || mealRequests.fetchedTS.diff(dayjs(), "minutes") > 10) {
+    if (!mealRequests.data || mealRequests.fetchedTS.diff(dayjs(), "minutes") > 10 || mealRequests.userId !== userId) {
         mealRequests.inProgress = api.getMealRequests();
 
         return mealRequests.inProgress
             .then((mr) => {
                 mealRequests.data = mr;
+                mealRequests.userId = userId;
                 return mr;
             })
             .finally(() => mealRequests.inProgress = undefined);
@@ -87,6 +89,7 @@ function App() {
     const [readyToInstall, setReadyToInstall] = useState<boolean>(false);
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
     const [volunteerId, setVolunteerId] = useState<string | null>();
+    const [actualUserId, setActualUserId] = useState<string>("");
     const [notificationPermission, setNotificationPermission] = useState<string>((typeof Notification !== 'undefined') && Notification && Notification.permission || "unsupported");
     const [unreadCount, setUnreadCount] = useState(0);
     const [reloadNotifications, setReloadNotifications] = useState(0);
@@ -107,15 +110,15 @@ function App() {
         return () => DisposeNavigationRequester();
     }, []);
 
-    useEffect(()=>{
+    useEffect(() => {
         if (navigationRequest) {
             setActiveIndex(navigationRequest.tab);
 
             // reset it
-            setTimeout(()=>setNavigationRequest(undefined), 2000);
+            setTimeout(() => setNavigationRequest(undefined), 2000);
         }
     },
-    [navigationRequest]);
+        [navigationRequest]);
 
     const showToast: ShowToast = (severity, summary, detail) => {
         if (toast.current) {
@@ -215,6 +218,12 @@ function App() {
             });
         }
     }, [user, volunteerId]);
+
+    useEffect(() => {
+        if (volunteerId) {
+            setActualUserId(volunteerId);
+        }
+    }, [volunteerId]);
 
     // NOTIFICATIONS:
     useEffect(() => {
@@ -337,14 +346,16 @@ body: `תאריך הבישול: 2024-18-28
         <div className="App">
             <ConfirmPopup />
             <Toast ref={toast} />
-            <Header 
+            <Header
                 userName={userInfo ? userInfo.firstName : ""}
+                volunteerId={volunteerId || ""}
                 logoSrc={header}
                 onLogout={handleLogout}
                 settingsComponent={settings}
                 onRefreshTokenClick={onAllowNotification}
                 onSendTestNotificationClick={userInfo?.notificationToken ? api.sendTestNotification : undefined}
                 userInfo={userInfo}
+                setActualUserId={setActualUserId}
             />
             {readyToInstall && !isDev && <PWAInstructions />}
             {error && <div>{error}</div>}
@@ -356,10 +367,10 @@ body: `תאריך הבישול: 2024-18-28
                         <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="רישום">
-                        {activeIndex == 1 && <RegistrationComponent getCachedMealRequest={getCachedMealRequest} showToast={showToast} />}
+                        {activeIndex == 1 && <RegistrationComponent getCachedMealRequest={getCachedMealRequest} showToast={showToast} actualUserId={actualUserId} />}
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="התחייבויות">
-                        {activeIndex == 2 && <ExistingRegistrationsComponent showToast={showToast} navigationRequest={navigationRequest}/>}
+                        {activeIndex == 2 && <ExistingRegistrationsComponent showToast={showToast} navigationRequest={navigationRequest} actualUserId={actualUserId}/>}
                     </TabPanel>
                     {isAdmin &&
                         <TabPanel headerStyle={{ fontSize: 20 }} header="שליחה">

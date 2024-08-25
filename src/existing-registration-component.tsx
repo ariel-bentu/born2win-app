@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
-import { Family, getFamilyDetails, getUserRegistrations, updateFamilityDemand } from './api';
+import { getUserRegistrations } from './api';
 import { SelectButton } from 'primereact/selectbutton';
-import { FamilyDemand, NavigationStep, ShowToast } from './types';
+import { FamilyCompact, FamilyDemand, NavigationStep, ShowToast } from './types';
 
-import { FamilyDetails } from './famility-registration-details';
 import { InProgress } from './common-ui';
 import OneLine from './one-line';
-import { confirmPopup } from 'primereact/confirmpopup';
 import RegistrationCancellation from './registration-cancellation';
 import { NICE_DATE } from './utils';
+import { FamilyDetailsComponent } from './famility-registration-details';
 
 const Filters = {
     ALL: 1,
@@ -29,35 +28,29 @@ export function ExistingRegistrationsComponent({ showToast, navigationRequest, a
     const [registrations, setRegistrations] = useState<FamilyDemand[] | undefined>();
     const [filter, setFilter] = useState(Filters.ALL);
     const [error, setError] = useState<any>(undefined);
-    const [showFamilyId, setShowFamilyId] = useState<string | undefined>(navigationRequest && navigationRequest.params && navigationRequest.params.length > 0 ? navigationRequest.params[0] : undefined);
-    const [currentFamily, setCurrentFamily] = useState<Family | undefined>();
-    const [showProgress, setShowProgress] = useState<boolean>(false);
+    const [currentRegistration, setCurrentRegistration] = useState<FamilyDemand | undefined>();
+    const [loading, setLoading] = useState<boolean>(false);
     const [reload, setReload] = useState<number>(0);
     const [showCancellationDialog, setShowCancellationDialog] = useState<FamilyDemand | null>(null);
 
     useEffect(() => {
+        setLoading(true);
+
+        const setCurrentRegistrationByNavigationRequest = navigationRequest && navigationRequest.params && navigationRequest.params.length > 0
+            ? navigationRequest.params[0] : undefined;
+
         getUserRegistrations().then((regs) => {
             regs.sort((a, b) => a.date > b.date ? 1 : -1);
             console.log("registrations loaded", regs?.length)
             setRegistrations(regs);
+            if (setCurrentRegistrationByNavigationRequest) {
+                const navTo = regs.find(reg => reg.id);
+                setCurrentRegistration(navTo);
+            }
         })
-            .catch(err => setError(err));
+            .catch(err => setError(err))
+            .finally(() => setLoading(false));
     }, [reload, actualUserId]);
-
-    useEffect(() => {
-        if (showFamilyId && registrations && registrations.length > 0) {
-            console.log("Loading family details", showFamilyId);
-            setShowProgress(true);
-            getFamilyDetails(showFamilyId).then((f) => {
-                console.log(" family details", f);
-                setCurrentFamily(f)
-            })
-                .catch(err => setError(err))
-                .finally(() => setShowProgress(false));
-        } else {
-            setCurrentFamily(undefined);
-        }
-    }, [showFamilyId, registrations]);
 
     const isInFuture = (date: string) => {
         return dayjs().diff(dayjs(date)) <= 0;
@@ -78,8 +71,15 @@ export function ExistingRegistrationsComponent({ showToast, navigationRequest, a
         <div>לא נמצאו נתונים...</div>
     )
 
-    if (currentFamily) {
-        return <FamilyDetails detailsOnly={true} family={currentFamily} onClose={() => setShowFamilyId(undefined)} showToast={showToast} cityId={currentFamily.fields.city_id_1} />
+    if (currentRegistration) {
+        const currentFamily = {
+            city: currentRegistration.city,
+            familyId: currentRegistration.familyRecordId,
+            familyLastName: currentRegistration.familyLastName
+        } as FamilyCompact;
+        console.log("reg id", currentRegistration.id)
+        return <FamilyDetailsComponent detailsOnly={true} family={currentFamily} onClose={() => setCurrentRegistration(undefined)}
+            showToast={showToast} demands={registrations} reloadOpenDemands={() => { }} />
     }
 
     if (showCancellationDialog) {
@@ -88,7 +88,7 @@ export function ExistingRegistrationsComponent({ showToast, navigationRequest, a
             onCancellationPerformed={() => {
                 setShowCancellationDialog(null);
                 showToast("success", "ביטול נקלט", "");
-                setShowFamilyId(undefined);
+                setCurrentRegistration(undefined);
                 setReload(prev => prev + 1);
             }}
             onError={(err) => showToast("error", "ביטול רישום נכשל", err.message)}
@@ -112,7 +112,7 @@ export function ExistingRegistrationsComponent({ showToast, navigationRequest, a
                 />
             </div>
 
-            {showProgress && <InProgress />}
+            {loading && <InProgress />}
             <div className="surface-ground px-4 py-5 md:px-6 lg:px-8">
                 <div className="grid">
                     {registrationsToShow?.length ?
@@ -124,7 +124,7 @@ export function ExistingRegistrationsComponent({ showToast, navigationRequest, a
                                 footer={dayjs(reg.date).format(NICE_DATE)}
                                 unread={isInFuture(reg.date)}
                                 onRead={() => {
-                                    setShowFamilyId(reg.familyRecordId);
+                                    setCurrentRegistration(reg);
                                 }}
                                 onDelete={dayjs(reg.date).isBefore(dayjs()) ?
                                     undefined : // only allow deleting future commitments

@@ -14,7 +14,7 @@ import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
 import {
-    AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilityIDPayload, FamilyDemand, GetDemandStatPayload, LoginInfo,
+    AirTableRecord, Collections, FamilityDemandUpdatePayload, includeContacts, FamilyDemand, FamilyDetails, GetDemandStatPayload, LoginInfo,
     NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord,
 } from "../../src/types";
 import axios from "axios";
@@ -714,13 +714,13 @@ async function getDemands(
         });
         if (demands.data.records) {
             return demands.data.records.map((demand: AirTableRecord) => ({
-                id: demand.fields.id,
+                id: demand.id,
                 date: demand.fields["תאריך"],
                 city: demand.fields["עיר"][0],
                 familyLastName: demand.fields.Name,
                 district: district,
                 status: demand.fields["זמינות שיבוץ"],
-                familyId: demand.fields.Family_id,
+                familyId: demand.fields.Family_id[0],
                 familyRecordId: demand.fields["משפחה"][0],
                 volunteerId: demand.fields.volunteer_id,
             }) as FamilyDemand);
@@ -729,13 +729,13 @@ async function getDemands(
     throw new HttpsError("not-found", "District not found");
 }
 
-exports.GetFamilityAvailability = onCall({ cors: true }, async (request):Promise<FamilyDemand[]> => {
+exports.GetOpenDemands = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
     const doc = await authenticate(request);
-    const gfp = request.data as FamilityIDPayload;
 
     const district = doc.data().mahoz;
-    return getDemands(district, "זמין", 45, undefined, gfp.familyId);
+    return getDemands(district, "זמין", 45);
 });
+
 
 exports.GetUserRegistrations = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
     const doc = await authenticate(request);
@@ -861,9 +861,9 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
 });
 
 
-exports.GetFamilyDetails = onCall({ cors: true }, async (request) => {
+exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<FamilyDetails> => {
     const doc = await authenticate(request);
-    const gfp = request.data as FamilityIDPayload;
+    const gfp = request.data as includeContacts;
     const mahoz = doc.data().mahoz;
 
     const mahuzRec = (await getDestricts()).find((d: any) => d.id === mahoz);
@@ -878,7 +878,46 @@ exports.GetFamilyDetails = onCall({ cors: true }, async (request) => {
         const userRegistrations = await axios.get(`https://api.airtable.com/v0/${baseId}/${familiesTable}/${gfp.familyId}`, {
             headers,
         });
-        return userRegistrations.data;
+        const rec = userRegistrations.data;
+
+        // if (gfp.includeContacts) {
+        //     // Get contacts from main base's אנשי קשר
+        //     const airTableMainBase = mainBase.value();
+
+        //     const userRegistrations = await axios.get(`https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("אנשי קשר")}?`,
+        //      {
+        //         ...headers,
+        //         params: {
+        //             filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
+        //             fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון"],
+        // }
+
+
+        return ({
+            id: rec.id,
+            familyId: rec.fields.familyid,
+            familyLastName: rec.fields.Name,
+            patientAge: rec.fields["גיל החולה"],
+            prefferedMeal: rec.fields["העדפה לסוג ארוחה"],
+            meatPreferences: rec.fields["העדפות בשר"],
+            fishPreferences: rec.fields["העדפות דגים"],
+            avoidDishes: rec.fields["לא אוכלים"],
+            sideDishes: rec.fields["תוספות"],
+            kosherLevel: rec.fields["כשרות מטבח"],
+            favoriteFood: rec.fields["אוהבים לאכול"],
+            alergies: rec.fields["רגישויות ואלרגיות (from בדיקת ההתאמה)"],
+            adultsCount: rec.fields["נפשות מבוגרים בבית"],
+            familyStructure: rec.fields["הרכב הורים"],
+            familyMembersAge: rec.fields["גילאים של הרכב המשפחה"],
+            cookingDays: rec.fields["ימים"],
+            city: rec.fields["עיר"],
+            cityId: rec.fields.city_id_1,
+            street: rec.fields["רחוב"],
+            floor: rec.fields["קומה"],
+            appartment: rec.fields["דירה"],
+            streatNumber: rec.fields["מספר דירה"],
+            district: mahuzRec.id,
+        }) as FamilyDetails;
     }
     throw new HttpsError("not-found", "Family not found");
 });
@@ -1011,7 +1050,7 @@ async function alertUpcomingCooking() {
 אם אין באפשרותך לבשל יש לבטל באפליקציה, או ליצור קשר.`;
                 await addNotificationToQueue("תזכורת לבישול!", msgBody, [], [demand.volunteerId], {
                     buttons: JSON.stringify([
-                        { label: "צפה בפרטים", action: NotificationActions.RegistrationDetails, params: [demand.familyRecordId] },
+                        { label: "צפה בפרטים", action: NotificationActions.RegistrationDetails, params: [demand.id] },
                         { label: "צור קשר עם עמותה", action: NotificationActions.StartConversation },
                     ]),
                 }

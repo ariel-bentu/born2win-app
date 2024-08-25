@@ -235,7 +235,7 @@ async function searchMeals() {
 
 async function alertUpcomingCooking() {
     const districts = await getDestricts();
-    const daysBefore = 9;
+    const daysBefore = 8;
     for (let i = 0; i < districts.length; i++) {
         if (districts[i].id !== "recxuE1Cwav0kfA7g") continue; // only in test for now
         const upcomingDemands = await getDemands(districts[i].id, "תפוס", daysBefore);
@@ -254,7 +254,7 @@ async function alertUpcomingCooking() {
 
                 await addNotificationToQueue("תזכורת לבישול!", msgBody, [], [demand.volunteerId], {
                     buttons: JSON.stringify([
-                        { label: "צפה בפרטים", action: "registration-details", params: [demand.familyId] },
+                        { label: "צפה בפרטים", action: "registration-details", params: [demand.id] },
                         { label: "צור קשר עם עמותה", action: "start-conversation" },
                     ]),
                 }
@@ -279,12 +279,14 @@ async function getDemands(district, status, daysAhead) {
         });
         if (demands.data.records) {
             return demands.data.records.map((demand) => ({
-                city: demand.fields["עיר"][0],
-                name: demand.fields.Name,
-                district: district,
+                id: demand.id,
                 date: demand.fields["תאריך"],
-                id: demand.fields.id,
-                familyId: demand.fields["משפחה"][0],
+                city: demand.fields["עיר"][0],
+                familyLastName: demand.fields.Name,
+                district: district,
+                status: demand.fields["זמינות שיבוץ"],
+                familyId: demand.fields.Family_id[0],
+                familyRecordId: demand.fields["משפחה"][0],
                 volunteerId: demand.fields.volunteer_id,
             }));
         }

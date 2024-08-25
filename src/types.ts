@@ -19,8 +19,9 @@ export interface NotificationUpdatePayload {
     tokenInfo: TokenInfo;
 }
 
-export interface FamilityIDPayload {
+export interface FamilityDetailsPayload {
     familyId: string;
+    includeContacts:boolean;
 }
 
 export interface City {
@@ -100,6 +101,8 @@ export interface FamilyDemand {
     volunteerId: string;
 }
 
+
+
 export interface StatsData {
     totalDemands: number[];
     fulfilledDemands: number[];
@@ -121,7 +124,7 @@ export interface SendMessagePayload {
 
 export interface Cached<T> {
     userId: string;
-    data: T | undefined;
+    data: T;
     fetchedTS: Dayjs;
     inProgress?: Promise<T>;
 }
@@ -148,17 +151,36 @@ export interface SendNotificationStats {
 
 export type ShowToast = (severity: "error" | "success" | "info" | "warn" | "secondary" | "contrast" | undefined, summary: string, detail: string) => void;
 
-export interface Family2 {
+export interface FamilyCompact {
+    familyId: string;
+    familyLastName: string;
     city: string;
-    name: string;
+}
+
+
+export interface FamilyDetails {
+    id: string; 
+    familyId: string;
+    city: string;
+    cityId: string;
+    familyLastName: string;
     patientAge: number;
     prefferedMeal: string[];
+    meatPreferences: string;
+    fishPreferences: string;
+    avoidDishes: string;
+    sideDishes: string;
     kosherLevel: string;
     favoriteFood: string;
     alergies: string;
     adultsCount: number;
+    familyStructure: string[];
     familyMembersAge: string;
+    cookingDays: string[];
     floor: string;
+    street: string;
+    appartment: string;
+    streatNumber: string;
     district: string;
 }
 

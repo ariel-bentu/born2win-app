@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { TabView, TabPanel } from 'primereact/tabview';
 import { Badge } from 'primereact/badge';
 import { Toast } from 'primereact/toast';
@@ -9,7 +9,7 @@ import 'primeflex/primeflex.css';
 import './App.css';
 import * as api from './api';
 import { NextOrObserver, User } from 'firebase/auth';
-import { Cached, NavigationStep, NotificationActions, ShowToast, UserInfo } from './types';
+import { Cached, FamilyDemand, NavigationStep, NotificationActions, ShowToast, UserInfo } from './types';
 import { ClientJS } from 'clientjs';
 import NotificationsComponent from './notifications-component';
 import { countUnreadNotifications } from './notifications';
@@ -59,30 +59,6 @@ const client = new ClientJS();
 const fingerprint = isIOS ? client.getFingerprint() + "" : "";
 
 
-
-let mealRequests = { fetchedTS: dayjs() } as Cached<api.Family[]>;
-
-const getCachedMealRequest = async (userId: string): Promise<api.Family[]> => {
-    if (mealRequests.inProgress) {
-        await mealRequests.inProgress;
-    }
-
-    // allow cache of 10 minutes
-    if (!mealRequests.data || mealRequests.fetchedTS.diff(dayjs(), "minutes") > 10 || mealRequests.userId !== userId) {
-        mealRequests.inProgress = api.getMealRequests();
-
-        return mealRequests.inProgress
-            .then((mr) => {
-                mealRequests.data = mr;
-                mealRequests.userId = userId;
-                return mr;
-            })
-            .finally(() => mealRequests.inProgress = undefined);
-    }
-    return mealRequests.data;
-};
-
-
 function App() {
     const [user, setUser] = useState<User | null>(offline ? { uid: "123" } as any : null);
     const [init, setInit] = useState<boolean>(false);
@@ -102,6 +78,8 @@ function App() {
         setUser(user);
     }
 
+    const [openDemands, setOpenDemands] = useState<Cached<FamilyDemand[]> | undefined>(undefined);
+
     const [navigationRequest, setNavigationRequest] = useState<NavigationStep | undefined>(undefined)
 
 
@@ -117,16 +95,28 @@ function App() {
             // reset it
             setTimeout(() => setNavigationRequest(undefined), 2000);
         }
-    },
-        [navigationRequest]);
+    }, [navigationRequest]);
+
+    const getOpenDemands = useCallback(async (force?:boolean):Promise<FamilyDemand[]> => {
+        if (!force && openDemands && openDemands.userId === actualUserId && openDemands.fetchedTS.diff(dayjs(), "minutes") < 10) {
+            return openDemands.data;
+        }
+        const demands = await api.getOpenDemands();
+        setOpenDemands({
+            data: demands,
+            userId:actualUserId,
+            fetchedTS: dayjs(),
+        });
+        return demands;
+
+    }, [actualUserId, openDemands]);
+
 
     const showToast: ShowToast = (severity, summary, detail) => {
         if (toast.current) {
             toast.current.show({ severity, summary, detail });
         }
     };
-
-
 
     // hack until Apple fix the postMessage not recieved when app is openned
     // Poll every 10 seconds the local indexDB
@@ -367,10 +357,13 @@ body: `תאריך הבישול: 2024-18-28
                         <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="רישום">
-                        {activeIndex == 1 && <RegistrationComponent getCachedMealRequest={getCachedMealRequest} showToast={showToast} actualUserId={actualUserId} />}
+                        {activeIndex == 1 && <RegistrationComponent openDemands={getOpenDemands()} openDemandsTS={openDemands?.fetchedTS.toISOString() || ""} showToast={showToast} actualUserId={actualUserId} 
+                        reloadOpenDemands={()=>{
+                            getOpenDemands(true);
+                        }}/>}
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="התחייבויות">
-                        {activeIndex == 2 && <ExistingRegistrationsComponent showToast={showToast} navigationRequest={navigationRequest} actualUserId={actualUserId}/>}
+                        {activeIndex == 2 && <ExistingRegistrationsComponent showToast={showToast} navigationRequest={navigationRequest} actualUserId={actualUserId} />}
                     </TabPanel>
                     {isAdmin &&
                         <TabPanel headerStyle={{ fontSize: 20 }} header="שליחה">

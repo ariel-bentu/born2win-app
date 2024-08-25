@@ -19,7 +19,7 @@ import {
 import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
-import { FamilityDemandUpdatePayload, FamilityIDPayload, FamilyDemand, GetDemandStatPayload, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
+import { FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyDemand, FamilyDetails, GetDemandStatPayload, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
 
 
 const firebaseConfig = {
@@ -190,50 +190,8 @@ function callFunctionWithImpersonation(functionName: string, payload?: any) {
 }
 
 
-export interface Family {
-    id: string;
-    fields: {
-        [key: string]: any;
-        'Name': string;
-        'עיר': string;
-        'גיל החולה': string;
-        'העדפה לסוג ארוחה': string[];
-        'כשרות מטבח': string;
-        'אוהבים לאכול': string;
-        'רגישויות ואלרגיות (from בדיקת ההתאמה)': string;
-        'נפשות מבוגרים בבית': string;
-        'גילאים של הרכב המשפחה': string;
-        'מחוז': string;
-        'קומה': string;
-        base_id: string;
-    };
-}
-
-export function getMealRequests(): Promise<Family[]> {
-    return callFunctionWithImpersonation('GetMealRequests').then((res: any) => res.data.records as Family[]);
-}
-
-
-// export interface Availability {
-//     id: string;
-//     createdTime: string;
-//     fields: {
-//         [key: string]: any;
-//         'Name': string;
-//         "תעדוף": string;
-//         "תאריך": string;
-//         "יום בשבוע1": string;
-//     }
-// }
-
-export function getFamilyAvailability(familyId: string): Promise<FamilyDemand[]> {
-    const payload = {
-        familyId,
-    } as FamilityIDPayload;
-
-    return callFunctionWithImpersonation('GetFamilityAvailability', payload).then((res: any) => {
-        return res.data as FamilyDemand[];
-    });
+export function getOpenDemands(): Promise<FamilyDemand[]> {
+    return callFunctionWithImpersonation('GetOpenDemands').then((res: any) => res.data as FamilyDemand[]);
 }
 
 export function updateFamilityDemand(demandId: string, familyId: string, cityId: string, isRegistering: boolean, reason?: string) {
@@ -248,14 +206,14 @@ export function updateFamilityDemand(demandId: string, familyId: string, cityId:
     return callFunctionWithImpersonation('UpdateFamilityDemand', payload);
 }
 
-export function getFamilyDetails(familyId: string) {
+export function getFamilyDetails(familyId: string, includeContacts: boolean): Promise<FamilyDetails> {
     const payload = {
-        familyId
-    } as FamilityIDPayload;
+        familyId, includeContacts
+    } as FamilityDetailsPayload;
 
     return callFunctionWithImpersonation('GetFamilyDetails', payload)
         .then((res: any) => {
-            return res.data as Family;
+            return res.data as FamilyDetails;
         });
 }
 
@@ -299,7 +257,7 @@ export async function searchUsers(query: string): Promise<Recipient[]> {
 
     return searchUsersFunc(payload).then(res => res.data as Recipient[]);
 }
-export const handleSearchUsers = async (userInfo: UserInfo, query:string) => {
+export const handleSearchUsers = async (userInfo: UserInfo, query: string) => {
     // Timeout to emulate a network connection
     console.log("query", query)
     const recipients = await searchUsers(query);

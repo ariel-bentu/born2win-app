@@ -41,6 +41,13 @@
   height: 20px;
 }
 
+.icon-btn-l {
+  border: none;
+  background-color: transparent;
+  width: 35px;
+  height: 35px;
+}
+
 .icon-btn-withLabel {
   width: 100px;
   display: flex;

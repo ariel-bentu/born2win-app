@@ -1,106 +1,92 @@
 import React, { useState, useEffect } from 'react';
 import { MultiSelect } from 'primereact/multiselect';
-import { Family } from './api';
 
 import 'primereact/resources/themes/saga-blue/theme.css';
 import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
 import "./registration.css";
-import { FamilyDetails } from './famility-registration-details';
+import { FamilyDetailsComponent } from './famility-registration-details';
 
 import { InProgress } from './common-ui';
-import { City, ShowToast } from './types';
+import { City, FamilyCompact, FamilyDemand, ShowToast } from './types';
 import OneLine from './one-line';
+import { getUniqueFamilies } from './utils';
 
-
-interface FamilyListProps {
-    families: Family[];
-    onFamilyClick: (family: Family) => void;
-}
-
-const FamilyList: React.FC<FamilyListProps> = ({ families, onFamilyClick }) => {
-    return (
-        <div className="family-list">
-            {families.map((family) => (
-                <OneLine
-                    key={family.id}
-                    title={family.fields.Name}
-                    body={`עיר: ${family.fields['עיר']}, גיל: ${family.fields['גיל החולה']}`}
-                    unread={false}
-                    footer={`סוג ארוחה מועדף: ${family.fields['העדפה לסוג ארוחה'].join(', ')}`}
-                    onRead={() => {
-                        console.log("family click", family.fields.Name)
-                        onFamilyClick(family)
-                    }}
-                />
-            ))}
-        </div>
-    );
-};
 
 interface RegistrationComponentProps {
-    getCachedMealRequest: (userId:string) => Promise<Family[]>;
+    openDemands: Promise<FamilyDemand[]>;
     actualUserId: string
     showToast: ShowToast;
+    openDemandsTS: string;
+    reloadOpenDemands: ()=>void;
 }
 
-function RegistrationComponent({ getCachedMealRequest, showToast, actualUserId }: RegistrationComponentProps) {
+function RegistrationComponent({ openDemands, showToast, actualUserId, openDemandsTS, reloadOpenDemands }: RegistrationComponentProps) {
     const [cities, setCities] = useState<City[]>([]);
     const [selectedCities, setSelectedCities] = useState<City[]>([]);
-    const [families, setFamilies] = useState<Family[] | null>(null);
-    const [filteredFamilies, setFilteredFamilies] = useState<Family[]>([]);
-    const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
+    const [familyDemands, setFamilyDemands] = useState<FamilyDemand[] | null>(null);
+    const [families, setFamilies] = useState<FamilyCompact[]>([]);
+    const [selectedFamily, setSelectedFamily] = useState<FamilyCompact | null>(null);
     const [error, setError] = useState<any>(undefined);
 
     useEffect(() => {
         setSelectedCities([])
-        getCachedMealRequest(actualUserId).then((records: Family[]) => {
-            setFamilies(records);
-            const cities = getUniqueCities(records);
+        openDemands.then().then((demands: FamilyDemand[]) => {
+            setFamilyDemands(demands);
+            const cities = getUniqueCities(demands);
             setCities(cities);
             if (cities.length == 1) {
                 console.log("cities", cities)
                 setSelectedCities([cities[0]]);
             }
+
+            const uniqueFamilies = getUniqueFamilies(demands);
+            setFamilies(uniqueFamilies);
+
         }).catch(err => setError(err));
-    }, [actualUserId]);
+    }, [actualUserId, openDemandsTS]);
 
-    useEffect(() => {
-        if (selectedCities.length === 0) {
-            setFilteredFamilies([]);
-        } else {
-            if (families) {
-                setFilteredFamilies(families.filter(family => selectedCities.some(sc=>sc.name == (family.fields['עיר']))));
+
+    const getUniqueCities = (records: FamilyDemand[]): City[] => {
+        const result = [] as City[];
+        records.forEach((fd, i) => {
+            if (!result.find(f => f.name === fd.city)) {
+                result.push({
+                    id: i + "",
+                    name: fd.city,
+                })
             }
-        }
-    }, [selectedCities, families]);
-
-
-    const getUniqueCities = (records: Family[]): City[] => {
-        const cities = new Set(records.map(record => ({ name: record.fields['עיר'], id: record.fields.city_id_1 })));
-        return Array.from(cities);
+        })
+        return result;
     };
 
     if (error) return (
         <div>תקלת טעינה - {error.message}</div>
     )
 
-    if (!families) return (
+    if (!familyDemands) return (
         <>
             <InProgress />
             <div>נתונים נטענים...</div>
         </>
     );
 
-    if (families.length == 0) return (
+    if (familyDemands.length == 0) return (
         <div>לא נמצאו נתונים...</div>
     )
 
-    if (selectedFamily) return (
-        <div className="p-m-4">
-            <FamilyDetails family={selectedFamily} onClose={() => setSelectedFamily(null)} showToast={showToast} cityId={selectedFamily.fields.city_id_1}/>
-        </div>
-    );
+    if (selectedFamily) {
+        const selectedFamilyDemand = familyDemands.filter(fd=>fd.familyRecordId === selectedFamily.familyId);
+        return (
+            <div className="p-m-4">
+                <FamilyDetailsComponent family={selectedFamily} onClose={() => setSelectedFamily(null)} 
+                showToast={showToast} demands={selectedFamilyDemand} 
+                reloadOpenDemands={reloadOpenDemands}/>
+            </div>
+        );
+    }
+
+    const filteredFamilies = families.filter(family => selectedCities.length == 0 || selectedCities.some(sc => sc.name === family.city))
 
     return (
         <div className="registration-component">
@@ -109,14 +95,22 @@ function RegistrationComponent({ getCachedMealRequest, showToast, actualUserId }
                     value={selectedCities}
                     options={cities.map(city => ({ label: city.name, value: city }))}
                     onChange={(e) => setSelectedCities(e.value)}
-                    placeholder="בחר עיר"
+                    placeholder="סינון לפי עיר"
                     className="w-full md:w-20rem"
                     display="chip"
                 />
             </div>
-            {filteredFamilies.length ?
-                <FamilyList families={filteredFamilies} onFamilyClick={setSelectedFamily} /> :
-                <div>בחר עיר תחילה...</div>}
+            {
+                filteredFamilies.map((family, i) => <OneLine
+                    key={i}
+                    title={family.familyLastName}
+                    body={`עיר: ${family.city}`}
+                    unread={false}
+                    onRead={() => {
+                        console.log("family click", family.familyLastName)
+                        setSelectedFamily(family)
+                    }}
+                />)}
         </div>
     );
 };

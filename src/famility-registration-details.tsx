@@ -3,12 +3,12 @@ import { Calendar, CalendarDateTemplateEvent, CalendarMonthChangeEvent, Calendar
 import "./registration.css";
 
 
-import { Availability, Family, getFamilyAvailability, updateFamilityDemand } from "./api";
+import {  Family, getFamilyAvailability, updateFamilityDemand } from "./api";
 import { useEffect, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
 import { InProgress } from "./common-ui";
-import { ShowToast } from "./types";
+import { FamilyDemand, ShowToast } from "./types";
 import { isNotEmpty } from "./utils";
 
 interface FamilyDetailsProps {
@@ -27,11 +27,12 @@ function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
 }
 
 export function FamilyDetails({ family, onClose, detailsOnly, showToast, cityId }: FamilyDetailsProps) {
-    const [availability, setAvailability] = useState<Availability[]>([]);
+    const [availability, setAvailability] = useState<FamilyDemand[]>([]);
     const [selectedDate, setSelectedDate] = useState<Nullable<Date>>(null);
     const [error, setError] = useState<any>(undefined);
-    const [loading, setLoading] = useState<any>(undefined);
+    const [loading, setLoading] = useState<boolean>(false);
     const [reload, setReload] = useState<number>(0);
+    const [saving, setSaving] = useState<boolean>(false);
 
     const [viewVisibleMonth, setViewVisibleMonth] = useState<CalendarMonthChangeEvent | null>(null);
 
@@ -42,7 +43,7 @@ export function FamilyDetails({ family, onClose, detailsOnly, showToast, cityId 
     useEffect(() => {
         if (family?.id && !detailsOnly) {
             setLoading(true);
-            getFamilyAvailability(family.id, family.fields.base_id)
+            getFamilyAvailability(family.id)
                 .then(res => setAvailability(res))
                 .catch(err => setError(err))
                 .finally(() => setLoading(false));
@@ -51,7 +52,7 @@ export function FamilyDetails({ family, onClose, detailsOnly, showToast, cityId 
 
     if (!family) return null;
 
-    const availableDates = availability.map(avail => new Date(avail.fields["תאריך"]));
+    const availableDates = availability.map(avail => new Date(avail.date));
 
     const isDateAvailable = (event: CalendarDateTemplateEvent) => {
         return availableDates.some(availableDate =>
@@ -75,7 +76,7 @@ export function FamilyDetails({ family, onClose, detailsOnly, showToast, cityId 
     const alergies = family.fields['רגישויות ואלרגיות (from בדיקת ההתאמה)'];
 
     const isAvailableDatesVisible = availability.some(av => {
-        const availableDate = dayjs(av.fields["תאריך"]);
+        const availableDate = dayjs(av.date);
         return availableDate.year() === viewVisibleMonth?.year && availableDate.month() - 1 == viewVisibleMonth?.month;
     });
 
@@ -126,17 +127,21 @@ export function FamilyDetails({ family, onClose, detailsOnly, showToast, cityId 
                     //yearNavigator 
                     //yearRange="2020:2030" 
                     />
-
+{saving && <InProgress />}
                     <Button
-                        disabled={!selectedDate}
+                        disabled={!selectedDate || saving}
                         label="שבצו אותי"
                         onClick={() => {
-                            const availabilityRecord = availability.find(a => dayjs(a.fields["תאריך"]).diff(selectedDate, "days") === 0);
+                            const availabilityRecord = availability.find(a => dayjs(a.date).diff(selectedDate, "days") === 0);
+                            // to avoid double click
+                            setSelectedDate(null);
                             if (availabilityRecord) {
+                                setSaving(true);
                                 updateFamilityDemand(availabilityRecord.id, family.fields.familyid, cityId, true).then(() => {
                                     showToast("success", "שיבוץ נקלט בהצלחה", "");
                                     setReload(prev => prev + 1);
-                                }).catch((err) => showToast("error", "תקלה ברישום (1) - ", err.message));
+                                }).catch((err) => showToast("error", "תקלה ברישום (1) - ", err.message))
+                                .finally(()=>setSaving(false));
                             }
                         }} className="mt-3" />
                 </div>

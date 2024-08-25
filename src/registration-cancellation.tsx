@@ -1,31 +1,22 @@
 import { useState } from "react";
-import { RegistrationRecord } from "./types";
 import { Card } from "primereact/card";
 import { InputTextarea } from "primereact/inputtextarea";
 import { Button } from "primereact/button";
 import { updateFamilityDemand } from "./api";
+import { FamilyDemand } from "./types";
+import { InProgress } from "./common-ui";
 
 interface RegistrationCancellationProps {
     onClose: () => void;
     onError: (err: Error) => void;
     onCancellationPerformed: () => void;
-    registration: RegistrationRecord;
+    registration: FamilyDemand;
 }
-
-//updateFamilityDemand(reg.id, reg.familyId, "cityId(unknown)", false).then(() => {
-//                 showToast("success", "ביטול נקלט", "")
-//             })
-//                 .catch((err) => showToast("error", "תקלה ברישום הביטול (2) - ", err.message))
-//                 .finally(() => {
-//                     setShowFamilyId(undefined);
-//                     setReload(prev => prev + 1);
-//                 });
-//         }
-
 
 export default function RegistrationCancellation({ onClose, onCancellationPerformed, registration, onError }: RegistrationCancellationProps) {
     const [reason, setReason] = useState<string>("");
     const [isReasonValid, setIsReasonValid] = useState<boolean>(false);
+    const [saving, setSaving] = useState<boolean>(false);
 
     const handleReasonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const value = e.target.value;
@@ -64,14 +55,17 @@ export default function RegistrationCancellation({ onClose, onCancellationPerfor
                                 icon="pi pi-check"
                                 className="p-button-danger p-mr-2"
                                 onClick={() => {
+                                    setSaving(true);
                                     updateFamilityDemand(registration.id, registration.familyId, "cityId(unknown)", false, reason)
                                         .then(onCancellationPerformed)
-                                        .catch(onError);
+                                        .catch(onError)
+                                        .finally(() => setSaving(false));
                                 }}
 
-                                disabled={!isReasonValid}
+                                disabled={!isReasonValid || saving}
                             />
                         </div>
+                        {saving && <InProgress />}
                     </div>
                 </Card>
             </div>

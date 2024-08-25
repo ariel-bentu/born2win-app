@@ -19,8 +19,7 @@ import {
 import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
-import { FamilityDemandUpdatePayload, FamilityIDPayload, GetDemandStatPayload, NotificationUpdatePayload, Recipient, RegistrationRecord, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
-import { userInfo } from "os";
+import { FamilityDemandUpdatePayload, FamilityIDPayload, FamilyDemand, GetDemandStatPayload, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
 
 
 const firebaseConfig = {
@@ -215,25 +214,25 @@ export function getMealRequests(): Promise<Family[]> {
 }
 
 
-export interface Availability {
-    id: string;
-    createdTime: string;
-    fields: {
-        [key: string]: any;
-        'Name': string;
-        "תעדוף": string;
-        "תאריך": string;
-        "יום בשבוע1": string;
-    }
-}
+// export interface Availability {
+//     id: string;
+//     createdTime: string;
+//     fields: {
+//         [key: string]: any;
+//         'Name': string;
+//         "תעדוף": string;
+//         "תאריך": string;
+//         "יום בשבוע1": string;
+//     }
+// }
 
-export function getFamilyAvailability(familyId: string, baseId: string): Promise<Availability[]> {
+export function getFamilyAvailability(familyId: string): Promise<FamilyDemand[]> {
     const payload = {
         familyId,
     } as FamilityIDPayload;
 
     return callFunctionWithImpersonation('GetFamilityAvailability', payload).then((res: any) => {
-        return res.data.records as Availability[];
+        return res.data as FamilyDemand[];
     });
 }
 
@@ -260,18 +259,9 @@ export function getFamilyDetails(familyId: string) {
         });
 }
 
-export function getUserRegistrations(): Promise<RegistrationRecord[]> {
+export function getUserRegistrations(): Promise<FamilyDemand[]> {
     return callFunctionWithImpersonation('GetUserRegistrations')
-        .then((res: any) => res.data.records.map((rec: any) => {
-            return {
-                id: rec.id,
-                date: rec.fields["תאריך"],
-                city: rec.fields["עיר"][0],
-                familyLastName: rec.fields.Name,
-                familyId: rec.fields.Family_id,
-                familyRecordId: rec.fields["משפחה"][0],
-            } as RegistrationRecord;
-        }));
+        .then((res: any) => res.data);
 }
 
 

@@ -87,16 +87,18 @@ export interface AirTableRecord {
     createdTime: string;
     fields: { [key: string]: any };
 }
-export interface RegistrationRecord {
+
+export interface FamilyDemand {
     id: string;
     date: string;
     city: string;
+    district: string;
+    status: string;
     familyLastName: string;
-    weekday: string;
     familyId: string;
     familyRecordId: string;
+    volunteerId: string;
 }
-
 
 export interface StatsData {
     totalDemands: number[];
@@ -159,11 +161,3 @@ export interface Family2 {
     district: string;
 }
 
-export interface FamilyDemand {
-    city: string;
-    name: string;
-    date: string;
-    id: string;
-    volunteerId: string;
-    familyId: string;
-}

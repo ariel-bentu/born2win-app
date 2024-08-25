@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import { Family, getFamilyDetails, getUserRegistrations, updateFamilityDemand } from './api';
 import { SelectButton } from 'primereact/selectbutton';
-import { NavigationStep, RegistrationRecord, ShowToast } from './types';
+import { FamilyDemand, NavigationStep, ShowToast } from './types';
 
 import { FamilyDetails } from './famility-registration-details';
 import { InProgress } from './common-ui';
@@ -25,14 +25,14 @@ interface ExistingRegistrationsComponentProps {
 }
 
 export function ExistingRegistrationsComponent({ showToast, navigationRequest }: ExistingRegistrationsComponentProps) {
-    const [registrations, setRegistrations] = useState<RegistrationRecord[] | undefined>();
+    const [registrations, setRegistrations] = useState<FamilyDemand[] | undefined>();
     const [filter, setFilter] = useState(Filters.ALL);
     const [error, setError] = useState<any>(undefined);
     const [showFamilyId, setShowFamilyId] = useState<string | undefined>(navigationRequest && navigationRequest.params && navigationRequest.params.length > 0 ? navigationRequest.params[0] : undefined);
     const [currentFamily, setCurrentFamily] = useState<Family | undefined>();
     const [showProgress, setShowProgress] = useState<boolean>(false);
     const [reload, setReload] = useState<number>(0);
-    const [showCancellationDialog, setShowCancellationDialog] = useState<RegistrationRecord | null>(null);
+    const [showCancellationDialog, setShowCancellationDialog] = useState<FamilyDemand | null>(null);
 
     useEffect(() => {
         getUserRegistrations().then((regs) => {

@@ -33,7 +33,7 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
             const isLink = value.startsWith('http://') || value.startsWith('https://');
             const label = part.slice(0, colonIndex + (isLink ? 0 : 1));
             return (
-                <p className="flex align-items-center" key={index}>
+                <div className="flex align-items-center" key={index}>
                     {isLink ? <>
                         <a href={value} target="_blank" rel="noopener noreferrer" className='ml-2'>
                             {label}
@@ -43,11 +43,11 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
                         <>
                             <strong className="pl-1">{label}</strong> <div>{value}</div>
                         </>}
-                </p>
+                </div>
             );
         }
 
-        return <p key={index}>{part}</p>;
+        return <div key={index}>{part}</div>;
     };
 
     return (
@@ -67,7 +67,7 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
                 </div>
 
                 {buttons?.length && onLineButtonPressed && <div className="flex flex-row align-items-end justify-content-between">
-                    {buttons.map(btn => (<Button label={btn.label} onClick={() => {
+                    {buttons.map((btn, i) => (<Button key={i} label={btn.label} onClick={() => {
                         onLineButtonPressed(btn.action, btn.params);
                     }} />))}
                 </div>}

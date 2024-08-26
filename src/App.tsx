@@ -167,51 +167,54 @@ function App() {
                         console.log("vol ID already paired- ignored", currentVolId, "vs. requested: ", userPairingRequest);
                         setError("תקלה באתחול (1) - פנה לעזרה.");
                     } else if (!isNotEmpty(currentVolId) || (isDev && currentVolId !== userPairingRequest)) {
-                        if (isDev && currentVolId !== userPairingRequest) {
+                        if (isDev &&  isNotEmpty(currentVolId) && currentVolId !== userPairingRequest) {
                             // switch user: 
+                            localStorage.removeItem(VOL_ID_STORAGE_KEY)
+                            api.logout();
+                            return;
                         }
 
                         console.log("identify on server as ", userPairingRequest)
                         api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, isDev ? false : isIOS).then(() => {
-                            setVolunteerId(userPairingRequest);
-                            if (isAndroid) {
-                                localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
-                            } else if (!isDev) {
-                                // Logout from Firebase
-                                setLoggedOut(true);
-                                api.logout();
+                                setVolunteerId(userPairingRequest);
+                                if (isAndroid) {
+                                    localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
+                                } else if (!isDev) {
+                                    // Logout from Firebase
+                                    setLoggedOut(true);
+                                    api.logout();
 
-                            }
+                                }
+                                setReadyToInstall(true);
+                            })
+                                    .catch((err: Error) => setError("תקלה באתחול (2). " + err.message));
+                        } else {
+                            setVolunteerId(currentVolId);
                             setReadyToInstall(true);
-                        })
-                            .catch((err: Error) => setError("תקלה באתחול (2). " + err.message));
-                    } else {
-                        setVolunteerId(currentVolId);
-                        setReadyToInstall(true);
+                        }
                     }
-                }
-            } else {
-                // PDA flow
-                if (!isNotEmpty(currentVolId)) {
-                    if (!isIOS) {
-                        // NOT EXPECTED!!! Andoid should have already volunteerId stored in localStorage
-                        setError("תקלה באתחול (5) - פנה לעזרה");
-                        return;
-                    }
-                    // an unpaired PWA - first time - load the volunteerId based on finger print
-                    api.updateLoginInfo(undefined, undefined, fingerprint, true).then((retVolId: string) => {
-                        setVolunteerId(retVolId);
-                        localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
-                    }).catch((err: Error) => {
-                        console.log("Failed to fetch volunteerId based on fingerprint", err);
-                        setError(" .תקלה באתחול (6) - פנה לעזרה" + err.message);
-                    });
                 } else {
-                    setVolunteerId(currentVolId)
+                    // PDA flow
+                    if (!isNotEmpty(currentVolId)) {
+                        if (!isIOS) {
+                            // NOT EXPECTED!!! Andoid should have already volunteerId stored in localStorage
+                            setError("תקלה באתחול (5) - פנה לעזרה");
+                            return;
+                        }
+                        // an unpaired PWA - first time - load the volunteerId based on finger print
+                        api.updateLoginInfo(undefined, undefined, fingerprint, true).then((retVolId: string) => {
+                            setVolunteerId(retVolId);
+                            localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
+                        }).catch((err: Error) => {
+                            console.log("Failed to fetch volunteerId based on fingerprint", err);
+                            setError(" .תקלה באתחול (6) - פנה לעזרה" + err.message);
+                        });
+                    } else {
+                        setVolunteerId(currentVolId)
+                    }
                 }
             }
-        }
-    }, [user]);
+        }, [user]);
 
     useEffect(() => {
         if (!oldUrlParamID && (!offline && (isPWA || isDev) && user && isNotEmpty(volunteerId))) {
@@ -292,7 +295,7 @@ function App() {
             accept: async () => {
                 try {
                     setLoggedOut(true);
-                    api.logout();
+                    await api.logout();
                     localStorage.removeItem(VOL_ID_STORAGE_KEY);
                 } catch (error) {
                     console.error('Error logging out', error);
@@ -339,9 +342,9 @@ function App() {
             <Button onClick={async () => {
                 const db = await getDB();
                 await db.put('notifications', {
-id: Date.now() + "",
-title: "תזכורת",
-body: `תאריך הבישול: 2024-18-28
+                    id: Date.now() + "",
+                    title: "תזכורת",
+                    body: `תאריך הבישול: 2024-18-28
 עוד: 3 ימים
 משפחה: yyy
 עיר: xxx
@@ -371,6 +374,7 @@ body: `תאריך הבישול: 2024-18-28
             <Toast ref={toast} />
             <Header
                 userName={userInfo ? userInfo.firstName : ""}
+                showToast={showToast}
                 volunteerId={volunteerId || ""}
                 logoSrc={header}
                 onLogout={handleLogout}

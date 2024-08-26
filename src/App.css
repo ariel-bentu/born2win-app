@@ -3,13 +3,14 @@
   direction: rtl;
   width: 100vw;
 }
-
-.msg-badge {
-  position: absolute;
-  top: 0;
-  left: 0;
+.header-logo {
+  left: 0; 
+  right: 0; 
+  margin-left: auto; 
+  margin-right: auto; 
+  position:absolute;
+  width: 190px;
 }
-
 
 .icon-btn {
   border: none;
@@ -44,9 +45,9 @@
   left: 5px;
   top: 5px;
   background-color: red;
-  width: 6px;
-  height: 6px;
-  border-radius: 3px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
 }
 
 .settingMenuItem {

@@ -97,8 +97,8 @@ function RegistrationComponent({ openDemands, showToast, actualUserId, openDeman
                 </div>
 
             </div>}
-            <div className='standalone-dynamic-host'>
-                <div className='standalone-card'>
+            <div className={standalone ? 'standalone-dynamic-host' : "w-full"}>
+                <div className={standalone ? 'standalone-card' : "w-full"}>
                     {selectedFamily ?
                         <FamilyDetailsComponent family={selectedFamily} onClose={() => setSelectedFamily(null)}
                             showToast={showToast} demands={selectedFamilyDemand || []}
@@ -134,7 +134,7 @@ function RegistrationComponent({ openDemands, showToast, actualUserId, openDeman
                 </div>
             </div>
 
-            {standalone && <img src={footerImg} style={{maxWidth:"100%"}}/>}
+            {standalone && <img src={footerImg} style={{ maxWidth: "100%" }} />}
         </div>
     );
 };

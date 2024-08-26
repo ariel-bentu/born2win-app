@@ -21,16 +21,16 @@ export enum NotificationChannels {
 };
 
 interface ChannelInfo {
-    name:string;
-    icon:string;
+    name: string;
+    icon: string;
 }
 
 export const NotificationChannelsName: { [key: string]: ChannelInfo } = {
-    [NotificationChannels.General]: {name: "כללי", icon: "pi-comment"},
-    [NotificationChannels.Alerts]: {name: "התראות / תזכורות",icon: "pi-bell"},
-    [NotificationChannels.Links]: {name: "לינקים למשתמשים",icon: "pi-link"},
-    [NotificationChannels.Greetings]: {name: "ברכות",icon: "pi-heart"},
-    [NotificationChannels.Registrations]: {name: "שיבוצים",icon: "pi-calendar"},
+    [NotificationChannels.General]: { name: "כללי", icon: "pi-comment" },
+    [NotificationChannels.Alerts]: { name: "התראות / תזכורות", icon: "pi-bell" },
+    [NotificationChannels.Links]: { name: "לינקים למשתמשים", icon: "pi-link" },
+    [NotificationChannels.Greetings]: { name: "ברכות", icon: "pi-heart" },
+    [NotificationChannels.Registrations]: { name: "שיבוצים", icon: "pi-calendar" },
 }
 
 
@@ -164,6 +164,10 @@ export interface Recipient {
 
 export interface SearchUsersPayload {
     query: string;
+}
+
+export interface GenerateLinkPayload {
+    userId: string;
 }
 
 export interface SendNotificationStats {

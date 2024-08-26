@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Sidebar } from "primereact/sidebar";
 import { Button } from "primereact/button";
-import { onClickEvent, UserInfo } from "./types";
+import { onClickEvent, ShowToast, UserInfo } from "./types";
 import { MenuItem } from "primereact/menuitem";
 import { PanelMenu } from "primereact/panelmenu";
 import "./header.css";
 import Impersonate from "./impersonate";
 import { impersonate, impersonateUser, resetImpersonation } from "./api";
+import { Divider } from "primereact/divider";
 
 interface HeaderProps {
     userName: string;
@@ -18,10 +19,11 @@ interface HeaderProps {
     onSendTestNotificationClick?: onClickEvent;
     onLogout: () => void;
     setActualUserId: (newUserId: string) => void;
+    showToast: ShowToast;
 }
 
-function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onSendTestNotificationClick, 
-    onLogout, userInfo, setActualUserId, volunteerId }: HeaderProps) {
+function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onSendTestNotificationClick,
+    onLogout, userInfo, setActualUserId, volunteerId, showToast }: HeaderProps) {
     const [sidebarVisible, setSidebarVisible] = useState(false);
     const [showTechInfo, setShowTechInfo] = useState<boolean>(false);
     const toggleText = () => {
@@ -68,14 +70,9 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
 
     return (
         <div>
-            <header className="flex justify-content-between align-items-center p-3 shadow-2 "
-                style={{
-                    direction: "rtl",
-                    backgroundColor: "#F8F8F8",
-                    //borderBottomWidth:1, borderBottomStyle:"solid", borderBottomColor:"lightgray" 
-                }}>
+            <header className="flex justify-content-between align-items-center p-3  ">
                 <Button icon="pi pi-bars" className="p-button-rounded p-button-text" onClick={() => setSidebarVisible(true)} />
-                <img src={logoSrc} alt="Logo" className="header-logo" style={{ height: "40px" }} />
+                <img src={logoSrc} className="header-logo" alt="Logo" />
                 <span>{userName}</span>
 
                 <Sidebar
@@ -88,7 +85,7 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
                     <h2 className="settings-title">הגדרות</h2>
                     <PanelMenu model={items} className="settings-menu" />
                     {userInfo?.isAdmin && <div dir="rtl" className="m-2">פעל בשם:</div>}
-                    <Impersonate userInfo={userInfo} onChange={(userId, name) => {
+                    <Impersonate showToast={showToast} userInfo={userInfo} onChange={(userId, name) => {
                         if (userId && name) {
                             impersonate(userId, name);
                             setActualUserId(userId);
@@ -100,6 +97,7 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
                 </Sidebar>
 
             </header>
+            <Divider />
             {impersonateUser && <div>בשם: {impersonateUser.name}</div>}
         </div>
     );

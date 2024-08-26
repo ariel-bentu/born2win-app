@@ -18,6 +18,7 @@ import {
     NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord,
     FamilityDetailsPayload,
     NotificationChannels,
+    GenerateLinkPayload,
 } from "../../src/types";
 import axios from "axios";
 import express = require("express");
@@ -315,11 +316,33 @@ async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
     };
 }
 
+exports.GenerateUserLink = onCall({ cors: true }, async (request) => {
+    const userInfo = await getUserInfo(request);
+    if (!userInfo.isAdmin) {
+        throw new HttpsError("permission-denied", "Only Admin can generate link");
+    }
+    const glp = request.data as GenerateLinkPayload;
+    const userDoc = await getUserByID(glp.userId);
+    if (!userDoc) {
+        throw new HttpsError("not-found", "User not found");
+    }
+
+    const update = {
+        // Keep existing otp if exists
+        otp: userDoc.data()?.otp ? userDoc.data()?.otp : crypto.randomUUID(),
+        // Renew date
+        otpCreatedAt: dayjs().format(DATE_TIME),
+    };
+    return userDoc.ref.update(update).then(()=>{
+        return getRegistrationLink(glp.userId, update.otp);
+    });
+});
+
 exports.TestNotification = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);
     if (doc) {
         const displayName = doc.data().firstName + " " + doc.data().lastName;
-        return addNotificationToQueue("הודעת בדיקה", "הודעת בדיקה ל:\n" + displayName, NotificationChannels.General, [], [doc.id]);
+        return addNotificationToQueue("הודעת בדיקה", "הודעת בדיקה ל:" + displayName, NotificationChannels.General, [], [doc.id]);
     }
 
     return;

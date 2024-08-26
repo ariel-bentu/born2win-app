@@ -52,7 +52,7 @@ const Filters = {
 }
 
 interface Channel {
-    name:string;
+    name: string;
     notifications: NotificationRecord[];
 }
 
@@ -65,12 +65,19 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
     const menu = useRef<Menu>(null);
     const divRef = useRef<HTMLDivElement>(null);
     const msgRef = useRef<ScrollPanel>(null);
+    const [localReload, setLocalReload] = useState<number>(0);
 
-    const fetchNotifications = async () => {
-        try {
-            const allNotifications = await readAllNotifications();
+
+
+    useEffect(() => {
+        readAllNotifications().then(allNotifications => {
             allNotifications.sort((n1, n2) => n2.timestamp - n1.timestamp);
+            const unreadCount = allNotifications.reduce((count, notification) => notification.read === NotificationStatus.Unread ? count + 1 : count, 0);
+            console.log("reload notifications from DB", allNotifications.length, "unread", unreadCount);
+
+            updateUnreadCount(unreadCount);
             setNotifications(allNotifications);
+
 
             // Group notifications by channel
             const grouped = allNotifications.reduce((acc: any, notification: NotificationRecord) => {
@@ -82,43 +89,34 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                 return acc;
             }, {});
 
-            
-            const channels = Object.keys(grouped).map(key=>({name:key, notifications: grouped[key]}));
-                
-            channels.sort((a, b) => {
+
+            const newChannels = Object.keys(grouped).map(key => ({ name: key, notifications: grouped[key] }));
+
+            newChannels.sort((a, b) => {
                 const latestA = a.notifications[0]?.timestamp || 0;
                 const latestB = a.notifications[0]?.timestamp || 0;
                 return latestB - latestA;
             })
 
-            setChannels(channels);
-        } catch (error) {
-            console.error('Error fetching notifications:', error);
-        }
-    };
+            setChannels(newChannels);
 
-    useEffect(() => {
-        fetchNotifications();
-    }, [reload]);
+            setCurrentChannel(curr => {
+                if (!curr) return null;
+                return newChannels.find(ch => ch.name === curr.name) || null;
+            })
+
+        }).catch(err => console.error('Error fetching notifications:', err));
+    }, [reload, localReload]);
 
     const markAsRead = async (id: string) => {
-        try {
-            await updateNotification(id, 1); // Use 1 for read
-            fetchNotifications();
-            countUnreadNotifications().then(updateUnreadCount);
-        } catch (error) {
-            console.error('Error marking notification as read:', error);
-        }
-    };
+        await updateNotification(id, 1);
+        setLocalReload(prev => prev + 1);
+    }
+
 
     const deleteOne = async (id: string) => {
-        try {
-            await deleteNotification(id);
-            fetchNotifications();
-            countUnreadNotifications().then(updateUnreadCount);
-        } catch (error) {
-            console.error('Error deleting notification:', error);
-        }
+        await deleteNotification(id);
+        setLocalReload(prev => prev + 1);
     };
 
     const deleteAll = (event: React.SyntheticEvent) => {
@@ -129,8 +127,7 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
             accept: async () => {
                 try {
                     await deleteAllNotifications();
-                    fetchNotifications();
-                    countUnreadNotifications().then(updateUnreadCount);
+                    setLocalReload(prev => prev + 1);
                 } catch (error) {
                     console.error('Error deleting all notifications:', error);
                 }
@@ -138,16 +135,10 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
         });
     };
 
-    const markAllAsRead = () => {
-        try {
-            const waitFor = notifications.map(n => updateNotification(n.id, 1));
-            Promise.all(waitFor).then(() => {
-                updateUnreadCount(0);
-                fetchNotifications();
-            });
-        } catch (error) {
-            console.error('Error marking notification as read:', error);
-        }
+    const markAllAsRead = async () => {
+        const waitFor = notifications.map(n => updateNotification(n.id, 1));
+        await Promise.all(waitFor);
+        setLocalReload(prev => prev + 1);
     };
 
     const contextMenu = [
@@ -155,10 +146,12 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
         { label: 'סימון הכל כנקרא', icon: 'pi pi-fw pi-eye', command: markAllAsRead },
     ] as MenuItem[];
 
-    const channelsToShow =  channels.filter(ch => filter === Filters.ALL || ch.notifications.some(notif=>notif.read == NotificationStatus.Unread));
+    const channelsToShow = channels.filter(ch => filter === Filters.ALL || ch.notifications.some(notif => notif.read == NotificationStatus.Unread));
     const scrollAreaHeight = currentChannel && divRef.current ?
         window.innerHeight - divRef.current.getBoundingClientRect().top - 50 : 400
 
+    const channelNotifications = currentChannel?.notifications
+        .filter(notif => filter === Filters.ALL || notif.read == Filters.UNREAD)
     return (
         <div>
             <Toast ref={toast} />
@@ -177,29 +170,31 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                 <Button unstyled icon="pi pi-ellipsis-v" className="three-dot-menu" onClick={(event) => menu.current?.toggle(event)} />
             </div>
 
-            <div className="surface-ground px-4 py-5 md:px-6 lg:px-8">
-                <div>
-                    {currentChannel === null ? (
-                        // Channels view
-                        channelsToShow.map((channel, i) => (
-                            <ChannelComponent key={i} index={i} channel={channel} 
-                                onClick={() => {
-                                    setCurrentChannel(channel);
-                                    if (msgRef.current) {
-                                        const scrollableElement = msgRef.current.getContent();
-                                        scrollableElement.scrollTop = 100;
-                                    }
-                                    msgRef.current?.getElement().scrollTo(0, 50);//scrollPanelRef.current.content.scrollHeight;
-                                }}
-                            />
-                        ))
-                    ) : (
-                        // Full channel view
-                        <div className='h-full relative'>
-                            <ChannelHeader name={currentChannel.name} onBack={() => setCurrentChannel(null)} />
-                            <div className="flex-grow" ref={divRef}>
-                                <ScrollPanel style={{ width: '100%', height: scrollAreaHeight }} ref={msgRef}>
-                                    {currentChannel.notifications.map(notification => (
+            <div>
+                {currentChannel === null ? (
+                    // Channels view
+                    channelsToShow.map((channel, i) => (
+                        <ChannelComponent key={i} index={i} channel={channel}
+                            onClick={() => {
+                                setCurrentChannel(channel);
+                                if (msgRef.current) {
+                                    const scrollableElement = msgRef.current.getContent();
+                                    scrollableElement.scrollTop = 100;
+                                }
+                                msgRef.current?.getElement().scrollTo(0, 50);//scrollPanelRef.current.content.scrollHeight;
+                            }}
+                        />
+                    ))
+                ) : (
+                    // Full channel view
+                    <div className='h-full relative'>
+                        <ChannelHeader name={currentChannel.name} onBack={() => setCurrentChannel(null)} />
+                        <Divider />
+                        <div className="flex-grow" ref={divRef}>
+                            <ScrollPanel style={{ width: '100%', height: scrollAreaHeight }} ref={msgRef}>
+                                {channelNotifications && channelNotifications.length > 0 ?
+
+                                    channelNotifications?.map(notification => (
                                         // <OneNotification
                                         <OneLine
                                             hideIcon={true}
@@ -221,18 +216,23 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                                             onLineButtonPressed={NotificationActionHandler}
                                             onRead={() => markAsRead(notification.id)}
                                         />
-                                    ))}
-                                </ScrollPanel>
-                            </div>
+                                    )) :
+                                    <div className='no-messages'>{getNoNotificationMessage(filter)}</div>
+                                }
+                            </ScrollPanel>
                         </div>
-                    )}
-                    {!channelsToShow?.length && <div className='no-messages'>אין הודעות</div>}
-                </div>
+                    </div>
+                )}
+                {!channelsToShow?.length && <div className='no-messages'>{getNoNotificationMessage(filter)}</div>}
+
             </div>
         </div>
     );
 };
 
+function getNoNotificationMessage(filter: number): string {
+    return "אין הודעות" + (filter === Filters.UNREAD ? " שלא נקראו" : "");
+}
 
 interface ChannelProps {
     channel: Channel;
@@ -269,11 +269,10 @@ interface ChannelHeaderProps {
 function ChannelHeader({ name, onBack }: ChannelHeaderProps) {
     const niceName = NotificationChannelsName[name]?.name || "כל השאר";
     const iconName = NotificationChannelsName[name]?.icon || "pi-clipboard";
-    console.log("ch", name, niceName)
     return <div className="w-12 flex flex-col align-items-center">
-        {<div className="back-btn" onClick={onBack}>
-            {onBack && <span className="pi pi-angle-right text-4xl" ></span>}
-        </div>}
+        {onBack ? <div className="back-btn" onClick={onBack}>
+            <span className="pi pi-angle-right text-4xl" ></span>
+        </div> : <div style={{ width: 5 }} />}
         <div className='channel-icon'>
             <span className={"pi text-4xl " + iconName}></span>
         </div>

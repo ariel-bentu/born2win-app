@@ -1,18 +1,21 @@
 import { AutoComplete, AutoCompleteCompleteEvent } from "primereact/autocomplete";
 import { useState } from "react";
 import { isNotEmpty } from "./utils";
-import { UserInfo } from "./types";
+import { ShowToast, UserInfo } from "./types";
 import { Button } from "primereact/button";
-import { handleSearchUsers } from "./api";
+import { generateInstallationLinkForUser, handleSearchUsers } from "./api";
+import { InProgress } from "./common-ui";
 
 interface ImpersonateProps {
     userInfo: UserInfo | null;
-    onChange:(userId: string | undefined, name?:string)=>void;
+    onChange: (userId: string | undefined, name?: string) => void;
+    showToast: ShowToast;
 }
 
-export default function Impersonate({ userInfo, onChange }: ImpersonateProps) {
+export default function Impersonate({ userInfo, onChange, showToast }: ImpersonateProps) {
     const [selectedUser, setSelectedUser] = useState<any | undefined>();
     const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
+    const [loading, setLoading] = useState<boolean>(false);
 
     if (!userInfo || !userInfo.isAdmin) return null;
 
@@ -31,7 +34,18 @@ export default function Impersonate({ userInfo, onChange }: ImpersonateProps) {
         }}
 
         onChange={(e) => setSelectedUser(e.value)} />
+        {loading && <InProgress />}
         <Button disabled={!selectedUser} label="שנה למשתמש" onClick={() => onChange(selectedUser.id, selectedUser.name)} />
-        <Button label="ביטול" onClick={() =>  onChange(undefined)} />
+        <Button label="בטל פעולה בשם" onClick={() => onChange(undefined)} />
+        <Button disabled={!selectedUser} label="העתק לינק להתקנה" onClick={async () => {
+            setLoading(true);
+            const link = await generateInstallationLinkForUser(selectedUser.id)
+                .catch(err => showToast("error", "יצירת לינק נכשלה", err.message))
+                .finally(() => setLoading(false));
+            if (link) {
+                navigator.clipboard.writeText(link);
+                showToast("success", "לינק הועתק ללוח - ניתק כעת להדביקו", "");
+            }
+        }} />
     </div>
 }

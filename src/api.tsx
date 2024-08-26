@@ -19,7 +19,7 @@ import {
 import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
-import { FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyDemand, FamilyDetails, GetDemandStatPayload, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
+import { FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyDemand, FamilyDetails, GenerateLinkPayload, GetDemandStatPayload, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
 
 
 const firebaseConfig = {
@@ -71,7 +71,7 @@ export function init(onAuth: NextOrObserver<User>) {
 }
 
 export function login() {
-    signInAnonymously(auth)
+    return signInAnonymously(auth)
         .then((u) => {
             // Signed in..
             console.log("User is authenticated", u.user.uid);
@@ -84,7 +84,7 @@ export function login() {
 }
 
 export function logout() {
-    signOut(auth)
+    return signOut(auth)
         .then((u) => {
             // signOut in..
             console.log("User is Now logged out");
@@ -257,6 +257,14 @@ export async function searchUsers(query: string): Promise<Recipient[]> {
 
     return searchUsersFunc(payload).then(res => res.data as Recipient[]);
 }
+
+export async function generateInstallationLinkForUser(userId: string): Promise<string> {
+    const payload = {
+        userId,
+    } as GenerateLinkPayload;
+    return httpsCallable(functions, 'GenerateUserLink')(payload).then(res => res.data as string);
+}
+
 export const handleSearchUsers = async (userInfo: UserInfo, query: string) => {
     // Timeout to emulate a network connection
     console.log("query", query)

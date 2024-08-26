@@ -1,3 +1,10 @@
+
+.msg-badge {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
 .settings-sidebar {
     width: 60%;
     background-color: #f0f8ff; /* Light blue background */

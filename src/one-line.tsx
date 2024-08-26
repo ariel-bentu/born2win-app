@@ -17,9 +17,11 @@ interface OneLineProps {
     deleteLabel?: string;
     buttons?: LineButton[];
     onLineButtonPressed?: (action: string, params: string[]) => void;
+    hideIcon?: boolean;
 }
 
-export default function OneLine({ title, body, unread, footer, onDelete, onRead, deleteLabel, buttons, onLineButtonPressed }: OneLineProps) {
+export default function OneLine({ title, body, unread, footer, onDelete, onRead, deleteLabel,
+    buttons, onLineButtonPressed, hideIcon }: OneLineProps) {
 
     const handleCopyLink = (link: string) => {
         navigator.clipboard.writeText(link);
@@ -60,10 +62,10 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
                             {body.split('\n').map(renderMessagePart)}
                         </div>
                     </div>
-                    <div className="flex relative align-items-center justify-content-center bg-purple-100 border-round" style={{ width: '2.5rem', height: '2.5rem' }}>
+                    {!hideIcon && <div className="flex relative align-items-center justify-content-center bg-purple-100 border-round" style={{ width: '2.5rem', height: '2.5rem' }}>
                         <i className="pi pi-comment text-purple-500 text-xl"></i>
                         {unread && <div className='red-dot' />}
-                    </div>
+                    </div>}
                 </div>
 
                 {buttons?.length && onLineButtonPressed && <div className="flex flex-row align-items-end justify-content-between">

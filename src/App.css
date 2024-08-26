@@ -1,31 +1,7 @@
 .App {
   text-align: center;
   direction: rtl;
-}
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-}
-
-.app-title {
-  font-size: 30px;
-  font-weight: bold;
-}
-
-.App-link {
-  color: #61dafb;
+  width: 100vw;
 }
 
 .msg-badge {
@@ -42,12 +18,17 @@
   height: 20px;
 }
 
-.icon-btn-l {
+.icon-btn-l{
   border: none;
   background-color: transparent;
-  width: 35px;
-  height: 35px;
+  width: 60px;
+  height: 60px;
+ 
 }
+.icon-btn-l .pi {
+  font-size: 30px; 
+}
+
 
 .icon-btn-withLabel {
   width: 100px;
@@ -85,13 +66,18 @@
   transform: rotate(180deg);
 }
 
+.img-header {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+}
 
 .standalone-dynamic-host {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  
+  max-width: 100%;
+
 }
 
 .standalone-card {

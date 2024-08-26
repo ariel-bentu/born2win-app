@@ -81,10 +81,10 @@ export function FamilyDetailsComponent({ family, onClose, detailsOnly, showToast
 
     return (
         <div className="surface-card shadow-2 p-3 border-round relative">
-            <Button unstyled icon="pi pi-times" onClick={onClose} className="icon-btn-l" style={{ position: "absolute", left: 10, top: 10 }} />
+            <Button unstyled icon="pi pi-times" onClick={onClose} className="icon-btn-l" style={{ position: "absolute", left: 10, top: 0 }} />
             {!detailsOnly && <>
                 <div className="flex flex-column justify-content-center align-items-center " >
-                    <div className="tm-5 pb-1 underline text-lg">{family.familyLastName}</div>
+                    <div className="tm-5 pb-1 underline text-lg" style={{maxWidth:"80%"}}>{family.familyLastName}</div>
                     <div className=" ">{family.city}</div>
 
                     <h3>לבחירת תאריך:</h3>
@@ -133,7 +133,7 @@ export function FamilyDetailsComponent({ family, onClose, detailsOnly, showToast
             </>}
             {error && <div>תקלה בקריאת פרטי משפחה</div>}
             {loading && <InProgress />}
-            {familyDetails && <ul className="pl-4 list-disc text-right w-8 mr-8">
+            {familyDetails && <ul className="pl-4 list-disc text-right w-8">
                 <div className="tm-5 pb-1 underline text-lg">פרטים:</div>
                 <li>המשפחה בת <strong> {familyDetails.adultsCount}</strong> נפשות</li>
                 <li><strong>הרכב בני המשפחה:</strong> {familyDetails.familyStructure}</li>

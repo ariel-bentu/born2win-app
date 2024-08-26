@@ -55,3 +55,7 @@ curl -X POST "https://api.airtable.com/v0/bases/app5CI9AWJKt1ZwTy/webhooks" \
     }
   }'
 ```
+
+## Setup custom domain for the site
+1. In firebase hosting, add custom domain
+2. Add a CNAME in the born2win.org.il domain pointing to the web.app domain of the firebase project

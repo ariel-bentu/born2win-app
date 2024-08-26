@@ -83,34 +83,37 @@ export function FamilyDetailsComponent({ family, onClose, detailsOnly, showToast
         <div className="surface-card shadow-2 p-3 border-round relative">
             <Button unstyled icon="pi pi-times" onClick={onClose} className="icon-btn-l" style={{ position: "absolute", left: 10, top: 10 }} />
             {!detailsOnly && <>
-                <div className="flex flex-column">
+                <div className="flex flex-column justify-content-center align-items-center " >
                     <div className="tm-5 pb-1 underline text-lg">{family.familyLastName}</div>
                     <div className=" ">{family.city}</div>
 
                     <h3>לבחירת תאריך:</h3>
                     {demands.length == 0 && <div>אין תאריכים זמינים</div>}
-                    <Calendar
-                        onMonthChange={handleMonthChange}
-                        className={!isAvailableDatesVisible ? 'watermarked-no-dates' : ''}
-                        value={selectedDate}
-                        enabledDates={availableDates}
-                        onChange={(e) => {
-                            console.log("date selected", e.value)
-                            setSelectedDate(e.value)
-                        }}
-                        inline
-                        // showButtonBar
-                        dateTemplate={dateTemplate}
-                        locale="he"
-                        //firstDayOfWeek={"Sunday"}
-                        monthNavigator
-                        minDate={minDate.toDate()}
-                    //yearNavigator 
-                    //yearRange="2020:2030" 
-                    />
+                        <Calendar
+                            style={{ width: '400px' }}
+                            onMonthChange={handleMonthChange}
+                            className={!isAvailableDatesVisible ? 'watermarked-no-dates' : ''}
+                            value={selectedDate}
+                            enabledDates={availableDates}
+                            onChange={(e) => {
+                                console.log("date selected", e.value)
+                                setSelectedDate(e.value)
+                            }}
+                            inline
+                            
+                            // showButtonBar
+                            dateTemplate={dateTemplate}
+                            locale="he"
+                            //firstDayOfWeek={"Sunday"}
+                            monthNavigator
+                            minDate={minDate.toDate()}
+                        //yearNavigator 
+                        //yearRange="2020:2030" 
+                        />
                     {saving && <InProgress />}
                     <Button
                         disabled={!selectedDate || !familyDetails || saving}
+                        
                         label="שבצו אותי"
                         onClick={() => {
                             const availabilityRecord = demands.find(a => dayjs(a.date).diff(selectedDate, "days") === 0);
@@ -125,12 +128,12 @@ export function FamilyDetailsComponent({ family, onClose, detailsOnly, showToast
                                 }).catch((err) => showToast("error", "תקלה ברישום (1) - ", err.message))
                                     .finally(() => setSaving(false));
                             }
-                        }} className="mt-3" />
+                        }} className="mt-3 w-full" />
                 </div>
             </>}
             {error && <div>תקלה בקריאת פרטי משפחה</div>}
             {loading && <InProgress />}
-            {familyDetails && <ul className="pl-4 list-disc text-right">
+            {familyDetails && <ul className="pl-4 list-disc text-right w-8 mr-8">
                 <div className="tm-5 pb-1 underline text-lg">פרטים:</div>
                 <li>המשפחה בת <strong> {familyDetails.adultsCount}</strong> נפשות</li>
                 <li><strong>הרכב בני המשפחה:</strong> {familyDetails.familyStructure}</li>

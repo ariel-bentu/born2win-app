@@ -1,5 +1,6 @@
 .App {
   text-align: center;
+  direction: rtl;
 }
 
 .App-logo {
@@ -53,8 +54,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem; /* Add space between the icon and the label */
+  gap: 0.5rem;
+  /* Add space between the icon and the label */
 }
+
 .red-dot {
   position: absolute;
   left: 5px;
@@ -80,4 +83,26 @@
 
 .p-calendar .p-datepicker .p-datepicker-next {
   transform: rotate(180deg);
+}
+
+
+.standalone-dynamic-host {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  
+}
+
+.standalone-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 700px;
+  width: 700px;
+  padding: 50px;
+
+  border-radius: 20px;
+  background-color: rgb(236, 240, 241);
+
 }

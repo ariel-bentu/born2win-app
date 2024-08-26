@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { MultiSelect } from 'primereact/multiselect';
+import headerImg from './media/header.png';
+import bunnerImg from './media/registration-banner.png';
+import footerImg from './media/registration-footer.png';
 
 import 'primereact/resources/themes/saga-blue/theme.css';
 import 'primereact/resources/primereact.min.css';
@@ -18,10 +21,11 @@ interface RegistrationComponentProps {
     actualUserId: string
     showToast: ShowToast;
     openDemandsTS: string;
-    reloadOpenDemands: ()=>void;
+    reloadOpenDemands: () => void;
+    standalone?: boolean;
 }
 
-function RegistrationComponent({ openDemands, showToast, actualUserId, openDemandsTS, reloadOpenDemands }: RegistrationComponentProps) {
+function RegistrationComponent({ openDemands, showToast, actualUserId, openDemandsTS, reloadOpenDemands, standalone }: RegistrationComponentProps) {
     const [cities, setCities] = useState<City[]>([]);
     const [selectedCities, setSelectedCities] = useState<City[]>([]);
     const [familyDemands, setFamilyDemands] = useState<FamilyDemand[] | null>(null);
@@ -76,41 +80,61 @@ function RegistrationComponent({ openDemands, showToast, actualUserId, openDeman
     )
 
     if (selectedFamily) {
-        const selectedFamilyDemand = familyDemands.filter(fd=>fd.familyRecordId === selectedFamily.familyId);
+        const selectedFamilyDemand = familyDemands.filter(fd => fd.familyRecordId === selectedFamily.familyId);
         return (
-            <div className="p-m-4">
-                <FamilyDetailsComponent family={selectedFamily} onClose={() => setSelectedFamily(null)} 
-                showToast={showToast} demands={selectedFamilyDemand} 
-                reloadOpenDemands={reloadOpenDemands}/>
+            <div className='standalone-dynamic-host'>
+                <div className='standalone-card'>
+
+                    <FamilyDetailsComponent family={selectedFamily} onClose={() => setSelectedFamily(null)}
+                        showToast={showToast} demands={selectedFamilyDemand}
+                        reloadOpenDemands={reloadOpenDemands} />
+                </div>
             </div>
         );
     }
 
-    const filteredFamilies = families.filter(family => selectedCities.length == 0 || selectedCities.some(sc => sc.name === family.city))
+    const filteredFamilies = families.filter(family => selectedCities.some(sc => sc.name === family.city))
 
     return (
         <div className="registration-component">
-            <div className="city-selection">
-                <MultiSelect
-                    value={selectedCities}
-                    options={cities.map(city => ({ label: city.name, value: city }))}
-                    onChange={(e) => setSelectedCities(e.value)}
-                    placeholder="סינון לפי עיר"
-                    className="w-full md:w-20rem"
-                    display="chip"
-                />
+
+            {standalone && <img src={headerImg} />}
+            {standalone && <img src={bunnerImg} alt="Registration Banner" />}
+            {standalone && <div>
+                <div className='standalone-title bm-4'>נולדת לנצח - מחוז יהודה ושומרון</div>
+                <div className='m-2'>
+                    היי אנחנו מודים לך על הבחירה לחבק חולים ולהכניס להם נצנצים הביתה.
+                    <br />
+                    יש לבחור מטה את הערים שבהן תרצו לחבק משפחה. לאחר מכן בחרו משפחה כדי לראות באלו ימים ניתן למסור לה את הארוחות
+                </div>
+
+            </div>}
+            <div className='standalone-dynamic-host'>
+                <div className='standalone-card'>
+                    <div className="city-selection">
+                        <MultiSelect
+                            value={selectedCities}
+                            options={cities.map(city => ({ label: city.name, value: city }))}
+                            onChange={(e) => setSelectedCities(e.value)}
+                            placeholder="סינון לפי עיר"
+                            className="w-full md:w-20rem"
+                            display="chip"
+                        />
+                    </div>
+                    {
+                        filteredFamilies.map((family, i) => <OneLine
+                            key={i}
+                            title={family.familyLastName}
+                            body={`עיר: ${family.city}`}
+                            unread={false}
+                            onRead={() => {
+                                console.log("family click", family.familyLastName)
+                                setSelectedFamily(family)
+                            }}
+                        />)}
+                </div>
             </div>
-            {
-                filteredFamilies.map((family, i) => <OneLine
-                    key={i}
-                    title={family.familyLastName}
-                    body={`עיר: ${family.city}`}
-                    unread={false}
-                    onRead={() => {
-                        console.log("family click", family.familyLastName)
-                        setSelectedFamily(family)
-                    }}
-                />)}
+            {standalone && <img src={footerImg} />}
         </div>
     );
 };

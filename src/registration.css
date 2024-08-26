@@ -77,3 +77,9 @@
     position: relative;
     z-index: 2; 
 }
+
+.standalone-title {
+    color: #1992a2;
+    font-weight: bolder;
+    font-size: 20px;
+}

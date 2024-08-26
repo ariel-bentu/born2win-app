@@ -14,8 +14,9 @@ import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
 import {
-    AirTableRecord, Collections, FamilityDemandUpdatePayload, includeContacts, FamilyDemand, FamilyDetails, GetDemandStatPayload, LoginInfo,
+    AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilyDemand, FamilyDetails, GetDemandStatPayload, LoginInfo,
     NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord,
+    FamilityDetailsPayload,
 } from "../../src/types";
 import axios from "axios";
 import express = require("express");
@@ -598,18 +599,31 @@ async function authenticate(request: CallableRequest<any>): Promise<QueryDocumen
         throw new HttpsError("unauthenticated", "Request is missing uid.");
     }
 
+    const impersonateUser = request.data.impersonateUser;
+
+    // TEMP anonymous access - remove after app-adoption
+    if (impersonateUser && impersonateUser.startsWith("OLD:")) {
+        const oldAccessUserID = impersonateUser.substring(4);
+        const impersonateDoc = await getUserByID(oldAccessUserID);
+        if (!impersonateDoc) {
+            throw new HttpsError("not-found", "impersonated user not found");
+        }
+        return impersonateDoc as QueryDocumentSnapshot;
+    }
+
+
     const doc = await findUserByUID(uid);
     if (!doc || !doc.data().active) {
         throw new HttpsError("unauthenticated", "unauthorized user");
     }
-    if (request.data && request.data.impersonateUser) {
+    if (request.data && impersonateUser) {
         const adminDoc = await db.collection(Collections.Admins).doc(doc.id).get();
         if (!adminDoc.exists) {
             throw new HttpsError("permission-denied", "not authorized to impersonate");
         }
 
         // Admin can impersonate to another user
-        const impersonateDoc = await getUserByID(request.data.impersonateUser);
+        const impersonateDoc = await getUserByID(impersonateUser);
         if (!impersonateDoc) {
             throw new HttpsError("not-found", "impersonated user not found");
         }
@@ -863,7 +877,7 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
 
 exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<FamilyDetails> => {
     const doc = await authenticate(request);
-    const gfp = request.data as includeContacts;
+    const gfp = request.data as FamilityDetailsPayload;
     const mahoz = doc.data().mahoz;
 
     const mahuzRec = (await getDestricts()).find((d: any) => d.id === mahoz);
@@ -915,7 +929,7 @@ exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<Famil
             street: rec.fields["רחוב"],
             floor: rec.fields["קומה"],
             appartment: rec.fields["דירה"],
-            streatNumber: rec.fields["מספר דירה"],
+            streatNumber: rec.fields["מספר דירה"], // todo verify the right number
             district: mahuzRec.id,
         }) as FamilyDetails;
     }

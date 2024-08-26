@@ -53,6 +53,7 @@ const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
 const userPairingRequest = urlParams.get('vid');
 const otpPairingRequest = urlParams.get('otp');
+const oldUrlParamID = urlParams.get('id');
 const isDev = !!urlParams.get('dev');
 const offline = !!urlParams.get('offline');
 const client = new ClientJS();
@@ -97,14 +98,14 @@ function App() {
         }
     }, [navigationRequest]);
 
-    const getOpenDemands = useCallback(async (force?:boolean):Promise<FamilyDemand[]> => {
+    const getOpenDemands = useCallback(async (force?: boolean): Promise<FamilyDemand[]> => {
         if (!force && openDemands && openDemands.userId === actualUserId && openDemands.fetchedTS.diff(dayjs(), "minutes") < 10) {
             return openDemands.data;
         }
         const demands = await api.getOpenDemands();
         setOpenDemands({
             data: demands,
-            userId:actualUserId,
+            userId: actualUserId,
             fetchedTS: dayjs(),
         });
         return demands;
@@ -121,7 +122,7 @@ function App() {
     // hack until Apple fix the postMessage not recieved when app is openned
     // Poll every 10 seconds the local indexDB
     useEffect(() => {
-        if (isIOS) {
+        if (isIOS && !oldUrlParamID) {
             const interval = setInterval(() => {
                 if (document.visibilityState === "visible") {
                     setReloadNotifications(prev => prev + 1);
@@ -133,6 +134,10 @@ function App() {
 
     // INIT Firebase
     useEffect(() => {
+        if (oldUrlParamID) {
+            api.impersonate("OLD:" + oldUrlParamID, "OLD-AccessPoint id: " + oldUrlParamID);
+        }
+
         if (!offline) {
             api.init(onAuth).then(() => setInit(true));
         }
@@ -141,7 +146,7 @@ function App() {
     // LOGIN
     useEffect(() => {
         if (!loggedOut && init && !user) {
-            if (isPWA || isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
+            if (oldUrlParamID || isPWA || isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
                 // Logs in annonymously and then user is set with user.uid
                 api.login();
             } else {
@@ -155,7 +160,9 @@ function App() {
         if (user && user.uid) {
             if (!isPWA) {
                 // BROWSER flow
-                if (isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
+                if (oldUrlParamID) {
+                    setVolunteerId(oldUrlParamID);
+                } else if (isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
                     if (isNotEmpty(currentVolId) && currentVolId !== userPairingRequest) {
                         console.log("vol ID already paired- ignored", currentVolId, "vs. requested: ", userPairingRequest);
                         setError("תקלה באתחול (1) - פנה לעזרה.");
@@ -202,7 +209,7 @@ function App() {
     }, [user]);
 
     useEffect(() => {
-        if (!offline && (isPWA || isDev) && user && isNotEmpty(volunteerId)) {
+        if (!oldUrlParamID && (!offline && (isPWA || isDev) && user && isNotEmpty(volunteerId))) {
             api.getUserInfo().then((uInfo) => {
                 setUserInfo(uInfo);
             });
@@ -289,6 +296,26 @@ function App() {
         });
     }
 
+    if (oldUrlParamID) {
+        // OLD URL SUPPORT - to remove after app launch
+        return <div className="App">
+            <ConfirmPopup />
+            <Toast ref={toast} />
+
+            {(isNotEmpty(volunteerId) && !error) ?
+                <RegistrationComponent
+                    standalone={true}
+                    openDemands={getOpenDemands()}
+                    openDemandsTS={openDemands?.fetchedTS.toISOString() || ""} showToast={showToast} actualUserId={oldUrlParamID}
+                    reloadOpenDemands={() => {
+                        getOpenDemands(true);
+                    }} /> :
+                <InProgress />
+            }
+        </div>
+    }
+
+
     const settings = <div style={{ display: "flex", flexDirection: "column", textAlign: "left", alignItems: "flex-start" }}>
         <div><strong>Technical Status:</strong></div>
         <div>Environment: {isPWA ? "PWA" : "Browser: " + navigator.userAgent}</div>
@@ -357,12 +384,12 @@ body: `תאריך הבישול: 2024-18-28
                         <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="רישום">
-                        {activeIndex == 1 && <RegistrationComponent openDemands={getOpenDemands()} openDemandsTS={openDemands?.fetchedTS.toISOString() || ""} showToast={showToast} actualUserId={actualUserId} 
-                        reloadOpenDemands={()=>{
-                            getOpenDemands(true);
-                        }}/>}
+                        {activeIndex == 1 && <RegistrationComponent openDemands={getOpenDemands()} openDemandsTS={openDemands?.fetchedTS.toISOString() || ""} showToast={showToast} actualUserId={actualUserId}
+                            reloadOpenDemands={() => {
+                                getOpenDemands(true);
+                            }} />}
                     </TabPanel>
-                    <TabPanel headerStyle={{ fontSize: 20 }} header="התחייבויות">
+                    <TabPanel headerStyle={{ fontSize: 20 }} header="פרטי התנדבות">
                         {activeIndex == 2 && <ExistingRegistrationsComponent showToast={showToast} navigationRequest={navigationRequest} actualUserId={actualUserId} />}
                     </TabPanel>
                     {isAdmin &&

@@ -21,7 +21,9 @@ export function NotificationActionHandler(action: string, params: string[]) {
     switch (action) {
         case NotificationActions.StartConversation:
             const message = "שלום רב";
-            const url = `https://wa.me/${WhatsAppPhoneNumber}?text=${encodeURIComponent(message)}`;
+            //const phone = params && params.length && params[0] || WhatsAppPhoneNumber;
+            const phone = WhatsAppPhoneNumber;
+            const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
             window.open(url, '_blank');
             break;
         case NotificationActions.RegistrationDetails:

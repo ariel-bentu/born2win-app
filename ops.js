@@ -33,8 +33,9 @@ const apiKey = process.env.BORN2WIN_API_KEY;
 const manualUsers = require(manualUsersPath);
 
 
-async function addNotificationToQueue(title, body, toDistricts, toRecipients, data) {
+async function addNotificationToQueue(title, body, channel, toDistricts, toRecipients, data) {
     const docRef = db.collection("notifications").doc();
+    data = {channel, ...data}
     return docRef.create({
         title,
         body,
@@ -235,7 +236,7 @@ async function searchMeals() {
 
 async function alertUpcomingCooking() {
     const districts = await getDestricts();
-    const daysBefore = 8;
+    const daysBefore = 7;
     for (let i = 0; i < districts.length; i++) {
         if (districts[i].id !== "recxuE1Cwav0kfA7g") continue; // only in test for now
         const upcomingDemands = await getDemands(districts[i].id, "תפוס", daysBefore);
@@ -252,10 +253,10 @@ async function alertUpcomingCooking() {
 אם אין באפשרותך לבשל יש לבטל באפליקציה, או ליצור קשר.`;
 
 
-                await addNotificationToQueue("תזכורת לבישול!", msgBody, [], [demand.volunteerId], {
+                await addNotificationToQueue("תזכורת לבישול!", msgBody, "alerts", [], [demand.volunteerId], {
                     buttons: JSON.stringify([
                         { label: "צפה בפרטים", action: "registration-details", params: [demand.id] },
-                        { label: "צור קשר עם עמותה", action: "start-conversation" },
+                        { label: "צור קשר עם עמותה", action: "start-conversation", params:["Eh00Vs81taq5dv8QOvP0qS", "hello"] },
                     ]),
                 }
                 );

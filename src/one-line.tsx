@@ -53,9 +53,9 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
     };
 
     return (
-        <div className="col-12">
-            <div className="surface-card shadow-2 p-3 border-round" onClick={onRead}>
-                <div className="flex justify-content-between mb-3">
+        <div className="flex flex-row m-2 w-11" >
+            <div className="surface-card shadow-2 p-3 border-round-xl w-12" onClick={onRead} >
+                <div className="flex justify-content-between mb-3" >
                     <div className="flex flex-column align-right">
                         <div className={`text-right  text-xl font-xlarge mb-3 ${unread ? 'font-bold' : ''}`}>{title}</div>
                         <div className="text-900 font-medium text-700">
@@ -68,11 +68,12 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
                     </div>}
                 </div>
 
-                {buttons?.length && onLineButtonPressed && <div className="flex flex-row align-items-end justify-content-between">
-                    {buttons.map((btn, i) => (<Button key={i} label={btn.label} onClick={() => {
-                        onLineButtonPressed(btn.action, btn.params);
-                    }} />))}
-                </div>}
+                {buttons?.length && onLineButtonPressed &&
+                    <div className="flex flex-row align-items-end justify-content-start">
+                        {buttons.map((btn, i) => (<Button className="ml-3" key={i} label={btn.label} onClick={() => {
+                            onLineButtonPressed(btn.action, btn.params);
+                        }} />))}
+                    </div>}
                 <div className="flex flex-row align-items-end justify-content-between">
                     {footer && <span className="text-400">{footer}</span>}
                     {onDelete && <div className="flex justify-content-end mt-3">

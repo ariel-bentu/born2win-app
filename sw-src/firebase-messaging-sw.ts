@@ -1,5 +1,6 @@
 import { getDB, NotificationStatus } from '../src/db';
 import { countUnreadNotifications } from '../src/notifications';
+import { NotificationChannels } from '../src/types';
 
 // Type definitions for the push and notification event data
 interface NotificationPayload {
@@ -43,6 +44,7 @@ self.addEventListener('push',  (event: any) => {
                     body: payload.notification.body || "",
                     read: NotificationStatus.Unread,
                     data: payload.notification.data,
+                    channel: payload.notification.data?.channel || NotificationChannels.General,
                     timestamp: Date.now(),
                 });
 

@@ -134,7 +134,7 @@ function RegistrationComponent({ openDemands, showToast, actualUserId, openDeman
                 </div>
             </div>
 
-            {standalone && <img src={footerImg} />}
+            {standalone && <img src={footerImg} style={{maxWidth:"100%"}}/>}
         </div>
     );
 };

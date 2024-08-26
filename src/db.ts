@@ -1,4 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { NotificationChannels } from './types';
 
 export const NOTIFICATIONS_TABLE = "notifications";
 // Define the shape of your database
@@ -15,6 +16,7 @@ export interface NotificationRecord {
     body: string;
     read: number; // 0 for unread, 1 for read
     data?: { [key: string]: string };
+    channel: NotificationChannels;
     timestamp: number;
 };
 

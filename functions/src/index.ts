@@ -17,6 +17,7 @@ import {
     AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilyDemand, FamilyDetails, GetDemandStatPayload, LoginInfo,
     NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord,
     FamilityDetailsPayload,
+    NotificationChannels,
 } from "../../src/types";
 import axios from "axios";
 import express = require("express");
@@ -44,6 +45,8 @@ const JERUSALEM = "Asia/Jerusalem";
 const DATE_TIME = "YYYY-MM-DD HH:mm";
 const db = getFirestore();
 
+const appHost = "app.born2win.org.il";
+
 const born2winApiKey = defineString("BORN2WIN_API_KEY");
 const mainBase = defineString("BORM2WIN_MAIN_BASE");
 
@@ -70,6 +73,7 @@ function findUserByUID(uid: string): Promise<QueryDocumentSnapshot | null> {
         }
         if (res.docs.length > 1) {
             // not expect - too many results
+            logger.error("Multiple users on same uid", uid);
             return null;
         }
         return res.docs[0];
@@ -315,7 +319,7 @@ exports.TestNotification = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);
     if (doc) {
         const displayName = doc.data().firstName + " " + doc.data().lastName;
-        return addNotificationToQueue("הודעת בדיקה", "הודעת בדיקה ל:\n" + displayName, [], [doc.id]);
+        return addNotificationToQueue("הודעת בדיקה", "הודעת בדיקה ל:\n" + displayName, NotificationChannels.General, [], [doc.id]);
     }
 
     return;
@@ -355,12 +359,17 @@ exports.SearchUsers = onCall({ cors: true }, async (request): Promise<Recipient[
     throw new HttpsError("unauthenticated", "Only admin can send message.");
 });
 
-async function addNotificationToQueue(title: string, body: string, toDistricts: string[], toRecipients: string[], data?: { [key: string]: string }) {
+async function addNotificationToQueue(title: string, body: string, channel: NotificationChannels, toDistricts: string[], toRecipients: string[], data?: { [key: string]: string }) {
     const docRef = db.collection(Collections.Notifications).doc();
+    if (data) {
+        data.channel = channel;
+    } else {
+        data = { channel };
+    }
     return docRef.create({
         title,
         body,
-        ...(data && { data: JSON.stringify(data) }),
+        data: JSON.stringify(data),
         toDistricts,
         toRecipients,
         created: dayjs().format(DATE_TIME),
@@ -412,7 +421,7 @@ exports.SendMessage = onCall({ cors: true }, async (request) => {
     if (userInfo.isAdmin) {
         const smp = request.data as SendMessagePayload;
 
-        return addNotificationToQueue(smp.title, smp.body, smp.toDistricts, smp.toRecipients);
+        return addNotificationToQueue(smp.title, smp.body, NotificationChannels.General, smp.toDistricts, smp.toRecipients);
     }
 
     throw new HttpsError("unauthenticated", "Only admin can send message.");
@@ -512,8 +521,8 @@ function chunkArray(array: any[], chunkSize: number) {
 const sendNotification = (title: string, body: string, devices: DeviceInfo[], data?: { [key: string]: string },): Promise<SendNotificationStats> => {
     // logger.info("sendNotification", title, body, data, devices);
 
-    const imageUrl = "https://born2win-prod.web.app/favicon.ico";
-    const actionUrl = "https://born2win-prod.web.app";
+    const imageUrl = `https://${appHost}/favicon.ico`;
+    const actionUrl = `https://${appHost}`;
     const message: any = {
         notification: {
             title,
@@ -599,7 +608,7 @@ async function authenticate(request: CallableRequest<any>): Promise<QueryDocumen
         throw new HttpsError("unauthenticated", "Request is missing uid.");
     }
 
-    const impersonateUser = request.data.impersonateUser;
+    const impersonateUser = request.data?.impersonateUser;
 
     // TEMP anonymous access - remove after app-adoption
     if (impersonateUser && impersonateUser.startsWith("OLD:")) {
@@ -824,7 +833,7 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
 משפחה: ${updatedRecord.fields.Name}
 מתנדב: ${doc.data().firstName + " " + doc.data().lastName}
 עיר: ${updatedRecord.fields["עיר"]}
-`, [], adminsIds);
+`, NotificationChannels.Registrations, [], adminsIds);
 
             logger.info("New registration added", response.data);
         });
@@ -865,7 +874,7 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
 משפחה: ${updatedRecord.fields.Name}
 מתנדב: ${doc.data().firstName + " " + doc.data().lastName}
 עיר: ${updatedRecord.fields["עיר"]}
-`, [], adminsIds);
+`, NotificationChannels.Registrations, [], adminsIds);
 
                 return;
             }
@@ -1039,7 +1048,7 @@ async function alertOpenDemands() {
                 const daysLeft = Math.abs(dayjs().diff(od.date, "days"));
                 msgBody += `- ${od.familyLastName} (עוד ${daysLeft} ימים)` + "\n";
             });
-            waitFor.push(addNotificationToQueue("שיבוצים חסרים - 5 ימים קרובים", msgBody, [], adminsIds));
+            waitFor.push(addNotificationToQueue("שיבוצים חסרים - 5 ימים קרובים", msgBody, NotificationChannels.Alerts, [], adminsIds));
         }
     }
     Promise.all(waitFor);
@@ -1062,7 +1071,7 @@ async function alertUpcomingCooking() {
 עיר: ${demand.city}
 לא לשכוח לתאם עוד היום בשיחה או הודעה את שעת מסירת האוכל.
 אם אין באפשרותך לבשל יש לבטל באפליקציה, או ליצור קשר.`;
-                await addNotificationToQueue("תזכורת לבישול!", msgBody, [], [demand.volunteerId], {
+                await addNotificationToQueue("תזכורת לבישול!", msgBody, NotificationChannels.Alerts, [], [demand.volunteerId], {
                     buttons: JSON.stringify([
                         { label: "צפה בפרטים", action: NotificationActions.RegistrationDetails, params: [demand.id] },
                         { label: "צור קשר עם עמותה", action: NotificationActions.StartConversation },
@@ -1192,25 +1201,15 @@ async function syncBorn2WinUsers(sinceDate?: any) {
             await Promise.all(newLinksToAdmin.map(link => addNotificationToQueue("לינק למשתמש", `שם: ${link.name}
 טלפון: ${link.phone}
 לינק לשליחה למשתמש: ${link.link}
-`, [], adminsIds)));
+`, NotificationChannels.Links, [], adminsIds)));
         }
         return;
     });
 }
 
 function getRegistrationLink(userId: string, otp: string): string {
-    return `https://born2win-prod.web.app?vid=${userId}&otp=${otp}`;
+    return `https://${appHost}?vid=${userId}&otp=${otp}`;
 }
-
-// exports.TestSync = onCall({ cors: true }, async () => {
-//     logger.info("Start test sync");
-//     try {
-//         return syncBorn2WinUsers();
-//     } catch (e) {
-//         logger.info("error test sync", e);
-//     }
-// });
-
 
 /**
  * ANALITICS

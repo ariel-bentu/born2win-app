@@ -12,6 +12,28 @@ export const NotificationActions = {
     StartConversation: "start-conversation"
 }
 
+export enum NotificationChannels {
+    General = "general",
+    Alerts = "alerts",
+    Links = "links",
+    Greetings = "greetings",
+    Registrations = "registrations",
+};
+
+interface ChannelInfo {
+    name:string;
+    icon:string;
+}
+
+export const NotificationChannelsName: { [key: string]: ChannelInfo } = {
+    [NotificationChannels.General]: {name: "כללי", icon: "pi-comment"},
+    [NotificationChannels.Alerts]: {name: "התראות / תזכורות",icon: "pi-bell"},
+    [NotificationChannels.Links]: {name: "לינקים למשתמשים",icon: "pi-link"},
+    [NotificationChannels.Greetings]: {name: "ברכות",icon: "pi-heart"},
+    [NotificationChannels.Registrations]: {name: "שיבוצים",icon: "pi-calendar"},
+}
+
+
 export type onClickEvent = (e: any) => void;
 
 export interface NotificationUpdatePayload {
@@ -21,7 +43,7 @@ export interface NotificationUpdatePayload {
 
 export interface FamilityDetailsPayload {
     familyId: string;
-    includeContacts:boolean;
+    includeContacts: boolean;
 }
 
 export interface City {
@@ -159,7 +181,7 @@ export interface FamilyCompact {
 
 
 export interface FamilyDetails {
-    id: string; 
+    id: string;
     familyId: string;
     city: string;
     cityId: string;

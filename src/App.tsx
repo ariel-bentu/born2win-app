@@ -9,7 +9,7 @@ import 'primeflex/primeflex.css';
 import './App.css';
 import * as api from './api';
 import { NextOrObserver, User } from 'firebase/auth';
-import { Cached, FamilyDemand, NavigationStep, NotificationActions, ShowToast, UserInfo } from './types';
+import { Cached, FamilyDemand, NavigationStep, NotificationActions, NotificationChannels, ShowToast, UserInfo } from './types';
 import { ClientJS } from 'clientjs';
 import NotificationsComponent from './notifications-component';
 import { countUnreadNotifications } from './notifications';
@@ -27,8 +27,8 @@ import { confirmPopup, ConfirmPopup } from 'primereact/confirmpopup';
 import { isNotEmpty } from './utils';
 import { DisposeNavigationRequester, initializeNavigationRequester } from './notification-actions';
 import { userInfo } from 'os';
-// import { Button } from 'primereact/button';
-// import { getDB } from './db';
+import { Button } from 'primereact/button';
+import { getDB } from './db';
 
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
@@ -163,10 +163,15 @@ function App() {
                 if (oldUrlParamID) {
                     setVolunteerId(oldUrlParamID);
                 } else if (isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
-                    if (isNotEmpty(currentVolId) && currentVolId !== userPairingRequest) {
+                    if (isNotEmpty(currentVolId) && currentVolId !== userPairingRequest && !isDev) {
                         console.log("vol ID already paired- ignored", currentVolId, "vs. requested: ", userPairingRequest);
                         setError("תקלה באתחול (1) - פנה לעזרה.");
-                    } else if (!isNotEmpty(currentVolId)) {
+                    } else if (!isNotEmpty(currentVolId) || (isDev && currentVolId !== userPairingRequest)) {
+                        if (isDev && currentVolId !== userPairingRequest) {
+                            // switch user: 
+                        }
+
+                        console.log("identify on server as ", userPairingRequest)
                         api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, isDev ? false : isIOS).then(() => {
                             setVolunteerId(userPairingRequest);
                             if (isAndroid) {
@@ -331,7 +336,7 @@ function App() {
         <div style={{ display: "flex", flexDirection: "column", width: 200, padding: 10 }}>
 
             {/* {isPWA && <Button onClick={() => api.sendTestNotification()} disabled={!userInfo?.notificationToken}>שלח הודעת בדיקה</Button>} */}
-            {/* <Button onClick={async () => {
+            <Button onClick={async () => {
                 const db = await getDB();
                 await db.put('notifications', {
 id: Date.now() + "",
@@ -342,17 +347,18 @@ body: `תאריך הבישול: 2024-18-28
 עיר: xxx
 לא לשכוח לתאם עוד היום בשיחה או הודעה את שעת מסירת האוכל.
 אם אין באפשרותך לבשל יש לבטל באפליקציה, או ליצור קשר.`,
-                    data: JSON.stringify({
-                                        buttons: [
-                                            { label: "צפה בפרטים", action: NotificationActions.RegistrationDetails, params: ["1234"] },
-                                            { label: "צור קשר עם עמותה", action: NotificationActions.StartConversation },
-                                        ],
-                                    }),
+                    // data: JSON.stringify({
+                    //                     buttons: [
+                    //                         { label: "צפה בפרטים", action: NotificationActions.RegistrationDetails, params: ["1234"] },
+                    //                         { label: "צור קשר עם עמותה", action: NotificationActions.StartConversation },
+                    //                     ],
+                    //                 }),
                     read: 0,
+                    channel: NotificationChannels.Links,
                     timestamp: Date.now(),
                 });
                 countUnreadNotifications().then(updateUnreadCount);
-            }} >Add Test DATA</Button> */}
+            }} >Add Test DATA</Button>
         </div>
     </div>
 

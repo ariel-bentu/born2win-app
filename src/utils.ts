@@ -20,3 +20,10 @@ export const getUniqueFamilies = (records: FamilyDemand[]): FamilyCompact[] => {
     })
     return result;
 };
+
+export function limitText(val:string, length:number):string {
+    if (val.length > length) {
+        return val.substring(0, length)+"...";
+    }
+    return val;
+}

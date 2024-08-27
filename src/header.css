@@ -5,11 +5,6 @@
     left: 0;
   }
 
-.settings-sidebar {
-    width: 60%;
-    background-color: #f0f8ff; /* Light blue background */
-    padding: 20px;
-}
 
 .settings-title {
     margin-bottom: 20px;
@@ -66,4 +61,11 @@
 
 .settings-menu .p-panelmenu .p-menuitem .p-menuitem-icon {
     margin-left: auto; /* Push icons to the left of the text */
+}
+
+.impersonate-name {
+    position: absolute;
+    bottom:0;
+    left:0;
+    right:0;
 }

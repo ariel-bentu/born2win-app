@@ -41,6 +41,7 @@ function getNiceDateTime(d: number) {
 interface NotificationsComponentProps {
     updateUnreadCount: (count: number) => void;
     reload: number;
+    topPosition: number;
 }
 const Filters = {
     ALL: 1,
@@ -56,19 +57,25 @@ interface Channel {
     notifications: NotificationRecord[];
 }
 
-const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateUnreadCount, reload }) => {
+const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateUnreadCount, reload, topPosition }) => {
     const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
     const [channels, setChannels] = useState<Channel[]>([]);
     const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
     const toast = useRef<Toast>(null);
     const [filter, setFilter] = useState(Filters.ALL);
     const menu = useRef<Menu>(null);
-    const divRef = useRef<HTMLDivElement>(null);
     const msgRef = useRef<ScrollPanel>(null);
     const [localReload, setLocalReload] = useState<number>(0);
 
-
-
+    /*
+    padding buttons = 16
+    buttons unread/all = 40
+    channel header = 50
+    divider = 32
+    spare 5
+    */
+    const channelsHeight = window.innerHeight - (143 + topPosition);
+    console.log("channelsHeight", channelsHeight, window.innerHeight)
     useEffect(() => {
         readAllNotifications().then(allNotifications => {
             allNotifications.sort((n1, n2) => n2.timestamp - n1.timestamp);
@@ -147,15 +154,13 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
     ] as MenuItem[];
 
     const channelsToShow = channels.filter(ch => filter === Filters.ALL || ch.notifications.some(notif => notif.read == NotificationStatus.Unread));
-    const scrollAreaHeight = currentChannel && divRef.current ?
-        window.innerHeight - divRef.current.getBoundingClientRect().top - 50 : 400
 
     const channelNotifications = currentChannel?.notifications
         .filter(notif => filter === Filters.ALL || notif.read == Filters.UNREAD)
     return (
         <div>
             <Toast ref={toast} />
-            <div className='flex flex-row relative'>
+            <div className='flex flex-row relative justify-content-center'>
                 <SelectButton
                     pt={{ root: { className: "select-button-container" } }}
                     unstyled
@@ -177,50 +182,50 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                         <ChannelComponent key={i} index={i} channel={channel}
                             onClick={() => {
                                 setCurrentChannel(channel);
-                                if (msgRef.current) {
-                                    const scrollableElement = msgRef.current.getContent();
-                                    scrollableElement.scrollTop = 100;
-                                }
-                                msgRef.current?.getElement().scrollTo(0, 50);//scrollPanelRef.current.content.scrollHeight;
+                                // if (msgRef.current) {
+                                //     const scrollableElement = msgRef.current.getContent();
+                                //     scrollableElement.scrollTop = 100;
+                                // }
+                                // msgRef.current?.getElement().scrollTo(0, 50);//scrollPanelRef.current.content.scrollHeight;
                             }}
                         />
                     ))
                 ) : (
                     // Full channel view
-                    <div className='h-full relative'>
+                    <div className='relative'>
                         <ChannelHeader name={currentChannel.name} onBack={() => setCurrentChannel(null)} />
                         <Divider />
-                        <div className="flex-grow" ref={divRef}>
-                            <ScrollPanel style={{ width: '100%', height: scrollAreaHeight }} ref={msgRef}>
-                                {channelNotifications && channelNotifications.length > 0 ?
+                        <ScrollPanel style={{ width: '100%', height: channelsHeight }} ref={msgRef}>
+                            {channelNotifications && channelNotifications.length > 0 ?
 
-                                    channelNotifications?.map(notification => (
-                                        // <OneNotification
-                                        <OneLine
-                                            hideIcon={true}
-                                            key={notification.id}
-                                            title={notification.title}
-                                            body={notification.body}
-                                            footer={getNiceDateTime(notification.timestamp)}
-                                            unread={notification.read == NotificationStatus.Unread}
-                                            onDelete={(event) => {
-                                                confirmPopup({
-                                                    target: event.currentTarget,
-                                                    message: "האם למחוק הודעה זו?",
-                                                    icon: 'pi pi-exclamation-triangle',
-                                                    accept: () => deleteOne(notification.id),
-                                                });
-                                            }}
-                                            deleteLabel="מחק"
-                                            buttons={notification.data?.buttons && JSON.parse(notification.data?.buttons)}
-                                            onLineButtonPressed={NotificationActionHandler}
-                                            onRead={() => markAsRead(notification.id)}
-                                        />
-                                    )) :
-                                    <div className='no-messages'>{getNoNotificationMessage(filter)}</div>
-                                }
-                            </ScrollPanel>
-                        </div>
+                                channelNotifications?.map(notification => (
+                                    // <OneNotification
+                                    <OneLine
+                                        hideIcon={true}
+                                        key={notification.id}
+                                        title={notification.title}
+                                        body={notification.body}
+                                        footer={getNiceDateTime(notification.timestamp)}
+                                        unread={notification.read == NotificationStatus.Unread}
+                                        onDelete={(event) => {
+                                            confirmPopup({
+                                                target: event.currentTarget,
+                                                message: "האם למחוק הודעה זו?",
+                                                icon: 'pi pi-exclamation-triangle',
+                                                accept: () => deleteOne(notification.id),
+                                            });
+                                        }}
+                                        deleteLabel="מחק"
+                                        buttons={notification.data?.buttons && JSON.parse(notification.data?.buttons)}
+                                        onLineButtonPressed={NotificationActionHandler}
+                                        onRead={() => markAsRead(notification.id)}
+
+
+                                    />
+                                )) :
+                                <div className='no-messages'>{getNoNotificationMessage(filter)}</div>
+                            }
+                        </ScrollPanel>
                     </div>
                 )}
                 {!channelsToShow?.length && <div className='no-messages'>{getNoNotificationMessage(filter)}</div>}

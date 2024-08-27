@@ -43,11 +43,11 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
             disabled: !onSendTestNotificationClick,
             command: onSendTestNotificationClick,
         },
-        {
-            label: 'התנתק',
-            icon: 'pi pi-sign-out',
-            command: onLogout,
-        },
+        // {
+        //     label: 'התנתק',
+        //     icon: 'pi pi-sign-out',
+        //     command: onLogout,
+        // },
         {
             label: 'פרטים טכנים',
             icon: 'pi pi-microchip',
@@ -69,8 +69,8 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
     ];
 
     return (
-        <div>
-            <header className="flex justify-content-between align-items-center p-3  ">
+        <div className="relative">
+            <header className="flex justify-content-between align-items-center p-3" style={{height:65}}>
                 <Button icon="pi pi-bars" className="p-button-rounded p-button-text" onClick={() => setSidebarVisible(true)} />
                 <img src={logoSrc} className="header-logo" alt="Logo" />
                 <span>{userName}</span>
@@ -80,7 +80,7 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
                     onHide={() => setSidebarVisible(false)}
                     className="settings-sidebar"
                     position={"right"}
-                    style={{ width: "60%" }}
+                    style={{ width: 300 }}
                 >
                     <h2 className="settings-title">הגדרות</h2>
                     <PanelMenu model={items} className="settings-menu" />
@@ -98,7 +98,7 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
 
             </header>
             <Divider />
-            {impersonateUser && <div>בשם: {impersonateUser.name}</div>}
+            {impersonateUser && <div className="impersonate-name">בשם: {impersonateUser.name}</div>}
         </div>
     );
 };

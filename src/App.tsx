@@ -167,7 +167,7 @@ function App() {
                         console.log("vol ID already paired- ignored", currentVolId, "vs. requested: ", userPairingRequest);
                         setError("תקלה באתחול (1) - פנה לעזרה.");
                     } else if (!isNotEmpty(currentVolId) || (isDev && currentVolId !== userPairingRequest)) {
-                        if (isDev &&  isNotEmpty(currentVolId) && currentVolId !== userPairingRequest) {
+                        if (isDev && isNotEmpty(currentVolId) && currentVolId !== userPairingRequest) {
                             // switch user: 
                             localStorage.removeItem(VOL_ID_STORAGE_KEY)
                             api.logout();
@@ -176,45 +176,45 @@ function App() {
 
                         console.log("identify on server as ", userPairingRequest)
                         api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, isDev ? false : isIOS).then(() => {
-                                setVolunteerId(userPairingRequest);
-                                if (isAndroid) {
-                                    localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
-                                } else if (!isDev) {
-                                    // Logout from Firebase
-                                    setLoggedOut(true);
-                                    api.logout();
+                            setVolunteerId(userPairingRequest);
+                            if (isAndroid) {
+                                localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
+                            } else if (!isDev) {
+                                // Logout from Firebase
+                                setLoggedOut(true);
+                                api.logout();
 
-                                }
-                                setReadyToInstall(true);
-                            })
-                                    .catch((err: Error) => setError("תקלה באתחול (2). " + err.message));
-                        } else {
-                            setVolunteerId(currentVolId);
+                            }
                             setReadyToInstall(true);
-                        }
-                    }
-                } else {
-                    // PDA flow
-                    if (!isNotEmpty(currentVolId)) {
-                        if (!isIOS) {
-                            // NOT EXPECTED!!! Andoid should have already volunteerId stored in localStorage
-                            setError("תקלה באתחול (5) - פנה לעזרה");
-                            return;
-                        }
-                        // an unpaired PWA - first time - load the volunteerId based on finger print
-                        api.updateLoginInfo(undefined, undefined, fingerprint, true).then((retVolId: string) => {
-                            setVolunteerId(retVolId);
-                            localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
-                        }).catch((err: Error) => {
-                            console.log("Failed to fetch volunteerId based on fingerprint", err);
-                            setError(" .תקלה באתחול (6) - פנה לעזרה" + err.message);
-                        });
+                        })
+                            .catch((err: Error) => setError("תקלה באתחול (2). " + err.message));
                     } else {
-                        setVolunteerId(currentVolId)
+                        setVolunteerId(currentVolId);
+                        setReadyToInstall(true);
                     }
                 }
+            } else {
+                // PDA flow
+                if (!isNotEmpty(currentVolId)) {
+                    if (!isIOS) {
+                        // NOT EXPECTED!!! Andoid should have already volunteerId stored in localStorage
+                        setError("תקלה באתחול (5) - פנה לעזרה");
+                        return;
+                    }
+                    // an unpaired PWA - first time - load the volunteerId based on finger print
+                    api.updateLoginInfo(undefined, undefined, fingerprint, true).then((retVolId: string) => {
+                        setVolunteerId(retVolId);
+                        localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
+                    }).catch((err: Error) => {
+                        console.log("Failed to fetch volunteerId based on fingerprint", err);
+                        setError(" .תקלה באתחול (6) - פנה לעזרה" + err.message);
+                    });
+                } else {
+                    setVolunteerId(currentVolId)
+                }
             }
-        }, [user]);
+        }
+    }, [user]);
 
     useEffect(() => {
         if (!oldUrlParamID && (!offline && (isPWA || isDev) && user && isNotEmpty(volunteerId))) {
@@ -368,6 +368,16 @@ function App() {
     const appReady = (isPWA || isDev) && isNotEmpty(volunteerId) && !error;
     const showProgress = requestWebTokenInprogress || !appReady && !error && !(readyToInstall);
     const isAdmin = userInfo?.isAdmin && userInfo?.districts?.length;
+
+    /*
+    header = 65
+    divider = 32
+    notificationMessage = 120 - ?
+    tab = 54
+    */
+    const showRegToMessages = appReady && userInfo && !userInfo?.notificationToken;
+    const tabContentsTop = 161 + (showRegToMessages ? 120 : 0);
+
     return (
         <div className="App">
             <ConfirmPopup />
@@ -387,13 +397,13 @@ function App() {
             {readyToInstall && !isDev && <PWAInstructions />}
             {error && <div>{error}</div>}
             {showProgress && <InProgress />}
-            {appReady && userInfo && !userInfo?.notificationToken && <RegisterToNotification onClick={requestWebTokenInprogress ? undefined : onAllowNotification} />}
+            {showRegToMessages && <RegisterToNotification onClick={requestWebTokenInprogress ? undefined : onAllowNotification} />}
             {appReady &&
                 <TabView dir='rtl' renderActiveOnly={false} activeIndex={activeIndex} onTabChange={(e) => setActiveIndex(e.index)}>
                     <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
-                        <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} />
+                        <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} topPosition={tabContentsTop}/>
                     </TabPanel>
-                    <TabPanel headerStyle={{ fontSize: 20 }} header="רישום">
+                    <TabPanel headerStyle={{ fontSize: 20 }} header="שיבוצים">
                         {activeIndex == 1 && <RegistrationComponent openDemands={getOpenDemands()} openDemandsTS={openDemands?.fetchedTS.toISOString() || ""} showToast={showToast} actualUserId={actualUserId}
                             reloadOpenDemands={() => {
                                 getOpenDemands(true);

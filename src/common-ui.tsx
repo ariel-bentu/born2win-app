@@ -16,7 +16,7 @@ export function RegisterToNotification({ onClick }: RegisterToNotificationProps)
     return (
         <div className="notification-container">
             <div className="notification-content">
-                <div className="notification-text">לצורך שימוש יעיל באפליקציה יש לאשר קבלת הודעות</div>
+                <div className="notification-text">לצורך שימוש יעיל באפליקציה יש לאשר הודעות</div>
                 <div className="button-container">
                     <i className={`arrow-animation ${PrimeIcons.ANGLE_RIGHT}`}></i>
                     <Button label="אישור קבלת הודעות" disabled={!onClick} onClick={onClick} className="notification-button" />

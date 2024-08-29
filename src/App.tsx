@@ -76,6 +76,7 @@ function App() {
     const [error, setError] = useState<string | undefined>();
     const [loggedOut, setLoggedOut] = useState<boolean>(false);
     const onAuth: NextOrObserver<User> = (user: User | null) => {
+        console.log("OnAuth - Login callback called", user);
         setUser(user);
     }
 
@@ -139,7 +140,12 @@ function App() {
         }
 
         if (!offline) {
-            api.init(onAuth).then(() => setInit(true));
+            console.log("Init firebase... ")
+
+            api.init(onAuth).then(() => {
+                setInit(true);
+                console.log("Init firebase successful");
+            });
         }
     }, []);
 
@@ -148,7 +154,13 @@ function App() {
         if (!loggedOut && init && !user) {
             if (oldUrlParamID || isPWA || isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
                 // Logs in annonymously and then user is set with user.uid
-                api.login();
+                console.log("Logging in...")
+                api.login()
+                    .then(() => console.log("Login successful"))
+                    .catch((err: Error) => {
+                        console.log("Login failed", err.message)
+                        setError("Login failed: " + err.message);
+                    });
             } else {
                 setError("תקלת אתחול (3) - חסר פרמטרים");
             }
@@ -158,6 +170,7 @@ function App() {
     useEffect(() => {
         const currentVolId = localStorage.getItem(VOL_ID_STORAGE_KEY);
         if (user && user.uid) {
+            console.log("Login passed, initializing...", currentVolId);
             if (!isPWA) {
                 // BROWSER flow
                 if (oldUrlParamID) {
@@ -175,7 +188,7 @@ function App() {
                         }
 
                         console.log("identify on server as ", userPairingRequest)
-                        api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, isDev ? false : isIOS).then(() => {
+                        return api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, isDev ? false : isIOS).then(() => {
                             setVolunteerId(userPairingRequest);
                             if (isAndroid) {
                                 localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
@@ -191,8 +204,10 @@ function App() {
                     } else {
                         setVolunteerId(currentVolId);
                         setReadyToInstall(true);
+                        return;
                     }
                 }
+                setError("Missing otp and/or vid parameter");
             } else {
                 // PDA flow
                 if (!isNotEmpty(currentVolId)) {
@@ -218,7 +233,9 @@ function App() {
 
     useEffect(() => {
         if (!oldUrlParamID && (!offline && (isPWA || isDev) && user && isNotEmpty(volunteerId))) {
+            console.log("Loading UserInfo ");
             api.getUserInfo().then((uInfo) => {
+                console.log("UserInfo set to", uInfo.firstName);
                 setUserInfo(uInfo);
             });
         }
@@ -226,6 +243,7 @@ function App() {
 
     useEffect(() => {
         if (volunteerId) {
+            console.log("Actual user set to", volunteerId);
             setActualUserId(volunteerId);
         }
     }, [volunteerId]);
@@ -364,9 +382,11 @@ function App() {
             }} >Add Test DATA</Button>
         </div>
     </div>
-
-    const appReady = (isPWA || isDev) && isNotEmpty(volunteerId) && !error;
+    // allow showing notification even if not ready
+    const isNotificationTab = activeIndex === 0;
+    let appReady = (isPWA || isDev) && !error && isNotEmpty(volunteerId);
     const showProgress = requestWebTokenInprogress || !appReady && !error && !(readyToInstall);
+    appReady ||= isNotificationTab
     const isAdmin = userInfo?.isAdmin && userInfo?.districts?.length;
 
     /*
@@ -377,7 +397,7 @@ function App() {
     */
     const showRegToMessages = appReady && userInfo && !userInfo?.notificationToken;
     const tabContentsTop = 161 + (showRegToMessages ? 120 : 0);
-
+    console.log("render App")
     return (
         <div className="App">
             <ConfirmPopup />
@@ -393,15 +413,16 @@ function App() {
                 onSendTestNotificationClick={userInfo?.notificationToken ? api.sendTestNotification : undefined}
                 userInfo={userInfo}
                 setActualUserId={setActualUserId}
+                showLoading={showProgress && isNotificationTab}
             />
             {readyToInstall && !isDev && <PWAInstructions />}
             {error && <div>{error}</div>}
-            {showProgress && <InProgress />}
+            {showProgress && !isNotificationTab && <InProgress />}
             {showRegToMessages && <RegisterToNotification onClick={requestWebTokenInprogress ? undefined : onAllowNotification} />}
             {appReady &&
                 <TabView dir='rtl' renderActiveOnly={false} activeIndex={activeIndex} onTabChange={(e) => setActiveIndex(e.index)}>
                     <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
-                        <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} topPosition={tabContentsTop}/>
+                        <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} topPosition={tabContentsTop} />
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="שיבוצים">
                         {activeIndex == 1 && <RegistrationComponent openDemands={getOpenDemands()} openDemandsTS={openDemands?.fetchedTS.toISOString() || ""} showToast={showToast} actualUserId={actualUserId}

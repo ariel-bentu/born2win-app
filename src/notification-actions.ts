@@ -1,5 +1,5 @@
 import { NavigationStep, NotificationActions } from "./types"
-const WhatsAppPhoneNumber = "+972522229135";
+export const WhatsAppPhoneNumber = "+972522229135";
 let setNavigationRequest: undefined | ((ns: NavigationStep) => void);
 
 export const AppTabs = {

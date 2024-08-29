@@ -76,7 +76,7 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
                         }} />))}
                     </div>}
                 <div className="flex flex-row align-items-end justify-content-between">
-                    {footer && <span className="text-400">{footer}</span>}
+                    {footer && <span className="text-700 text-black-alpha-80">{footer}</span>}
                     {onDelete && <div className="flex justify-content-end mt-3">
                         <Button unstyled label={deleteLabel} icon="pi pi-trash" className={"icon-btn " + (deleteLabel ? "icon-btn-withLabel" : "")} onClick={(e) => {
                             e.stopPropagation();

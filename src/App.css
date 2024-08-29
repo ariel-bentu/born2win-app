@@ -1,14 +1,25 @@
+:root {
+  --born2win-button-color: #B0038A;
+  --born2win-button-text-color: #ffffff;
+  --born2win-button-green: rgb(0, 149, 162);
+  --born2win-button-orange: #FCB414;
+}
+
 .App {
   text-align: center;
   direction: rtl;
   width: 100vw;
 }
+
+
+
+
 .header-logo {
-  left: 0; 
-  right: 0; 
-  margin-left: auto; 
-  margin-right: auto; 
-  position:absolute;
+  left: 0;
+  right: 0;
+  margin-left: auto;
+  margin-right: auto;
+  position: absolute;
   width: 220px;
 }
 
@@ -17,17 +28,19 @@
   background-color: transparent;
   width: 20px;
   height: 20px;
+  color: var(--born2win-button-color);
 }
 
-.icon-btn-l{
+.icon-btn-l {
   border: none;
   background-color: transparent;
   width: 60px;
   height: 60px;
- 
+
 }
+
 .icon-btn-l .pi {
-  font-size: 30px; 
+  font-size: 30px;
 }
 
 
@@ -44,7 +57,7 @@
   position: absolute;
   left: 5px;
   top: 5px;
-  background-color: red;
+  background-color: var(--born2win-button-color);
   width: 15px;
   height: 15px;
   border-radius: 50%;
@@ -92,4 +105,53 @@
   border-radius: 20px;
   background-color: rgb(236, 240, 241);
 
+}
+
+/* Born2Win theme */
+/* custom-theme.css */
+.p-button {
+  background-color: #B0038A !important;
+  border-color: #B0038A !important;
+  margin: 3px;
+}
+
+.p-button:hover {
+  background-color: #B0038A !important;
+  border-color: #B0038A !important;
+}
+
+/* Style for the selected tab */
+.p-tabview .p-tabview-nav li.p-highlight .p-tabview-title {
+  color: #E84F40 !important;
+}
+
+/* Style for the underline (border) of the selected tab */
+.p-tabview-selected .p-tabview-nav-link {
+  border-bottom: 2px solid #E84F40 !important;
+}
+
+.settings-btn,
+.settings-btn:hover {
+  background-color: transparent !important;
+  border: none;
+  color: black;
+
+}
+
+.settings-btn>span {
+  font-size: 25px;
+}
+
+.custom-spinner .p-progress-spinner {
+  stroke: var(--born2win-button-orange);
+  /* The main color of the spinner */
+}
+
+.custom-spinner .p-progress-spinner path {
+  stroke: var(--born2win-button-orange);
+  /* The color of the circular path */
+}
+
+.p-progressbar-value {
+  background-color: var(--born2win-button-color);
 }

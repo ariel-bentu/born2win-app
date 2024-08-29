@@ -8,6 +8,8 @@ import "./header.css";
 import Impersonate from "./impersonate";
 import { impersonate, impersonateUser, resetImpersonation } from "./api";
 import { Divider } from "primereact/divider";
+import { ProgressSpinner } from "primereact/progressspinner";
+import { WhatsAppPhoneNumber } from "./notification-actions";
 
 interface HeaderProps {
     userName: string;
@@ -20,15 +22,21 @@ interface HeaderProps {
     onLogout: () => void;
     setActualUserId: (newUserId: string) => void;
     showToast: ShowToast;
+    showLoading: boolean;
 }
 
 function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onSendTestNotificationClick,
-    onLogout, userInfo, setActualUserId, volunteerId, showToast }: HeaderProps) {
+    onLogout, userInfo, setActualUserId, volunteerId, showToast, showLoading }: HeaderProps) {
     const [sidebarVisible, setSidebarVisible] = useState(false);
     const [showTechInfo, setShowTechInfo] = useState<boolean>(false);
     const toggleText = () => {
         setShowTechInfo(prev => !prev);
     };
+
+    const openLink = (url: string) => {
+        window.open(url, '_blank');
+    };
+
     const items: MenuItem[] = [
         {
             label: 'רענן טוקן הודעות',
@@ -70,10 +78,13 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
 
     return (
         <div className="relative">
-            <header className="flex justify-content-between align-items-center p-3" style={{height:65}}>
-                <Button icon="pi pi-bars" className="p-button-rounded p-button-text" onClick={() => setSidebarVisible(true)} />
+            <header className="flex justify-content-between align-items-center p-3" style={{ height: 65 }}>
+                <Button icon="pi pi-bars" className="p-button-rounded settings-btn" onClick={() => setSidebarVisible(true)} />
                 <img src={logoSrc} className="header-logo" alt="Logo" />
                 <span>{userName}</span>
+                {showLoading &&
+                    <ProgressSpinner className="header-loading" />
+                }
 
                 <Sidebar
                     visible={sidebarVisible}
@@ -82,9 +93,42 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
                     position={"right"}
                     style={{ width: 300 }}
                 >
+                    <div className="p-mt-3 w-full flex flex-row justify-content-evenly">
+                        <Button
+                            icon="pi pi-facebook"
+                            className="p-button-rounded p-button-primary p-mr-2"
+                            onClick={() => openLink('https://www.facebook.com/groups/409895932930832/')}
+                            aria-label="Facebook"
+                        />
+                        <Button
+                            icon="pi pi-linkedin"
+                            className="p-button-rounded p-button-help"
+                            onClick={() => openLink('https://www.linkedin.com/company/born-to-win-n-g-o/?viewAsMember=true')}
+                            aria-label="LinkedIn"
+                        />
+                        <Button
+                            icon="pi pi-instagram"
+                            className="p-button-rounded p-button-danger p-mr-2"
+                            onClick={() => openLink('https://www.instagram.com/borntowinas/')}
+                            aria-label="Instagram"
+                        />
+                        <Button
+                            icon="pi pi-whatsapp"
+                            className="p-button-rounded p-button-success p-mr-2"
+                            onClick={() => openLink(`https://wa.me/${WhatsAppPhoneNumber}`)}
+                            aria-label="WhatsApp"
+                        />
+                        <Button
+                            icon="pi pi-globe"
+                            className="p-button-rounded p-button-info"
+                            onClick={() => openLink('https://www.born2win.org.il')}
+                            aria-label="Website"
+                        />
+                    </div>
+
                     <h2 className="settings-title">הגדרות</h2>
                     <PanelMenu model={items} className="settings-menu" />
-                    {userInfo?.isAdmin && <div dir="rtl" className="m-2">פעל בשם:</div>}
+                    {userInfo?.isAdmin && <div dir="rtl" className="m-2 text-lg font-semibold">פעל בשם:</div>}
                     <Impersonate showToast={showToast} userInfo={userInfo} onChange={(userId, name) => {
                         if (userId && name) {
                             impersonate(userId, name);

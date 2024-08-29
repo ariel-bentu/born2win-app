@@ -35,17 +35,19 @@ export default function Impersonate({ userInfo, onChange, showToast }: Impersona
 
         onChange={(e) => setSelectedUser(e.value)} />
         {loading && <InProgress />}
-        <Button disabled={!selectedUser} label="שנה למשתמש" onClick={() => onChange(selectedUser.id, selectedUser.name)} />
-        <Button label="בטל פעולה בשם" onClick={() => onChange(undefined)} />
-        <Button disabled={!selectedUser} label="העתק לינק להתקנה" onClick={async () => {
-            setLoading(true);
-            const link = await generateInstallationLinkForUser(selectedUser.id)
-                .catch(err => showToast("error", "יצירת לינק נכשלה", err.message))
-                .finally(() => setLoading(false));
-            if (link) {
-                navigator.clipboard.writeText(link);
-                showToast("success", "לינק הועתק ללוח - ניתק כעת להדביקו", "");
-            }
-        }} />
+        <div className="flex flex-column">
+            <Button disabled={!selectedUser} label={"פעל בשם" + (selectedUser ? ": " + selectedUser.name : "")} onClick={() => onChange(selectedUser.id, selectedUser.name)} />
+            <Button label="בטל פעולה בשם" onClick={() => onChange(undefined)} />
+            <Button disabled={!selectedUser} label="העתק לינק להתקנה" onClick={async () => {
+                setLoading(true);
+                const link = await generateInstallationLinkForUser(selectedUser.id)
+                    .catch(err => showToast("error", "יצירת לינק נכשלה", err.message))
+                    .finally(() => setLoading(false));
+                if (link) {
+                    navigator.clipboard.writeText(link);
+                    showToast("success", "לינק הועתק ללוח - ניתק כעת להדביקו", "");
+                }
+            }} />
+        </div>
     </div>
 }

@@ -99,7 +99,7 @@ export function ExistingRegistrationsComponent({ showToast, navigationRequest, a
     const registrationsToShow = registrations?.filter(r => filter === Filters.ALL || filter === Filters.FUTURE && isInFuture(r.date));
     return (
         <div>
-            <div className='flex flex-row relative'>
+            <div className='flex flex-row justify-content-center relative'>
                 <SelectButton
                     pt={{ root: { className: "select-button-container" } }}
                     unstyled
@@ -119,6 +119,7 @@ export function ExistingRegistrationsComponent({ showToast, navigationRequest, a
                         registrationsToShow.map(reg => (
                             <OneLine
                                 key={reg.id}
+                                hideIcon={true}
                                 title={reg.familyLastName}
                                 body={`עיר: ${reg.city}`}
                                 footer={dayjs(reg.date).format(NICE_DATE)}

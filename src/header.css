@@ -11,8 +11,15 @@
     color: #333;
     text-align: center;
     font-size: 24px;
-    border-bottom: 2px solid #42A5F5; /* Underline for the title */
+    border-bottom: 2px solid var(--born2win-button-color); /* Underline for the title */
     padding-bottom: 10px;
+}
+
+.header-loading {
+    position: absolute;
+    width:45px;
+    height:45px;
+    left: 70px;
 }
 
 .settings-menu {
@@ -38,13 +45,14 @@
 
 .p-panelmenu .p-panelmenu-header-link:focus,
 .p-panelmenu .p-panelmenu-header-link:active {
-    background-color: transparent; /* Remove background on click */
+    background-color: transparent !important;; /* Remove background on click */
     color: #333; /* Keep the original text color */
     outline: none; /* Remove outline when focused */
 }
 
 .p-panelmenu .p-panelmenu-header-link:hover {
-    color: #42A5F5;
+    color: red;
+    background-color: transparent !important;; /* Remove background on click */
 }
 
 .p-panelmenu .p-panelmenu-header-link .pi {

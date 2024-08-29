@@ -1,8 +1,9 @@
 .notification-container {
     height: 120px;
-    background-color: #f0f8ff;
+    /* background-color: #f0f8ff; */
+    background-color: rgba(252, 223, 72, 0.3);
     /* Light blue background */
-    border-radius: 10px;
+    /* border-radius: 10px; */
     /* padding: 20px; */
     text-align: center;
     position: relative;
@@ -35,7 +36,7 @@
 .arrow-animation {
     font-size: 2rem;
     /* Adjust size as needed */
-    color: #42A5F5;
+    color: var(--born2win-button-color);
     /* Color of the arrow */
     animation: slideLeftToRight 1s infinite;
 }

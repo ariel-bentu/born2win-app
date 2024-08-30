@@ -188,7 +188,7 @@ function App() {
                         }
 
                         console.log("identify on server as ", userPairingRequest)
-                        return api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, isDev ? false : isIOS).then(() => {
+                        api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, isDev ? false : isIOS).then(() => {
                             setVolunteerId(userPairingRequest);
                             if (isAndroid) {
                                 localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
@@ -201,6 +201,7 @@ function App() {
                             setReadyToInstall(true);
                         })
                             .catch((err: Error) => setError("תקלה באתחול (2). " + err.message));
+                        return;
                     } else {
                         setVolunteerId(currentVolId);
                         setReadyToInstall(true);
@@ -384,9 +385,9 @@ function App() {
     </div>
     // allow showing notification even if not ready
     const isNotificationTab = activeIndex === 0;
-    let appReady = (isPWA || isDev) && !error && isNotEmpty(volunteerId);
-    const showProgress = requestWebTokenInprogress || !appReady && !error && !(readyToInstall);
-    appReady ||= isNotificationTab
+    let appReady = (isPWA || isDev) && !error && isNotEmpty(volunteerId) && !readyToInstall;
+    const showProgress = requestWebTokenInprogress || !appReady && !error && !readyToInstall;
+    appReady ||= (isPWA || isDev) && isNotificationTab
     const isAdmin = userInfo?.isAdmin && userInfo?.districts?.length;
 
     /*
@@ -404,6 +405,7 @@ function App() {
             <Toast ref={toast} />
             <Header
                 userName={userInfo ? userInfo.firstName : ""}
+                actualUserId={actualUserId}
                 showToast={showToast}
                 volunteerId={volunteerId || ""}
                 logoSrc={header}

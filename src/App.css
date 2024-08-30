@@ -1,5 +1,5 @@
 :root {
-  --born2win-button-color: #B0038A;
+  --born2win-button-color: #66387C;
   --born2win-button-text-color: #ffffff;
   --born2win-button-green: rgb(0, 149, 162);
   --born2win-button-orange: #FCB414;
@@ -110,24 +110,24 @@
 /* Born2Win theme */
 /* custom-theme.css */
 .p-button {
-  background-color: #B0038A !important;
-  border-color: #B0038A !important;
+  background-color: var(--born2win-button-color) !important;
+  border-color: var(--born2win-button-color) !important;
   margin: 3px;
 }
 
 .p-button:hover {
-  background-color: #B0038A !important;
-  border-color: #B0038A !important;
+  background-color: var(--born2win-button-color) !important;
+  border-color: var(--born2win-button-color) !important;
 }
 
 /* Style for the selected tab */
 .p-tabview .p-tabview-nav li.p-highlight .p-tabview-title {
-  color: #E84F40 !important;
+  color: var(--born2win-button-green) !important;
 }
 
 /* Style for the underline (border) of the selected tab */
 .p-tabview-selected .p-tabview-nav-link {
-  border-bottom: 2px solid #E84F40 !important;
+  border-bottom: 2px solid var(--born2win-button-green) !important;
 }
 
 .settings-btn,

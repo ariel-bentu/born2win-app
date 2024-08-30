@@ -282,6 +282,7 @@ async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
             notificationToken: data.notificationTokens?.find((tokenInfo: TokenInfo) => tokenInfo.uid === request.auth?.uid),
             firstName: data.firstName,
             lastName: data.lastName,
+            phone: data.phone,
             notificationOn: data.notificationOn,
         } as UserInfo;
 
@@ -308,9 +309,11 @@ async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
         });
     }
     return {
+        id: "",
         isAdmin: false,
         firstName: "לא ידוע",
         lastName: "",
+        phone: "",
         notificationOn: false,
         notificationToken: undefined,
     };
@@ -333,7 +336,7 @@ exports.GenerateUserLink = onCall({ cors: true }, async (request) => {
         // Renew date
         otpCreatedAt: dayjs().format(DATE_TIME),
     };
-    return userDoc.ref.update(update).then(()=>{
+    return userDoc.ref.update(update).then(() => {
         return getRegistrationLink(glp.userId, update.otp);
     });
 });
@@ -376,6 +379,7 @@ exports.SearchUsers = onCall({ cors: true }, async (request): Promise<Recipient[
         return Array.from(users.values()).map(u => ({
             name: u.data().firstName + " " + u.data().lastName,
             id: u.id,
+            phone: u.data().phone,
             mahoz: u.data().mahoz,
         }));
     }

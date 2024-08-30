@@ -75,10 +75,12 @@ export interface UpdateUserLoginPayload {
 }
 
 export interface UserInfo {
+    id:string;
     notificationToken: TokenInfo | undefined,
     firstName: string,
     lastName: string,
     notificationOn: boolean,
+    phone: string,
     isAdmin: boolean,
     districts?: { id: string, name: string }[],
 }
@@ -159,6 +161,7 @@ export interface NavigationStep {
 export interface Recipient {
     name: string;
     id: string;
+    phone: string;
     mahoz: string;
 }
 

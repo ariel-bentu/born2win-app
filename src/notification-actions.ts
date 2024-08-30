@@ -8,6 +8,10 @@ export const AppTabs = {
     commitments: 2,
 }
 
+export function openWhatsApp(phone: string, text: string) {
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+}
 
 export function initializeNavigationRequester(setNavRequest: (ns: NavigationStep) => void) {
     setNavigationRequest = setNavRequest;

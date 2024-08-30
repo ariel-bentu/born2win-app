@@ -19,7 +19,9 @@ import {
 import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
-import { FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyDemand, FamilyDetails, GenerateLinkPayload, GetDemandStatPayload, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
+import { FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyDemand, FamilyDetails, GenerateLinkPayload, GetDemandStatPayload, NotificationChannels, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
+import { readAllNotifications } from "./notifications";
+import { getDB } from "./db";
 
 
 const firebaseConfig = {
@@ -247,6 +249,45 @@ export async function sendMessage(districts: string[], recipient: Recipient[] | 
     } as SendMessagePayload;
     return sendMessageFunc(payload);
 }
+
+export async function syncNotifications() {
+    // no impersonation
+    const loadExistingNotificationsFunc = httpsCallable(functions, 'LoadExistingNotifications');
+
+    return loadExistingNotificationsFunc().then(async result => {
+        const serverNotifications = result.data as any[];
+        const localNotifications = await readAllNotifications();
+
+        const db = await getDB();
+
+        for (let i = 0; i < serverNotifications.length; i++) {
+            // check if the notificaitone exists already
+            const oneServerNotif = serverNotifications[i];
+            if (!localNotifications.find(ln => ln.title == oneServerNotif.title && ln.body == oneServerNotif.body)) {
+
+                let ch = NotificationChannels.General;
+                let dataObj:any = {};
+                if (oneServerNotif.data && oneServerNotif.data.length > 2) {
+                    dataObj = JSON.parse(oneServerNotif.data);
+                    if (dataObj.channel) {
+                        ch = dataObj.channel;
+                    }
+                }
+
+                await db.put('notifications', {
+                    id: oneServerNotif.id,
+                    title: oneServerNotif.title,
+                    body: oneServerNotif.body || "",
+                    read: 0,
+                    data: dataObj,
+                    channel: ch,
+                    timestamp: oneServerNotif.timestamp,
+                });
+            }
+        }
+    });
+}
+
 
 export async function searchUsers(query: string): Promise<Recipient[]> {
     // no impersonation

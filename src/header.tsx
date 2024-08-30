@@ -18,15 +18,16 @@ interface HeaderProps {
     logoSrc: string;
     settingsComponent: JSX.Element;
     onRefreshTokenClick: onClickEvent;
+    onSyncNotifications: () => void;
     onSendTestNotificationClick?: onClickEvent;
     onLogout: () => void;
-    actualUserId:string;
+    actualUserId: string;
     setActualUserId: (newUserId: string) => void;
     showToast: ShowToast;
     showLoading: boolean;
 }
 
-function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onSendTestNotificationClick,
+function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onSendTestNotificationClick, onSyncNotifications,
     onLogout, userInfo, setActualUserId, volunteerId, showToast, showLoading, actualUserId }: HeaderProps) {
     const [sidebarVisible, setSidebarVisible] = useState(false);
     const [showTechInfo, setShowTechInfo] = useState<boolean>(false);
@@ -51,6 +52,11 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
             icon: 'pi pi-envelope',
             disabled: !onSendTestNotificationClick,
             command: onSendTestNotificationClick,
+        },
+        {
+            label: 'סנכרן הודעות',
+            icon: 'pi pi-history',
+            command: onSyncNotifications,
         },
         // {
         //     label: 'התנתק',

@@ -412,6 +412,9 @@ function App() {
                 onLogout={handleLogout}
                 settingsComponent={settings}
                 onRefreshTokenClick={onAllowNotification}
+                onSyncNotifications={() =>
+                    api.syncNotifications().then(() => setReloadNotifications(prev => prev + 1))
+                }
                 onSendTestNotificationClick={userInfo?.notificationToken ? api.sendTestNotification : undefined}
                 userInfo={userInfo}
                 setActualUserId={setActualUserId}

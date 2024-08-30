@@ -386,6 +386,17 @@ exports.SearchUsers = onCall({ cors: true }, async (request): Promise<Recipient[
     throw new HttpsError("unauthenticated", "Only admin can send message.");
 });
 
+/**
+ *
+ * @param title
+ * @param body
+ * @param channel
+ * @param toDistricts an array of districts ID or "all"
+ * @param toRecipients an array of users ID
+ * @param data
+ * @returns
+ */
+
 async function addNotificationToQueue(title: string, body: string, channel: NotificationChannels, toDistricts: string[], toRecipients: string[], data?: { [key: string]: string }) {
     const docRef = db.collection(Collections.Notifications).doc();
     if (data) {
@@ -441,6 +452,40 @@ exports.OnNotificationAdded = onDocumentCreated(`${Collections.Notifications}/{d
         logger.info("OnNotificationAdded missing. id=", event.params.docId);
     }
     return;
+});
+
+exports.LoadExistingNotifications = onCall({ cors: true }, async (request) => {
+    const doc = await authenticate(request);
+    const mahoz = doc.data().mahoz;
+
+    const NotificationsRef = db.collection(Collections.Notifications);
+
+    return Promise.all([
+        // Personal messages
+        NotificationsRef.where("toRecipients", "array-contains", doc.id).get(),
+        NotificationsRef.where("toDistricts", "array-contains", mahoz).get(),
+        NotificationsRef.where("toDistricts", "array-contains", "all").get(),
+    ]).then(all => {
+        // Unite and filter to 2 weeks old:
+        const notifications: any[] = [];
+        all.forEach(result => {
+            result.docs.forEach(doc => {
+                if (!notifications.find(f => f.id === doc.id)) {
+                    const data = doc.data();
+                    if (data.created > dayjs().subtract(2, "weeks").format(DATE_TIME)) {
+                        notifications.push({
+                            id: doc.id,
+                            title: data.title,
+                            body: data.body,
+                            data: data.data,
+                            timestamp: dayjs(data.created).valueOf(),
+                        });
+                    }
+                }
+            });
+        });
+        return notifications;
+    });
 });
 
 exports.SendMessage = onCall({ cors: true }, async (request) => {
@@ -1023,6 +1068,7 @@ const schedules = [
     { desc: "Sync Born2Win users daily", min: 0, hour: [17], weekDay: "*", callback: syncBorn2WinUsers },
     { desc: "Alert 5 days ahead open demand", min: 40, hour: [13], weekDay: "*", callback: alertOpenDemands },
     { desc: "Alert 72 hours before cooking", min: 0, hour: [16], weekDay: "*", callback: alertUpcomingCooking },
+    // todo - archive notifications
 ];
 
 function check(obj: any, fieldName: string, value: any) {

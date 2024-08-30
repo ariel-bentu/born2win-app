@@ -112,6 +112,7 @@
 .p-button {
   background-color: var(--born2win-button-color) !important;
   border-color: var(--born2win-button-color) !important;
+  color: var(--born2win-button-text-color);
   margin: 3px;
 }
 

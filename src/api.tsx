@@ -226,7 +226,7 @@ export function getUserRegistrations(): Promise<FamilyDemand[]> {
 
 
 export async function getDemandStats(dateRange: [Date | null, Date | null], districts: string[]): Promise<StatsData> {
-    if (!dateRange[0] || !dateRange[1]) return { totalDemands: [0], fulfilledDemands: [0], labels: [""] }
+    if (!dateRange[0] || !dateRange[1]) return { totalDemands: [0], fulfilledDemands: [0], labels: [""], openDemands: [] }
 
     // No impersonation
     const getDemandStatsFunc = httpsCallable(functions, 'GetDemandStats');
@@ -266,7 +266,7 @@ export async function syncNotifications() {
             if (!localNotifications.find(ln => ln.title == oneServerNotif.title && ln.body == oneServerNotif.body)) {
 
                 let ch = NotificationChannels.General;
-                let dataObj:any = {};
+                let dataObj: any = {};
                 if (oneServerNotif.data && oneServerNotif.data.length > 2) {
                     dataObj = JSON.parse(oneServerNotif.data);
                     if (dataObj.channel) {

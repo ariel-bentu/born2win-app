@@ -20,7 +20,7 @@ import isYesterday from 'dayjs/plugin/isYesterday';
 import OneLine from './one-line';
 import { NotificationActionHandler } from './notification-actions';
 import "./notifications.css"
-import { limitText } from './utils';
+import { getNiceDateTime, limitText } from './utils';
 import { Divider } from 'primereact/divider';
 import { NotificationChannels, NotificationChannelsName } from './types';
 import { ScrollPanel } from 'primereact/scrollpanel';
@@ -28,15 +28,6 @@ import { ScrollPanel } from 'primereact/scrollpanel';
 dayjs.extend(isToday);
 dayjs.extend(isYesterday);
 
-function getNiceDateTime(d: number) {
-    const theDate = dayjs(d);
-    if (theDate.isToday()) {
-        return theDate.format("HH:mm");
-    } else if (theDate.isYesterday()) {
-        return "אתמול ב " + theDate.format("HH:mm");
-    }
-    return theDate.format("[יום ]dddd, D [ב]MMMM HH:mm");
-}
 
 interface NotificationsComponentProps {
     updateUnreadCount: (count: number) => void;
@@ -160,7 +151,7 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
     return (
         <div>
             <Toast ref={toast} />
-            <div className='flex flex-row relative justify-content-center'>
+            <div className='flex flex-row relative justify-content-center align-items-center'>
                 <SelectButton
                     pt={{ root: { className: "select-button-container" } }}
                     unstyled

@@ -198,13 +198,13 @@ function App() {
                                 api.logout();
 
                             }
-                            setReadyToInstall(true);
+                            setReadyToInstall(true && !isDev);
                         })
                             .catch((err: Error) => setError("תקלה באתחול (2). " + err.message));
                         return;
                     } else {
                         setVolunteerId(currentVolId);
-                        setReadyToInstall(true);
+                        setReadyToInstall(true && !isDev);
                         return;
                     }
                 }
@@ -443,7 +443,8 @@ function App() {
                             {isAdmin && <SendMessage userInfo={userInfo} showToast={showToast} />}
                         </TabPanel>}
                     {isAdmin &&
-                        <TabPanel headerStyle={{ fontSize: 20 }} header="גרפים">
+                        <TabPanel headerStyle={{ fontSize: 20 }} header="ניהול שיבוצים">
+                            
                             {isAdmin && <Stats userInfo={userInfo} />}
                         </TabPanel>
                     }

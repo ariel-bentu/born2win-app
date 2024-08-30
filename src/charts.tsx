@@ -7,9 +7,21 @@ import { StatsData, UserInfo } from './types';
 import { getDemandStats } from './api';
 
 import { InProgress } from './common-ui';
+import { SelectButton } from 'primereact/selectbutton';
+import OneLine from './one-line';
+import { getNiceDate, getNiceDateTime } from './utils';
 
 interface DemandChartProps {
-    data: any;
+    data: StatsData;
+}
+
+const Modes = {
+    Details: 1,
+    Chart: 2,
+    array: [
+        { name: 'פרטים', value: 1 },
+        { name: 'גרפים', value: 2 },
+    ]
 }
 
 interface StatsProps {
@@ -22,11 +34,13 @@ export function Stats({ userInfo }: StatsProps) {
         totalDemands: [],
         fulfilledDemands: [],
         labels: [],
+        openDemands: [],
     });
     const [dateRange, setDateRange] = useState<[Date, Date | null] | null>(null);
     const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
     const calendar = useRef<Calendar>(null);
+    const [mode, setMode] = useState(Modes.Details);
 
     useEffect(() => {
         if (userInfo?.isAdmin && dateRange && selectedDistricts.length > 0) {
@@ -60,14 +74,31 @@ export function Stats({ userInfo }: StatsProps) {
 
     return (
         <div>
-            <Calendar
-                ref={calendar}
-                value={dateRange}
-                onChange={handleDateChange}
-                selectionMode="range"
-                placeholder="בחר שבוע או מס׳ שבועות"
-                readOnlyInput
-            />
+            <div className='flex flex-row  justify-content-center align-items-center'>
+                <span className='ml-2'>תחום תאריכים</span>
+                <Calendar
+                    ref={calendar}
+                    value={dateRange}
+                    onChange={handleDateChange}
+                    selectionMode="range"
+                    placeholder="בחר שבוע או מס׳ שבועות"
+                    readOnlyInput
+                    showWeek={true}
+                    locale="he"
+                />
+                <div className='flex flex-row  justify-content-center align-items-center'>
+                    <SelectButton
+                        pt={{ root: { className: "select-button-container" } }}
+                        unstyled
+                        value={mode} onChange={(e) => setMode(e.value)} optionLabel="name" options={Modes.array}
+                        itemTemplate={(option) => (
+                            <div className={`select-button-item ${mode === option.value ? 'p-highlight' : ''}`}>
+                                {option.name}
+                            </div>
+                        )}
+                    />
+                </div>
+            </div>
 
             {userInfo && userInfo.districts && userInfo.districts.length > 1 &&
                 <MultiSelect
@@ -80,10 +111,32 @@ export function Stats({ userInfo }: StatsProps) {
                 />}
 
             {error && <small style={{ color: 'red' }}>{error}</small>}
+
             {loading && <InProgress />}
-            <DemandChart data={data} />
+            {mode == Modes.Details ?
+                <DemandList data={data} /> :
+                <DemandChart data={data} />
+            }
         </div>
     );
+}
+
+export const DemandList: React.FC<DemandChartProps> = ({ data }) => {
+    return <div>
+        {data.openDemands.map((family, i) => (<OneLine
+            key={i}
+            title={family.familyLastName}
+            body={`עיר: ${family.city}`}
+            unread={false}
+            onRead={() => { }}
+            footer={getNiceDate(family.date)}
+            //     console.log("family click", family.familyLastName)
+            //     setSelectedFamily(family)
+            // }}
+            hideIcon={true}
+        />))
+        }
+    </div>
 }
 
 

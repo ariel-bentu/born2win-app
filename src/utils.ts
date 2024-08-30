@@ -1,3 +1,4 @@
+import dayjs from "dayjs";
 import { FamilyCompact, FamilyDemand } from "./types";
 
 export const isNotEmpty = (val: string | null | undefined): val is string => {
@@ -21,9 +22,24 @@ export const getUniqueFamilies = (records: FamilyDemand[]): FamilyCompact[] => {
     return result;
 };
 
-export function limitText(val:string, length:number):string {
+export function limitText(val: string, length: number): string {
     if (val.length > length) {
-        return val.substring(0, length)+"...";
+        return val.substring(0, length) + "...";
     }
     return val;
+}
+
+export function getNiceDate(d: number | string) {
+    const theDate = dayjs(d);
+    return theDate.format("[יום ]dddd, D [ב]MMMM");
+}
+
+export function getNiceDateTime(d: number | string) {
+    const theDate = dayjs(d);
+    if (theDate.isToday()) {
+        return theDate.format("HH:mm");
+    } else if (theDate.isYesterday()) {
+        return "אתמול ב " + theDate.format("HH:mm");
+    }
+    return theDate.format("[יום ]dddd, D [ב]MMMM HH:mm");
 }

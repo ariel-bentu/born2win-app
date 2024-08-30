@@ -808,21 +808,30 @@ async function getDemands(
             headers,
         });
         if (demands.data.records) {
-            return demands.data.records.map((demand: AirTableRecord) => ({
-                id: demand.id,
-                date: demand.fields["תאריך"],
-                city: demand.fields["עיר"][0],
-                familyLastName: demand.fields.Name,
-                district: district,
-                status: demand.fields["זמינות שיבוץ"],
-                familyId: demand.fields.Family_id[0],
-                familyRecordId: demand.fields["משפחה"][0],
-                volunteerId: demand.fields.volunteer_id,
-            }) as FamilyDemand);
+            return demands.data.records.map((demand: AirTableRecord) => demandAirtable2FamilyDemand(demand, district));
         }
     }
     throw new HttpsError("not-found", "District not found");
 }
+
+function demandAirtable2FamilyDemand(demand: AirTableRecord, district: string): FamilyDemand {
+    return {
+        id: demand.id,
+        date: demand.fields["תאריך"],
+        city: getSafeFirstArrayElement(demand.fields["עיר"], ""),
+        familyLastName: demand.fields.Name,
+        district: district,
+        status: demand.fields["זמינות שיבוץ"],
+        familyId: getSafeFirstArrayElement(demand.fields.Family_id, ""),
+        familyRecordId: getSafeFirstArrayElement(demand.fields["משפחה"], ""),
+        volunteerId: demand.fields.volunteer_id,
+    };
+}
+
+function getSafeFirstArrayElement(arr: any[], defaultValue: any) {
+    return arr && arr.length && arr[0] || defaultValue;
+}
+
 
 exports.GetOpenDemands = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
     const doc = await authenticate(request);
@@ -1293,6 +1302,7 @@ exports.GetDemandStats = onCall({ cors: true }, async (request): Promise<StatsDa
         const gdsp = request.data as GetDemandStatPayload;
         const totalDemandsMap: { [key: string]: number } = {};
         const fulfilledDemandsMap: { [key: string]: number } = {};
+        const openDemands = [] as FamilyDemand[];
 
         const startDate = dayjs(gdsp.from).startOf("day");
         const endDate = dayjs(gdsp.to).endOf("day");
@@ -1313,7 +1323,6 @@ exports.GetDemandStats = onCall({ cors: true }, async (request): Promise<StatsDa
                                 Authorization: `Bearer ${apiKey}`,
                             },
                             params: {
-                                fields: ["תאריך", "זמינות שיבוץ", "volunteer_id"],
                                 offset: offset,
                                 filterByFormula: `AND(IS_AFTER({תאריך}, '${startDate.format("YYYY-MM-DD")}'), IS_BEFORE({תאריך}, '${endDate.format("YYYY-MM-DD")}'))`,
                             },
@@ -1334,6 +1343,8 @@ exports.GetDemandStats = onCall({ cors: true }, async (request): Promise<StatsDa
 
                             if (record.fields["זמינות שיבוץ"] === "תפוס" && record.fields.volunteer_id) {
                                 fulfilledDemandsMap[weekLabel] += 1;
+                            } else if (record.fields["זמינות שיבוץ"] === "זמין") {
+                                openDemands.push(demandAirtable2FamilyDemand(record, district.id));
                             }
                         });
                     } while (offset);
@@ -1348,7 +1359,8 @@ exports.GetDemandStats = onCall({ cors: true }, async (request): Promise<StatsDa
             totalDemands,
             fulfilledDemands,
             labels,
+            openDemands,
         };
     }
-    return { totalDemands: [0], fulfilledDemands: [0], labels: [""] };
+    return { totalDemands: [0], fulfilledDemands: [0], labels: [""], openDemands: [] };
 });

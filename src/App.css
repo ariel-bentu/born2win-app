@@ -107,6 +107,33 @@
 
 }
 
+/* styles.css */
+.select-button-container {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 5px;
+}
+
+.select-button-item {
+  padding: 10px 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: bold;
+  color: white;
+}
+
+.select-button-item:not(.p-highlight) {
+  background-color: lightgray;
+
+}
+
+.select-button-item.p-highlight {
+  /* background-color: #2196F3; */
+  background-color: var(--born2win-button-green);
+}
+
+
 /* Born2Win theme */
 /* custom-theme.css */
 .p-button {

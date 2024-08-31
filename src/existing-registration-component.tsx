@@ -26,7 +26,7 @@ interface ExistingRegistrationsComponentProps {
 
 export function ExistingRegistrationsComponent({ showToast, navigationRequest, actualUserId }: ExistingRegistrationsComponentProps) {
     const [registrations, setRegistrations] = useState<FamilyDemand[] | undefined>();
-    const [filter, setFilter] = useState(Filters.ALL);
+    const [filter, setFilter] = useState(Filters.FUTURE);
     const [error, setError] = useState<any>(undefined);
     const [currentRegistration, setCurrentRegistration] = useState<FamilyDemand | undefined>();
     const [loading, setLoading] = useState<boolean>(false);

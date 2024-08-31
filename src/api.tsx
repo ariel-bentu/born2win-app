@@ -326,7 +326,8 @@ export const handleSearchUsers = async (userInfo: UserInfo, query: string) => {
 
         mahoz.users.push({
             name: r.name,
-            id: r.id
+            id: r.id,
+            phone: r.phone,
         });
     });
 

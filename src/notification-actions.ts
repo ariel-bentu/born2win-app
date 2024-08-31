@@ -9,6 +9,12 @@ export const AppTabs = {
 }
 
 export function openWhatsApp(phone: string, text: string) {
+    console.log("send to whatsapp", phone, text)
+    if (phone.startsWith("0")) {
+        phone = "+972" + phone.substring(1);
+    }
+    phone = phone.replaceAll(" ", "");
+    phone = phone.replaceAll("-", "");
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
 }

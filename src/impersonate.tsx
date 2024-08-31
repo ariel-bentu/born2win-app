@@ -36,12 +36,15 @@ export default function Impersonate({ userInfo, onChange, showToast, isImpersona
             setFilteredUsers(newFilter);
         }}
 
-        onChange={(e) => setSelectedUser(e.value)} />
+        onChange={(e) => {
+            setSelectedUser(e.value)
+            setInstallLink("")
+        }} />
         {loading && <InProgress />}
         <div className="flex flex-column">
-            <Button disabled={!selectedUser} label={"פעל בשם" + (selectedUser ? ": " + selectedUser.name : "")} onClick={() => onChange(selectedUser.id, selectedUser.name)} />
+            <Button disabled={!selectedUser || !selectedUser.id} label={"פעל בשם" + (selectedUser && selectedUser.name ? ": " + selectedUser.name : "")} onClick={() => onChange(selectedUser.id, selectedUser.name)} />
             <Button disabled={!isImpersonated} label="בטל פעולה בשם" onClick={() => onChange(undefined)} />
-            <Button disabled={!selectedUser} label="שלח לינק להתקנה" onClick={async () => {
+            <Button disabled={!selectedUser || !selectedUser.id} label="שלח לינק להתקנה" onClick={async () => {
                 setLoading(true);
                 const link = await generateInstallationLinkForUser(selectedUser.id)
                     .catch(err => showToast("error", "יצירת לינק נכשלה", err.message))
@@ -53,12 +56,12 @@ export default function Impersonate({ userInfo, onChange, showToast, isImpersona
             {installLink && <div className="flex flex-row align-items-center">
                 <span>שלח בווטסאפ למשתמש</span>
                 <Button
-                            icon="pi pi-whatsapp"
-                            className="p-button-rounded p-button-info m-2"
-                            onClick={() => openWhatsApp(selectedUser.phone, "לינק להתקנה: " + installLink)}
-                            aria-label="WhatsApp"
-                        />
-                </div>}
+                    icon="pi pi-whatsapp"
+                    className="p-button-rounded p-button-info m-2"
+                    onClick={() => openWhatsApp(selectedUser.phone, "לינק להתקנה: " + installLink)}
+                    aria-label="WhatsApp"
+                />
+            </div>}
         </div>
     </div>
 }

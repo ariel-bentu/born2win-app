@@ -784,7 +784,9 @@ async function getDemands(
     const mahuzRec = (await getDestricts()).find((d: any) => d.id === district);
     if (mahuzRec) {
         const baseId = mahuzRec.base_id;
-        const filters = [];
+        const filters = [
+            "({סטטוס בעמותה} = 'פעיל')",
+        ];
 
         if (familyId) {
             filters.push(`FIND("${familyId}",  ARRAYJOIN({record_id (from משפחה)})) > 0`);
@@ -1324,7 +1326,7 @@ exports.GetDemandStats = onCall({ cors: true }, async (request): Promise<StatsDa
                             },
                             params: {
                                 offset: offset,
-                                filterByFormula: `AND(IS_AFTER({תאריך}, '${startDate.format("YYYY-MM-DD")}'), IS_BEFORE({תאריך}, '${endDate.format("YYYY-MM-DD")}'))`,
+                                filterByFormula: `AND(({סטטוס בעמותה} = 'פעיל'), IS_AFTER({תאריך}, '${startDate.format("YYYY-MM-DD")}'), IS_BEFORE({תאריך}, '${endDate.format("YYYY-MM-DD")}'))`,
                             },
                         });
 

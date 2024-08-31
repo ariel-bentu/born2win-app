@@ -445,7 +445,7 @@ function App() {
                     {isAdmin &&
                         <TabPanel headerStyle={{ fontSize: 20 }} header="ניהול שיבוצים">
                             
-                            {isAdmin && <Stats userInfo={userInfo} />}
+                            {isAdmin && <Stats showToast={showToast} userInfo={userInfo} />}
                         </TabPanel>
                     }
                 </TabView>}

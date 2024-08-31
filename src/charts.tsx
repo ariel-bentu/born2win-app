@@ -3,13 +3,15 @@ import { Chart } from 'primereact/chart';
 import { Calendar } from 'primereact/calendar';
 import { MultiSelect } from 'primereact/multiselect';
 import dayjs from 'dayjs';
-import { StatsData, UserInfo } from './types';
+import { ShowToast, StatsData, UserInfo } from './types';
 import { getDemandStats } from './api';
 
 import { InProgress } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
 import OneLine from './one-line';
 import { getNiceDate, getNiceDateTime } from './utils';
+import { Button } from 'primereact/button';
+import { setSelectionRange } from '@testing-library/user-event/dist/utils';
 
 interface DemandChartProps {
     data: StatsData;
@@ -19,23 +21,34 @@ const Modes = {
     Details: 1,
     Chart: 2,
     array: [
-        { name: 'פרטים', value: 1 },
+        { name: 'חסרים', value: 1 },
         { name: 'גרפים', value: 2 },
     ]
 }
 
 interface StatsProps {
     userInfo: UserInfo,
+    showToast: ShowToast;
+
+}
+const empty = {
+    totalDemands: [],
+    fulfilledDemands: [],
+    labels: [],
+    openDemands: [],
 }
 
-export function Stats({ userInfo }: StatsProps) {
+function simplifyFamilyName(name: string): string {
+    const match = name.match(/משפחת\s(.+?)\s-/);
+    if (match) {
+        return match[1]; // Extracted family name
+    }
+    return name;
+}
+
+export function Stats({ userInfo, showToast }: StatsProps) {
     const [loading, setLoading] = useState<boolean>(false);
-    const [data, setData] = useState<StatsData>({
-        totalDemands: [],
-        fulfilledDemands: [],
-        labels: [],
-        openDemands: [],
-    });
+    const [data, setData] = useState<StatsData>(empty);
     const [dateRange, setDateRange] = useState<[Date, Date | null] | null>(null);
     const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -46,6 +59,8 @@ export function Stats({ userInfo }: StatsProps) {
         if (userInfo?.isAdmin && dateRange && selectedDistricts.length > 0) {
             setLoading(true);
             getDemandStats(dateRange, selectedDistricts).then(setData).finally(() => setLoading(false));
+        } else {
+            setData(empty);
         }
     }, [dateRange, selectedDistricts, userInfo]);
 
@@ -68,6 +83,62 @@ export function Stats({ userInfo }: StatsProps) {
         }
     };
 
+    const handlePrepareMessageToSend = () => {
+        // Initialize an object to group families by city and family name
+        const groupedByCityAndFamily: any = {};
+
+        // Group families by city and family name
+        data.openDemands.forEach((family) => {
+            const city = family.city;
+            const familyName = simplifyFamilyName(family.familyLastName);
+
+            const dateFormatted = dayjs(family.date).format("DD.MM");
+
+            // If the city doesn't exist in the object, initialize it
+            if (!groupedByCityAndFamily[city]) {
+                groupedByCityAndFamily[city] = {};
+            }
+
+            // If the family doesn't exist under the city, initialize it
+            if (!groupedByCityAndFamily[city][familyName]) {
+                groupedByCityAndFamily[city][familyName] = [];
+            }
+
+            // Add the formatted date to the family's array under the city
+            groupedByCityAndFamily[city][familyName].push(dateFormatted);
+        });
+
+        // Sort cities alphabetically
+        const sortedCities = Object.keys(groupedByCityAndFamily).sort();
+
+
+        let message = `היי קהילת נולדת לנצח💜
+
+מי יכול.ה לסייע בבישול בחודש הקרוב 🙏
+
+
+`;
+        sortedCities.forEach((city) => {
+            message += `*${city}*\n`;
+
+            // Sort families alphabetically within each city
+            const sortedFamilies = Object.keys(groupedByCityAndFamily[city]).sort();
+
+            sortedFamilies.forEach((familyName) => {
+                const dates = groupedByCityAndFamily[city][familyName].join(', ');
+                message += `${familyName} - ${dates}\n`;
+            });
+
+            message += '\n'; // Add an extra newline after each city's group
+        });
+
+
+        message += `ניתן להשתבץ בלינק ב🤖
+מסתבכים? אני פה כדי לעזור`;
+        navigator.clipboard.writeText(message)
+        showToast("success", "הודעה הוכנה והועתקה - הדבקו היכן שתרצו", "");
+    }
+
     const handleDistrictChange = (e: any) => {
         setSelectedDistricts(e.value);
     };
@@ -77,29 +148,25 @@ export function Stats({ userInfo }: StatsProps) {
             <div className='flex flex-row  justify-content-center align-items-center'>
                 <span className='ml-2'>תחום תאריכים</span>
                 <Calendar
+                    className="range-calender"
                     ref={calendar}
                     value={dateRange}
                     onChange={handleDateChange}
                     selectionMode="range"
                     placeholder="בחר שבוע או מס׳ שבועות"
                     readOnlyInput
-                    showWeek={true}
+
                     locale="he"
                 />
-                <div className='flex flex-row  justify-content-center align-items-center'>
-                    <SelectButton
-                        pt={{ root: { className: "select-button-container" } }}
-                        unstyled
-                        value={mode} onChange={(e) => setMode(e.value)} optionLabel="name" options={Modes.array}
-                        itemTemplate={(option) => (
-                            <div className={`select-button-item ${mode === option.value ? 'p-highlight' : ''}`}>
-                                {option.name}
-                            </div>
-                        )}
-                    />
-                </div>
+                <Button label="חודש קדימה" unstyled icon="pi pi-calendar" className="icon-btn icon-btn-withLabel text-xs"
+                    onClick={() => {
+                        const start = dayjs()
+                        const end = start.add(1, "month")
+                        setDateRange([start.toDate(), end.toDate()]);
+                    }} />
             </div>
 
+            {loading && <InProgress />}
             {userInfo && userInfo.districts && userInfo.districts.length > 1 &&
                 <MultiSelect
                     value={selectedDistricts}
@@ -109,10 +176,22 @@ export function Stats({ userInfo }: StatsProps) {
                     display="chip"
                     className="w-full md:w-20rem mt-3"
                 />}
+            <div className='flex flex-row  justify-content-start align-items-center relative'>
+                <SelectButton
+                    pt={{ root: { className: "select-button-container" } }}
+                    unstyled
+                    value={mode} onChange={(e) => setMode(e.value)} optionLabel="name" options={Modes.array}
+                    itemTemplate={(option) => (
+                        <div className={`select-button-item ${mode === option.value ? 'p-highlight' : ''}`}>
+                            {option.name}
+                        </div>
+                    )}
+                />
+                {mode == Modes.Details && <Button disabled={data.openDemands.length == 0} className="btn-on-the-right" label="הכן הודעה" onClick={handlePrepareMessageToSend} />}
+            </div>
 
             {error && <small style={{ color: 'red' }}>{error}</small>}
 
-            {loading && <InProgress />}
             {mode == Modes.Details ?
                 <DemandList data={data} /> :
                 <DemandChart data={data} />

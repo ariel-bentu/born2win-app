@@ -64,12 +64,17 @@
 }
 
 .settingMenuItem {
-  /* display: flex; */
   text-align: right;
   align-items: center;
   justify-content: space-between;
   width: 100%;
 }
+
+.btn-on-the-right {
+  position: absolute;
+  left: 0;
+}
+
 
 /* Flip the arrows for hebrew experience of the Calendar control */
 .p-calendar .p-datepicker .p-datepicker-prev {
@@ -120,7 +125,7 @@
   border-radius: 20px;
   cursor: pointer;
   font-weight: bold;
-  color: white;
+  color: var(--born2win-button-text-color);
 }
 
 .select-button-item:not(.p-highlight) {
@@ -182,4 +187,8 @@
 
 .p-progressbar-value {
   background-color: var(--born2win-button-color);
+}
+
+.range-calender > input {
+  font-size: 12px;
 }

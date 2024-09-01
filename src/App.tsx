@@ -59,6 +59,8 @@ const isDev = !!urlParams.get('dev');
 const offline = !!urlParams.get('offline');
 const client = new ClientJS();
 const fingerprint = isIOS ? client.getFingerprint() + "" : "";
+const currentVolId = localStorage.getItem(VOL_ID_STORAGE_KEY);
+
 
 
 function App() {
@@ -71,7 +73,7 @@ function App() {
     const [notificationPermission, setNotificationPermission] = useState<string>((typeof Notification !== 'undefined') && Notification && Notification.permission || "unsupported");
     const [unreadCount, setUnreadCount] = useState(0);
     const [reloadNotifications, setReloadNotifications] = useState(0);
-    const [requestWebTokenInprogress, setRequestWebTokenInprogress] = useState<boolean>(false);
+    const [loading, setLoading] = useState<boolean>(true);
     const toast = useRef<Toast>(null);
     const [activeIndex, setActiveIndex] = useState(0);
     const [error, setError] = useState<string | undefined>();
@@ -86,6 +88,7 @@ function App() {
 
     const onAuth: NextOrObserver<User> = (user: User | null) => {
         console.log("OnAuth - Login callback called", user);
+        setLoading(false);
         setUser(user);
     }
 
@@ -103,18 +106,18 @@ function App() {
         setError(undefined);
         if (phonePhase == "phone") {
             // todo validate phone
-            setRequestWebTokenInprogress(true);
+            setLoading(true);
             api.updateLoginInfo(undefined, undefined, undefined, phoneInput, true).then(() => {
                 setPhonePhase("code");
                 setVerificationCodeInput(undefined);
                 showToast("success", "בקשתך התקבלה - תיכף תתקבל באמצעות ווטסאפ הודעה עם קוד אישור - עליך להקליד אותו ", "");
             }).catch((err: Error) => {
-                setError("תקלת הזדהות באמצעות טלפון - תקלה 6. " + err.message);
+                setError("תקלת הזדהות באמצעות טלפון. (" + err.message + ")");
                 console.log("Failed to start phone flow", err);
-            }).finally(() => setRequestWebTokenInprogress(false));
+            }).finally(() => setLoading(false));
         } else {
             console.log("Sending verification code", phoneInput, verificationCodeInput);
-            setRequestWebTokenInprogress(true);
+            setLoading(true);
             api.updateLoginInfo(undefined, verificationCodeInput, undefined, phoneInput, true).then((retVolId: string) => {
                 setVolunteerId(retVolId);
                 localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
@@ -123,7 +126,7 @@ function App() {
             }).catch((err: Error) => {
                 setError("תקלת הזדהות באמצעות קוד האימות. " + err.message);
                 console.log("Failed to verify code in phone flow", err);
-            }).finally(() => setRequestWebTokenInprogress(false));
+            }).finally(() => setLoading(false));
         }
     }, [phonePhase, phoneInput, verificationCodeInput]);
 
@@ -193,26 +196,27 @@ function App() {
             if (oldUrlParamID || isPWA || isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
                 // Logs in annonymously and then user is set with user.uid
                 console.log("Logging in...")
+                setLoading(true);
                 api.login()
                     .then(() => console.log("Login successful"))
                     .catch((err: Error) => {
                         console.log("Login failed", err.message)
                         setError("Login failed: " + err.message);
-                    });
+                    }).finally(()=>setLoading(false));
             } else {
-                setError("תקלת אתחול (3) - חסר פרמטרים");
+                setReadyToInstall(true);
             }
         }
     }, [init, user]);
 
     useEffect(() => {
-        const currentVolId = localStorage.getItem(VOL_ID_STORAGE_KEY);
         if (user && user.uid) {
             console.log("Login passed, initializing...", currentVolId);
             if (!isPWA) {
                 // BROWSER flow
                 if (oldUrlParamID) {
                     setVolunteerId(oldUrlParamID);
+                    return;
                 } else if (isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
                     if (isNotEmpty(currentVolId) && currentVolId !== userPairingRequest && !isDev) {
                         console.log("vol ID already paired- ignored", currentVolId, "vs. requested: ", userPairingRequest);
@@ -337,7 +341,7 @@ function App() {
     };
 
     const onAllowNotification = () => {
-        setRequestWebTokenInprogress(true);
+        setLoading(true);
         api.requestWebPushToken().then(token => {
             if (token) {
                 return api.updateUserNotification(true, token, isSafari).then(() => {
@@ -350,7 +354,7 @@ function App() {
             }
         })
             .catch((err) => showToast('error', 'תקלה ברישום להודעות', err.message))
-            .finally(() => setRequestWebTokenInprogress(false));
+            .finally(() => setLoading(false));
     }
 
     const handleLogout = () => {
@@ -388,7 +392,6 @@ function App() {
         </div>
     }
 
-
     const settings = <div style={{ display: "flex", flexDirection: "column", textAlign: "left", alignItems: "flex-start" }}>
         <div><strong>Technical Status:</strong></div>
         <div>Environment: {isPWA ? "PWA" : "Browser: " + navigator.userAgent}</div>
@@ -402,38 +405,12 @@ function App() {
         <div>Notification Permission: {notificationPermission}</div>
         <div>Notification Token: {userInfo?.notificationToken ? "Exists: " + userInfo.notificationToken.token.substring(0, 5) + "..." : "Missing"}</div>
         <div style={{ display: "flex", flexDirection: "column", width: 200, padding: 10 }}>
-
-            {/* {isPWA && <Button onClick={() => api.sendTestNotification()} disabled={!userInfo?.notificationToken}>שלח הודעת בדיקה</Button>} */}
-            <Button onClick={async () => {
-                const db = await getDB();
-                await db.put('notifications', {
-                    id: Date.now() + "",
-                    title: "תזכורת",
-                    body: `תאריך הבישול: 2024-18-28
-עוד: 3 ימים
-משפחה: yyy
-עיר: xxx
-לא לשכוח לתאם עוד היום בשיחה או הודעה את שעת מסירת האוכל.
-אם אין באפשרותך לבשל יש לבטל באפליקציה, או ליצור קשר.`,
-                    // data: JSON.stringify({
-                    //                     buttons: [
-                    //                         { label: "צפה בפרטים", action: NotificationActions.RegistrationDetails, params: ["1234"] },
-                    //                         { label: "צור קשר עם עמותה", action: NotificationActions.StartConversation },
-                    //                     ],
-                    //                 }),
-                    read: 0,
-                    channel: NotificationChannels.Links,
-                    timestamp: Date.now(),
-                });
-                countUnreadNotifications().then(updateUnreadCount);
-            }} >Add Test DATA</Button>
         </div>
     </div>
     // allow showing notification even if not ready
     const isNotificationTab = activeIndex === 0;
     let appReady = (isPWA || isDev) && !error && isNotEmpty(volunteerId) && !readyToInstall;
-    const showProgress = requestWebTokenInprogress || !appReady && !error && !readyToInstall;
-    appReady ||= (isPWA || isDev) && isNotificationTab && !phoneFlow;
+    appReady ||= (isPWA || isDev) && isNotificationTab && !phoneFlow && (isNotEmpty(currentVolId) || isNotEmpty(volunteerId));
     const isAdmin = userInfo?.isAdmin && userInfo?.districts?.length;
 
     /*
@@ -464,7 +441,7 @@ function App() {
                 onSendTestNotificationClick={userInfo?.notificationToken ? api.sendTestNotification : undefined}
                 userInfo={userInfo}
                 setActualUserId={setActualUserId}
-                showLoading={showProgress && isNotificationTab}
+                showLoading={loading && isNotificationTab}
             />
             {readyToInstall && !isDev && <PWAInstructions />}
             {phoneFlow && <PhoneRegistration
@@ -477,8 +454,8 @@ function App() {
             />}
 
             {error && <div>{error}</div>}
-            {showProgress && !isNotificationTab && <InProgress />}
-            {showRegToMessages && <RegisterToNotification onClick={requestWebTokenInprogress ? undefined : onAllowNotification} />}
+            {loading && !isNotificationTab && <InProgress />}
+            {showRegToMessages && <RegisterToNotification onClick={loading ? undefined : onAllowNotification} />}
             {appReady &&
                 <TabView dir='rtl' renderActiveOnly={false} activeIndex={activeIndex} onTabChange={(e) => setActiveIndex(e.index)}>
                     <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
@@ -510,3 +487,31 @@ function App() {
 }
 
 export default App;
+
+
+/*
+ {isPWA && <Button onClick={() => api.sendTestNotification()} disabled={!userInfo?.notificationToken}>שלח הודעת בדיקה</Button>
+ <Button onClick={async () => {
+    const db = await getDB();
+    await db.put('notifications', {
+        id: Date.now() + "",
+        title: "תזכורת",
+        body: `תאריך הבישול: 2024-18-28
+עוד: 3 ימים
+משפחה: yyy
+עיר: xxx
+לא לשכוח לתאם עוד היום בשיחה או הודעה את שעת מסירת האוכל.
+אם אין באפשרותך לבשל יש לבטל באפליקציה, או ליצור קשר.`,
+        // data: JSON.stringify({
+        //                     buttons: [
+        //                         { label: "צפה בפרטים", action: NotificationActions.RegistrationDetails, params: ["1234"] },
+        //                         { label: "צור קשר עם עמותה", action: NotificationActions.StartConversation },
+        //                     ],
+        //                 }),
+        read: 0,
+        channel: NotificationChannels.Links,
+        timestamp: Date.now(),
+    });
+    countUnreadNotifications().then(updateUnreadCount);
+}} >Add Test DATA</Button>
+*/

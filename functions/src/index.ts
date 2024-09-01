@@ -99,17 +99,11 @@ function findUserByFingerprint(fingerprint: string): Promise<QueryDocumentSnapsh
 }
 
 function replaceAll(str: string, find: string, replace: string) {
-    const regex = new RegExp(find, 'g');
+    const regex = new RegExp(find, "g");
 
     return str.replace(regex, replace);
 }
 
-
-/**
- *
- * @param phone - expected 05... with all variations: spaces, dash
- * @returns
- */
 function findUserByPhone(phone: string): Promise<QueryDocumentSnapshot | null> {
     if (phone.startsWith("0")) {
         phone = "972" + phone.substring(1);

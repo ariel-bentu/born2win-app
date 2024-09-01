@@ -212,5 +212,8 @@ export interface FamilyDetails {
     appartment: string;
     streatNumber: string;
     district: string;
+    contactName: string;
+    relationToPatient: string;
+    phone: string;
 }
 

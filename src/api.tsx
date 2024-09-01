@@ -149,10 +149,10 @@ export async function sendTestNotification() {
     return testNotification();
 }
 
-export function updateLoginInfo(volunteerId: string | undefined, otp: string | undefined, fingerprint: string | undefined, isIOS: boolean): any {
+export function updateLoginInfo(volunteerId: string | undefined, otp: string | undefined, fingerprint: string | undefined, phone: string | undefined, isIOS: boolean): any {
     // no impersonation
     const updateLoginInfoFunc = httpsCallable(functions, 'UpdateUserLogin');
-    const uulp = { fingerprint, otp, volunteerId, isIOS } as UpdateUserLoginPayload;
+    const uulp = { fingerprint, otp, volunteerId, phone, isIOS } as UpdateUserLoginPayload;
 
     return updateLoginInfoFunc(uulp).then(res => res.data);
 }

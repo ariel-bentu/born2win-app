@@ -70,6 +70,7 @@ export interface TokenInfo {
 export interface UpdateUserLoginPayload {
     volunteerId?: string;
     fingerprint?: string;
+    phone?:string;
     otp?: string;
     isIOS: boolean;
 }
@@ -97,6 +98,7 @@ export interface UserRecord {
     firstName: string;
     lastName: string;
     phone: string;
+    manychat_id:string;
     uid?: string[];
     fingerpring?: string[];
     loginInfo?: LoginInfo[],

@@ -6,6 +6,8 @@ const homeDirectory = os.homedir();
 
 const axios = require("axios");
 const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const timezone = require("dayjs/plugin/timezone");
 
 const serviceAccountPath = path.join(homeDirectory, 'Library', 'CloudStorage', 'OneDrive-SAPSE', 'Documents', 'born2win', 'firebase', 'born2win-prod-firebase-adminsdk-dltch-7d0cd3c9f4.json');
 const manualUsersPath = path.join(homeDirectory, 'Library', 'CloudStorage', 'OneDrive-SAPSE', 'Documents', 'born2win', 'users.json');
@@ -17,6 +19,9 @@ const {
     FieldPath,
     FieldValue,
 } = require("@google-cloud/firestore");
+dayjs.extend(utc);
+dayjs.extend(timezone);
+const JERUSALEM = "Asia/Jerusalem";
 
 
 admin.initializeApp({
@@ -62,7 +67,7 @@ async function updateAllUsers() {
             },
             params: {
                 //filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${modifiedSince}')`,
-                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "אמייל", "manychat_id"],
+                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "אמייל", "manychat_id","phone_e164"],
                 offset: offset,
             }
         }).catch(e => console.log(e));
@@ -77,7 +82,7 @@ async function updateAllUsers() {
                 firstName: user.fields["שם פרטי"],
                 lastName: user.fields["שם משפחה"],
                 mahoz: user.fields["מחוז"][0],
-                phone: user.fields["טלפון"],
+                phone: user.fields.phone_e164,
                 volId: user.id,
             }
 

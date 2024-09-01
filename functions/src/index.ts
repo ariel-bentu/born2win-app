@@ -49,6 +49,8 @@ const db = getFirestore();
 const appHost = "app.born2win.org.il";
 
 const born2winApiKey = defineString("BORN2WIN_API_KEY");
+const manyChatApiKey = defineString("BORN2WIN_MANYCHAT_API_KEY");
+
 const mainBase = defineString("BORM2WIN_MAIN_BASE");
 
 const usersWebHookID = defineString("BORM2WIN_AT_WEBHOOK_USERS_ID");
@@ -90,6 +92,41 @@ function findUserByFingerprint(fingerprint: string): Promise<QueryDocumentSnapsh
         if (res.docs.length > 1) {
             // take the newest - todo
             console.log("Warnning multiple matches to fingerpring", fingerprint);
+            return res.docs[0];
+        }
+        return res.docs[0];
+    });
+}
+
+function replaceAll(str: string, find: string, replace: string) {
+    const regex = new RegExp(find, 'g');
+
+    return str.replace(regex, replace);
+}
+
+
+/**
+ *
+ * @param phone - expected 05... with all variations: spaces, dash
+ * @returns
+ */
+function findUserByPhone(phone: string): Promise<QueryDocumentSnapshot | null> {
+    if (phone.startsWith("0")) {
+        phone = "972" + phone.substring(1);
+    } else if (phone.startsWith("+972")) {
+        phone = phone.substring(1);
+    }
+    phone = replaceAll(phone, " ", "");
+    phone = replaceAll(phone, "-", "");
+
+    return db.collection(Collections.Users).where("phone", "==", phone).get().then(res => {
+        if (res.empty) {
+            // no matching users
+            return null;
+        }
+        if (res.docs.length > 1) {
+            // take the newest - todo
+            console.log("Warnning multiple matches for phone", phone);
             return res.docs[0];
         }
         return res.docs[0];
@@ -221,6 +258,46 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
 
         // Return volunteerID for Phase 2
         return doc.id;
+    } else if (uulp.phone) {
+        // Phone flow
+        doc = await findUserByPhone(uulp.phone);
+        if (!doc) {
+            throw new HttpsError("not-found", "User with given phone is not known");
+        }
+
+        if (!uulp.otp) {
+            // Phone - Phase 1 (no otp)
+            // Generate OTP:
+            const newOTP = Math.floor(1000 + Math.random() * 9000) + "";
+            await doc.ref.update({
+                // Generate 4 digits otp
+                otp: newOTP,
+                // Renew date
+                otpCreatedAt: now.format(DATE_TIME),
+            });
+
+            await sendOTPViaManychat(doc.data().manychat_id, newOTP);
+        } else {
+            // Phone - Phase 2 (with otp)
+            logger.log("phone flow", doc.data().otp, uulp.otp, Math.abs(now.diff(doc.data().otpCreatedAt, "seconds")));
+            if (doc.data().otp === uulp.otp &&
+                Math.abs(now.diff(dayjs.tz(doc.data().otpCreatedAt, JERUSALEM), "seconds")) < 300) {
+                // Update UID based on the verified phone (iOS Phase 2)
+                const update: any = {
+                    uid: FieldValue.arrayUnion(uid),
+                    otp: FieldValue.delete(),
+                    otpCreatedAt: FieldValue.delete(),
+                    loginInfo: FieldValue.arrayUnion({ uid, createdAt: now.format(DATE_TIME), isIOS: uulp.isIOS }),
+                };
+                await doc.ref.update(update);
+
+                // All set
+                return doc.id;
+            } else {
+                throw new HttpsError("invalid-argument", "Invalid or expired OTP");
+            }
+        }
+        return ""; // not yet sending volunteer Id
     } else {
         throw new HttpsError("invalid-argument", "Missing volunteerID or fingerprint");
     }
@@ -231,6 +308,22 @@ function validateOTPOrFingerprint(token: string | undefined, savedToken: string 
     if (!token || !savedToken) return false;
 
     return (token === savedToken && dayjs(createdAt).isAfter(dayjs().subtract(validForDays, "day")));
+}
+
+function sendOTPViaManychat(manySubscriberId: string, otp: string) {
+    const apiKey = manyChatApiKey.value();
+    const httpOptions = {
+        headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        },
+    };
+
+    return axios.post("https://api.manychat.com/fb/subscriber/setCustomFieldByName", {
+        subscriber_id: manySubscriberId,
+        field_name: "verificationCode",
+        field_value: otp,
+    }, httpOptions);
 }
 
 exports.UpdateNotification = onCall({ cors: true }, async (request) => {
@@ -1040,7 +1133,7 @@ async function getFamilyContactDetails(familyId: string) {
 
         const airTableMainBase = mainBase.value();
         const apiKey = born2winApiKey.value();
-             // Construct the URL
+        // Construct the URL
         const url = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("אנשי קשר")}`;
 
         // Make the request
@@ -1260,7 +1353,7 @@ async function syncBorn2WinUsers(sinceDate?: any) {
             },
             params: {
                 filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
-                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון"],
+                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "phone_e164", "manychat_id"],
                 offset: offset,
             },
         });
@@ -1284,9 +1377,10 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                 firstName: user.fields["שם פרטי"],
                 lastName: user.fields["שם משפחה"],
                 lastModified: now,
-                phone: user.fields["טלפון"],
+                phone: user.fields.phone_e164,
                 mahoz: user.fields["מחוז"][0],
                 volId: user.id,
+                manychat_id: user.fields.manychat_id,
             } as UserRecord;
 
             if (userDoc && userDoc.exists) {

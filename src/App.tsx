@@ -29,6 +29,7 @@ import { DisposeNavigationRequester, initializeNavigationRequester } from './not
 import { userInfo } from 'os';
 import { Button } from 'primereact/button';
 import { getDB } from './db';
+import PhoneRegistration from './phone-registration';
 
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
@@ -75,6 +76,14 @@ function App() {
     const [activeIndex, setActiveIndex] = useState(0);
     const [error, setError] = useState<string | undefined>();
     const [loggedOut, setLoggedOut] = useState<boolean>(false);
+
+    // Phone flow
+    const [phoneFlow, setPhoneFlow] = useState<boolean>(false);
+    const [phoneInput, setPhoneInput] = useState<string | undefined>();
+    const [verificationCodeInput, setVerificationCodeInput] = useState<string | undefined>();
+    const [phonePhase, setPhonePhase] = useState<"phone" | "code">("phone");
+
+
     const onAuth: NextOrObserver<User> = (user: User | null) => {
         console.log("OnAuth - Login callback called", user);
         setUser(user);
@@ -83,6 +92,40 @@ function App() {
     const [openDemands, setOpenDemands] = useState<Cached<FamilyDemand[]> | undefined>(undefined);
 
     const [navigationRequest, setNavigationRequest] = useState<NavigationStep | undefined>(undefined)
+
+    const showToast: ShowToast = (severity, summary, detail) => {
+        if (toast.current) {
+            toast.current.show({ severity, summary, detail });
+        }
+    };
+
+    const handlePhoneFlowSubmit = useCallback(() => {
+        setError(undefined);
+        if (phonePhase == "phone") {
+            // todo validate phone
+            setRequestWebTokenInprogress(true);
+            api.updateLoginInfo(undefined, undefined, undefined, phoneInput, true).then(() => {
+                setPhonePhase("code");
+                setVerificationCodeInput(undefined);
+                showToast("success", "בקשתך התקבלה - תיכף תתקבל באמצעות ווטסאפ הודעה עם קוד אישור - עליך להקליד אותו ", "");
+            }).catch((err: Error) => {
+                setError("תקלת הזדהות באמצעות טלפון - תקלה 6. " + err.message);
+                console.log("Failed to start phone flow", err);
+            }).finally(() => setRequestWebTokenInprogress(false));
+        } else {
+            console.log("Sending verification code", phoneInput, verificationCodeInput);
+            setRequestWebTokenInprogress(true);
+            api.updateLoginInfo(undefined, verificationCodeInput, undefined, phoneInput, true).then((retVolId: string) => {
+                setVolunteerId(retVolId);
+                localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
+                setPhoneFlow(false);
+                showToast("success", "אימות הושלם בהצלחה", "");
+            }).catch((err: Error) => {
+                setError("תקלת הזדהות באמצעות קוד האימות. " + err.message);
+                console.log("Failed to verify code in phone flow", err);
+            }).finally(() => setRequestWebTokenInprogress(false));
+        }
+    }, [phonePhase, phoneInput, verificationCodeInput]);
 
 
     useEffect(() => {
@@ -114,11 +157,6 @@ function App() {
     }, [actualUserId, openDemands]);
 
 
-    const showToast: ShowToast = (severity, summary, detail) => {
-        if (toast.current) {
-            toast.current.show({ severity, summary, detail });
-        }
-    };
 
     // hack until Apple fix the postMessage not recieved when app is openned
     // Poll every 10 seconds the local indexDB
@@ -188,7 +226,7 @@ function App() {
                         }
 
                         console.log("identify on server as ", userPairingRequest)
-                        api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, isDev ? false : isIOS).then(() => {
+                        api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, undefined, isDev ? false : isIOS).then(() => {
                             setVolunteerId(userPairingRequest);
                             if (isAndroid) {
                                 localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
@@ -207,24 +245,32 @@ function App() {
                         setReadyToInstall(true && !isDev);
                         return;
                     }
+                } else if (isDev && isNotEmpty(currentVolId)) {
+                    setVolunteerId(currentVolId);
+                    return;
                 }
-                setError("Missing otp and/or vid parameter");
+                // Assume phone flow
+                console.log("ready to install, assume phone flow")
+                if (isDev) {
+                    setPhoneFlow(true);
+                    return;
+                }
+                setReadyToInstall(true);
             } else {
                 // PDA flow
                 if (!isNotEmpty(currentVolId)) {
-                    if (!isIOS) {
-                        // NOT EXPECTED!!! Andoid should have already volunteerId stored in localStorage
-                        setError("תקלה באתחול (5) - פנה לעזרה");
-                        return;
+                    if (isIOS) {
+                        // an unpaired PWA - first time - try to load the volunteerId based on finger print
+                        api.updateLoginInfo(undefined, undefined, fingerprint, undefined, true).then((retVolId: string) => {
+                            setVolunteerId(retVolId);
+                            localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
+                        }).catch((err: Error) => {
+                            setPhoneFlow(true);
+                            console.log("Failed to fetch volunteerId based on fingerprint", err);
+                        });
+                    } else {
+                        setPhoneFlow(true);
                     }
-                    // an unpaired PWA - first time - load the volunteerId based on finger print
-                    api.updateLoginInfo(undefined, undefined, fingerprint, true).then((retVolId: string) => {
-                        setVolunteerId(retVolId);
-                        localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
-                    }).catch((err: Error) => {
-                        console.log("Failed to fetch volunteerId based on fingerprint", err);
-                        setError(" .תקלה באתחול (6) - פנה לעזרה" + err.message);
-                    });
                 } else {
                     setVolunteerId(currentVolId)
                 }
@@ -387,7 +433,7 @@ function App() {
     const isNotificationTab = activeIndex === 0;
     let appReady = (isPWA || isDev) && !error && isNotEmpty(volunteerId) && !readyToInstall;
     const showProgress = requestWebTokenInprogress || !appReady && !error && !readyToInstall;
-    appReady ||= (isPWA || isDev) && isNotificationTab
+    appReady ||= (isPWA || isDev) && isNotificationTab && !phoneFlow;
     const isAdmin = userInfo?.isAdmin && userInfo?.districts?.length;
 
     /*
@@ -421,6 +467,15 @@ function App() {
                 showLoading={showProgress && isNotificationTab}
             />
             {readyToInstall && !isDev && <PWAInstructions />}
+            {phoneFlow && <PhoneRegistration
+                phoneInput={phoneInput}
+                setPhoneInput={setPhoneInput}
+                verificationCodeInput={verificationCodeInput}
+                setVerificationCodeInput={setVerificationCodeInput}
+                onSubmit={handlePhoneFlowSubmit}
+                phase={phonePhase}
+            />}
+
             {error && <div>{error}</div>}
             {showProgress && !isNotificationTab && <InProgress />}
             {showRegToMessages && <RegisterToNotification onClick={requestWebTokenInprogress ? undefined : onAllowNotification} />}
@@ -444,7 +499,7 @@ function App() {
                         </TabPanel>}
                     {isAdmin &&
                         <TabPanel headerStyle={{ fontSize: 20 }} header="ניהול שיבוצים">
-                            
+
                             {isAdmin && <Stats showToast={showToast} userInfo={userInfo} />}
                         </TabPanel>
                     }

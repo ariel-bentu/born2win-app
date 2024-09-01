@@ -1,19 +1,50 @@
 import { Button } from "primereact/button";
 import { InputText } from "primereact/inputtext";
+import { useCallback, useState } from "react";
+import { ShowToast } from "./types";
+import { updateLoginInfo } from "./api";
+import { InProgress } from "./common-ui";
 
 interface PhoneRegistrationProps {
-    phoneInput: string | undefined;
-    setPhoneInput: (newValue: string) => void;
-    verificationCodeInput: string | undefined;
-    setVerificationCodeInput: (newValue: string) => void;
-    phase: "phone" | "code";
-    onSubmit: () => void;
+    onPhoneRegistrationComplete: (vid: string) => void;
+    showToast: ShowToast;
 }
 
-export default function PhoneRegistration({ phase, phoneInput, setPhoneInput, verificationCodeInput,
-    setVerificationCodeInput, onSubmit }: PhoneRegistrationProps) {
+export default function PhoneRegistration({ showToast, onPhoneRegistrationComplete }: PhoneRegistrationProps) {
+    const [phoneInput, setPhoneInput] = useState<string>("");
+    const [verificationCodeInput, setVerificationCodeInput] = useState<string>("");
+    const [phonePhase, setPhonePhase] = useState<"phone" | "code">("phone");
+    const [loading, setLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | undefined>();
 
-    const readyToSubmit = phase == "phone" ?
+
+    const handlePhoneFlowSubmit = useCallback(() => {
+        setError(undefined);
+        if (phonePhase == "phone") {
+            // todo validate phone
+            setLoading(true);
+            updateLoginInfo(undefined, undefined, undefined, phoneInput, true).then(() => {
+                setPhonePhase("code");
+                setVerificationCodeInput("");
+                showToast("success", "בקשתך התקבלה - תיכף תתקבל באמצעות ווטסאפ הודעה עם קוד אישור - עליך להקליד אותו ", "");
+            }).catch((err: Error) => {
+                setError("תקלת הזדהות באמצעות טלפון. (" + err.message + ")");
+                console.log("Failed to start phone flow", err);
+            }).finally(() => setLoading(false));
+        } else {
+            console.log("Sending verification code", phoneInput, verificationCodeInput);
+            setLoading(true);
+            updateLoginInfo(undefined, verificationCodeInput, undefined, phoneInput, true).then((retVolId: string) => {
+                onPhoneRegistrationComplete(retVolId);
+                showToast("success", "אימות הושלם בהצלחה", "");
+            }).catch((err: Error) => {
+                setError("תקלת הזדהות באמצעות קוד האימות. " + err.message);
+                console.log("Failed to verify code in phone flow", err);
+            }).finally(() => setLoading(false));
+        }
+    }, [phonePhase, phoneInput, verificationCodeInput]);
+
+    const readyToSubmit = phonePhase == "phone" ?
         phoneInput && phoneInput.length == 10 && phoneInput[0] == "0" :
         true;
 
@@ -33,17 +64,21 @@ export default function PhoneRegistration({ phase, phoneInput, setPhoneInput, ve
 
     return <div>
         <div dir="ltr" className="flex flex-column w-11 align-items-center ">
-            {phase == "phone" ?
+            {loading && <InProgress />}
+            {error && <div>{error}</div>}
+            {phonePhase == "phone" ?
                 <>
                     <div className="m-4 text-xl">נא להזין את מספר הטלפון הסלולרי, כולל קידומת</div>
-                    <InputText autoFocus onKeyDown={handleKeyDownOnlyDigits}  maxLength={10} className="text-center text-3xl" onChange={(e)=>setPhoneInput(e.currentTarget.value)} value={phoneInput || ""}></InputText>
+                    <InputText autoFocus onKeyDown={handleKeyDownOnlyDigits} maxLength={10}
+                        className="text-center text-3xl" onChange={(e) => setPhoneInput(e.currentTarget.value)} value={phoneInput} />
                 </> :
                 <>
                     <div className="m-2">קוד שנשלח אליך בווטסאפ</div>
-                    <InputText onKeyDown={handleKeyDownOnlyDigits} maxLength={4} className="text-center" onChange={(e) => setVerificationCodeInput(e.currentTarget.value)} value={verificationCodeInput || ""}></InputText>
+                    <InputText onKeyDown={handleKeyDownOnlyDigits} maxLength={4}
+                        className="text-center text-3xl" onChange={(e) => setVerificationCodeInput(e.currentTarget.value)} value={verificationCodeInput} />
                 </>
             }
-            <Button disabled={!readyToSubmit} className="m-3" label="שלח" onClick={onSubmit} />
+            <Button disabled={!readyToSubmit} className="m-3" label="שלח" onClick={handlePhoneFlowSubmit} />
         </div>
     </div>
 }

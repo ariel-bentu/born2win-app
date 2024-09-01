@@ -59,9 +59,29 @@ const isDev = !!urlParams.get('dev');
 const offline = !!urlParams.get('offline');
 const client = new ClientJS();
 const fingerprint = isIOS ? client.getFingerprint() + "" : "";
-const currentVolId = localStorage.getItem(VOL_ID_STORAGE_KEY);
+let currentVolId: string | null = localStorage.getItem(VOL_ID_STORAGE_KEY);
+
+/*
+Tests:
+Browser:
+https://app.born2win.org.il -> show install instructions (check on android and iPhone verify the instructions match the platform)
+            after install - phone flow
+
+https://app.born2win.org.il?id=<rec-id> -> open the dynamic registration compatible to old form
+https://app.born2win.org.il?vid=<rec-id>&otp=<someotp> -> 
+            in android: sets the LocalStorage: born2win_vol_id=<red-id>, sets loginInfo in users collection - then install instructions,
+              after install, open app and ready
+            in iOS: set fingerprint in users' collection, show instructions, after install set loginInfo and ready (restart app and it works)
+
+https://app.born2win.org.il?vid=<rec-id>&otp=<someotp>&dev=true -> 
+                sets the LocalStorage: born2win_vol_id=<red-id>, 
+                sets loginInfo in users collection - then ready
 
 
+https://app.born2win.org.il?dev=true -> show phone flow - for developers only test the phone flow,
+                 after flow, sets the LocalStorage: born2win_vol_id=<red-id>, then ready
+
+*/
 
 function App() {
     const [user, setUser] = useState<User | null>(offline ? { uid: "123" } as any : null);
@@ -78,13 +98,7 @@ function App() {
     const [activeIndex, setActiveIndex] = useState(0);
     const [error, setError] = useState<string | undefined>();
     const [loggedOut, setLoggedOut] = useState<boolean>(false);
-
-    // Phone flow
     const [phoneFlow, setPhoneFlow] = useState<boolean>(false);
-    const [phoneInput, setPhoneInput] = useState<string | undefined>();
-    const [verificationCodeInput, setVerificationCodeInput] = useState<string | undefined>();
-    const [phonePhase, setPhonePhase] = useState<"phone" | "code">("phone");
-
 
     const onAuth: NextOrObserver<User> = (user: User | null) => {
         console.log("OnAuth - Login callback called", user);
@@ -101,34 +115,6 @@ function App() {
             toast.current.show({ severity, summary, detail });
         }
     };
-
-    const handlePhoneFlowSubmit = useCallback(() => {
-        setError(undefined);
-        if (phonePhase == "phone") {
-            // todo validate phone
-            setLoading(true);
-            api.updateLoginInfo(undefined, undefined, undefined, phoneInput, true).then(() => {
-                setPhonePhase("code");
-                setVerificationCodeInput(undefined);
-                showToast("success", "בקשתך התקבלה - תיכף תתקבל באמצעות ווטסאפ הודעה עם קוד אישור - עליך להקליד אותו ", "");
-            }).catch((err: Error) => {
-                setError("תקלת הזדהות באמצעות טלפון. (" + err.message + ")");
-                console.log("Failed to start phone flow", err);
-            }).finally(() => setLoading(false));
-        } else {
-            console.log("Sending verification code", phoneInput, verificationCodeInput);
-            setLoading(true);
-            api.updateLoginInfo(undefined, verificationCodeInput, undefined, phoneInput, true).then((retVolId: string) => {
-                setVolunteerId(retVolId);
-                localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
-                setPhoneFlow(false);
-                showToast("success", "אימות הושלם בהצלחה", "");
-            }).catch((err: Error) => {
-                setError("תקלת הזדהות באמצעות קוד האימות. " + err.message);
-                console.log("Failed to verify code in phone flow", err);
-            }).finally(() => setLoading(false));
-        }
-    }, [phonePhase, phoneInput, verificationCodeInput]);
 
 
     useEffect(() => {
@@ -193,7 +179,7 @@ function App() {
     // LOGIN
     useEffect(() => {
         if (!loggedOut && init && !user) {
-            if (oldUrlParamID || isPWA || isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
+            if (oldUrlParamID || isPWA || isDev || isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
                 // Logs in annonymously and then user is set with user.uid
                 console.log("Logging in...")
                 setLoading(true);
@@ -202,7 +188,7 @@ function App() {
                     .catch((err: Error) => {
                         console.log("Login failed", err.message)
                         setError("Login failed: " + err.message);
-                    }).finally(()=>setLoading(false));
+                    }).finally(() => setLoading(false));
             } else {
                 setReadyToInstall(true);
             }
@@ -212,71 +198,87 @@ function App() {
     useEffect(() => {
         if (user && user.uid) {
             console.log("Login passed, initializing...", currentVolId);
+
+            if (oldUrlParamID) {
+                console.log("Compatibility to old UI, vid=", oldUrlParamID);
+                setVolunteerId(oldUrlParamID);
+                return;
+            }
+
+            if (isPWA && isNotEmpty(currentVolId)) {
+                // all set, user is known
+                setVolunteerId(currentVolId);
+                return;
+            }
+
             if (!isPWA) {
                 // BROWSER flow
-                if (oldUrlParamID) {
-                    setVolunteerId(oldUrlParamID);
-                    return;
-                } else if (isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
-                    if (isNotEmpty(currentVolId) && currentVolId !== userPairingRequest && !isDev) {
-                        console.log("vol ID already paired- ignored", currentVolId, "vs. requested: ", userPairingRequest);
-                        setError("תקלה באתחול (1) - פנה לעזרה.");
-                    } else if (!isNotEmpty(currentVolId) || (isDev && currentVolId !== userPairingRequest)) {
-                        if (isDev && isNotEmpty(currentVolId) && currentVolId !== userPairingRequest) {
-                            // switch user: 
-                            localStorage.removeItem(VOL_ID_STORAGE_KEY)
-                            api.logout();
-                            return;
-                        }
+                if (isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
+                    // old value in dev mode only
+                    if (isDev && isNotEmpty(currentVolId) && currentVolId !== userPairingRequest) {
+                        // Developer had localStorage for user1 and params for user2 - flow will restart
+                        localStorage.removeItem(VOL_ID_STORAGE_KEY)
+                        currentVolId = null;
+                        api.logout();
+                        return;
+                    }
 
-                        console.log("identify on server as ", userPairingRequest)
-                        api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, undefined, isDev ? false : isIOS).then(() => {
+                    if (isDev && isNotEmpty(currentVolId)) {
+                        setVolunteerId(currentVolId);
+                        return;
+                    }
+
+                    // prod-mode: initialize by link with rec-id and otp
+                    setLoading(true);
+                    api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, undefined, isIOS)
+                        .then(() => {
                             setVolunteerId(userPairingRequest);
                             if (isAndroid) {
                                 localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
                             } else if (!isDev) {
-                                // Logout from Firebase
+                                // Logout from Firebase - to cleanup
                                 setLoggedOut(true);
                                 api.logout();
-
                             }
-                            setReadyToInstall(true && !isDev);
+                            setReadyToInstall(!isDev);
                         })
-                            .catch((err: Error) => setError("תקלה באתחול (2). " + err.message));
-                        return;
-                    } else {
-                        setVolunteerId(currentVolId);
-                        setReadyToInstall(true && !isDev);
-                        return;
-                    }
-                } else if (isDev && isNotEmpty(currentVolId)) {
-                    setVolunteerId(currentVolId);
+                        .catch((err: Error) => setError("תקלה באתחול (2). " + err.message))
+                        .finally(() => setLoading(false));
+
                     return;
                 }
-                // Assume phone flow
-                console.log("ready to install, assume phone flow")
+
+                // No Parameters, 
                 if (isDev) {
+                    if (isNotEmpty(currentVolId)) {
+                        setVolunteerId(currentVolId);
+                        return;
+                    }
+
+
                     setPhoneFlow(true);
                     return;
                 }
+
                 setReadyToInstall(true);
             } else {
                 // PDA flow
-                if (!isNotEmpty(currentVolId)) {
-                    if (isIOS) {
-                        // an unpaired PWA - first time - try to load the volunteerId based on finger print
-                        api.updateLoginInfo(undefined, undefined, fingerprint, undefined, true).then((retVolId: string) => {
+                if (isIOS) {
+                    // an unpaired PWA - first time - try to load the volunteerId based on finger print
+                    setLoading(true);
+                    api.updateLoginInfo(undefined, undefined, fingerprint, undefined, true)
+                        .then((retVolId: string) => {
                             setVolunteerId(retVolId);
                             localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
-                        }).catch((err: Error) => {
+                        })
+                        .catch((err: Error) => {
                             setPhoneFlow(true);
                             console.log("Failed to fetch volunteerId based on fingerprint", err);
-                        });
-                    } else {
-                        setPhoneFlow(true);
-                    }
+                        })
+                        .finally(() => setLoading(false));
+
                 } else {
-                    setVolunteerId(currentVolId)
+                    setPhoneFlow(true);
                 }
             }
         }
@@ -407,10 +409,20 @@ function App() {
         <div style={{ display: "flex", flexDirection: "column", width: 200, padding: 10 }}>
         </div>
     </div>
+
     // allow showing notification even if not ready
     const isNotificationTab = activeIndex === 0;
-    let appReady = (isPWA || isDev) && !error && isNotEmpty(volunteerId) && !readyToInstall;
-    appReady ||= (isPWA || isDev) && isNotificationTab && !phoneFlow && (isNotEmpty(currentVolId) || isNotEmpty(volunteerId));
+    let appReady =
+        (isPWA || isDev) &&
+        !error &&
+        (
+            isNotEmpty(volunteerId) || //loged in and set
+            (isNotEmpty(currentVolId) && isNotificationTab) // inprocess of login, allow showing notification tab
+        ) &&
+        !readyToInstall &&
+        !phoneFlow;
+
+
     const isAdmin = userInfo?.isAdmin && userInfo?.districts?.length;
 
     /*
@@ -445,12 +457,12 @@ function App() {
             />
             {readyToInstall && !isDev && <PWAInstructions />}
             {phoneFlow && <PhoneRegistration
-                phoneInput={phoneInput}
-                setPhoneInput={setPhoneInput}
-                verificationCodeInput={verificationCodeInput}
-                setVerificationCodeInput={setVerificationCodeInput}
-                onSubmit={handlePhoneFlowSubmit}
-                phase={phonePhase}
+                showToast={showToast}
+                onPhoneRegistrationComplete={(vid: string) => {
+                    setVolunteerId(vid);
+                    localStorage.setItem(VOL_ID_STORAGE_KEY, vid);
+                    setPhoneFlow(false);
+                }}
             />}
 
             {error && <div>{error}</div>}

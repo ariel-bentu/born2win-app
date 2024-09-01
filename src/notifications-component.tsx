@@ -20,7 +20,7 @@ import isYesterday from 'dayjs/plugin/isYesterday';
 import OneLine from './one-line';
 import { NotificationActionHandler } from './notification-actions';
 import "./notifications.css"
-import { getNiceDateTime, limitText } from './utils';
+import { getNiceDateTime, isNotEmpty, limitText } from './utils';
 import { Divider } from 'primereact/divider';
 import { NotificationChannels, NotificationChannelsName } from './types';
 import { ScrollPanel } from 'primereact/scrollpanel';
@@ -189,9 +189,18 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                         <ScrollPanel style={{ width: '100%', height: channelsHeight }} ref={msgRef}>
                             {channelNotifications && channelNotifications.length > 0 ?
 
-                                channelNotifications?.map(notification => (
+                                channelNotifications?.map(notification => {
                                     // <OneNotification
-                                    <OneLine
+                                    const buttonStr = notification.data?.buttons;
+                                    let buttons;
+                                    if (buttonStr && buttonStr.length) {
+                                        try {
+                                            buttons = JSON.parse(buttonStr);
+                                        } catch (err) {
+                                            console.log("Button failed parse", buttonStr)
+                                        }
+                                    }
+                                    return <OneLine
                                         hideIcon={true}
                                         key={notification.id}
                                         title={notification.title}
@@ -207,13 +216,13 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                                             });
                                         }}
                                         deleteLabel="מחק"
-                                        buttons={notification.data?.buttons && JSON.parse(notification.data?.buttons)}
+                                        buttons={buttons}
                                         onLineButtonPressed={NotificationActionHandler}
                                         onRead={() => markAsRead(notification.id)}
 
 
                                     />
-                                )) :
+                                }) :
                                 <div className='no-messages'>{getNoNotificationMessage(filter)}</div>
                             }
                         </ScrollPanel>

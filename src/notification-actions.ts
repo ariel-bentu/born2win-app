@@ -8,8 +8,7 @@ export const AppTabs = {
     commitments: 2,
 }
 
-export function openWhatsApp(phone: string, text: string) {
-    console.log("send to whatsapp", phone, text)
+function normilizePhone(phone: string): string {
     if (phone.startsWith("0")) {
         phone = "+972" + phone.substring(1);
     } else {
@@ -20,8 +19,32 @@ export function openWhatsApp(phone: string, text: string) {
 
     phone = phone.replaceAll(" ", "");
     phone = phone.replaceAll("-", "");
+    return phone;
+}
+
+export function openWhatsApp(phone: string, text: string) {
+    console.log("send to whatsapp", phone, text)
+
+    phone = normilizePhone(phone);
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
+
+    openAppUrl(url);
+}
+
+
+
+export function openPhoneDialer(phone: string) {
+    phone = normilizePhone(phone);
+    openAppUrl(`tel:${phone}`);
+}
+
+function openAppUrl(url: string) {
+    const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    setTimeout(() => {
+        if (newWindow) {
+            newWindow.close();
+        }
+    }, 1000);
 }
 
 export function initializeNavigationRequester(setNavRequest: (ns: NavigationStep) => void) {

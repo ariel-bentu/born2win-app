@@ -100,9 +100,9 @@ function RegistrationComponent({ openDemands, showToast, actualUserId, openDeman
             <div className={standalone ? 'standalone-dynamic-host' : "w-full"}>
                 <div className={standalone ? 'standalone-card' : "w-full"}>
                     {selectedFamily ?
-                        <FamilyDetailsComponent family={selectedFamily} onClose={() => setSelectedFamily(null)}
+                        <FamilyDetailsComponent familyId={selectedFamily.familyId} family={selectedFamily} onClose={() => setSelectedFamily(null)}
                             showToast={showToast} demands={selectedFamilyDemand || []}
-                            reloadOpenDemands={reloadOpenDemands} /> :
+                            reloadOpenDemands={reloadOpenDemands} includeContacts={false} /> :
 
                         <>
                             <div className="city-selection">

@@ -78,8 +78,8 @@ export function ExistingRegistrationsComponent({ showToast, navigationRequest, a
             familyLastName: currentRegistration.familyLastName
         } as FamilyCompact;
         console.log("reg id", currentRegistration.id)
-        return <FamilyDetailsComponent detailsOnly={true} family={currentFamily} onClose={() => setCurrentRegistration(undefined)}
-            showToast={showToast} demands={registrations} reloadOpenDemands={() => { }} />
+        return <FamilyDetailsComponent detailsOnly={true} familyId={currentRegistration.familyRecordId} family={currentFamily} onClose={() => setCurrentRegistration(undefined)}
+            showToast={showToast} demands={registrations} reloadOpenDemands={() => { }} includeContacts={true}/>
     }
 
     if (showCancellationDialog) {

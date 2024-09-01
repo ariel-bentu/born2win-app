@@ -985,20 +985,24 @@ exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<Famil
             headers,
         });
         const rec = userRegistrations.data;
+        const contactDetails = {
+            name: "",
+            relationToPatient: "",
+            phone: "",
+        };
+        if (gfp.includeContacts) {
+            logger.info("includeContacts", gfp.includeContacts);
 
-        // if (gfp.includeContacts) {
-        //     // Get contacts from main base's אנשי קשר
-        //     const airTableMainBase = mainBase.value();
-
-        //     const userRegistrations = await axios.get(`https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("אנשי קשר")}?`,
-        //      {
-        //         ...headers,
-        //         params: {
-        //             filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
-        //             fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון"],
-        // }
-
-
+            try {
+                // Call the getFamilyContactDetails method
+                const fetchedDetails = await getFamilyContactDetails(rec.fields.familyid);
+                // Save the returned contact details as constants
+                contactDetails.name = fetchedDetails.name;
+                contactDetails.phone = fetchedDetails.phone;
+            } catch (error) {
+                logger.error("Error fetching contact details:", (error as any).message);
+            }
+        }
         return ({
             id: rec.id,
             familyId: rec.fields.familyid,
@@ -1023,11 +1027,56 @@ exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<Famil
             appartment: rec.fields["דירה"],
             streatNumber: rec.fields["מספר דירה"], // todo verify the right number
             district: mahuzRec.id,
+            contactName: contactDetails.name,
+            relationToPatient: contactDetails.relationToPatient,
+            phone: contactDetails.phone,
         }) as FamilyDetails;
     }
     throw new HttpsError("not-found", "Family not found");
 });
+async function getFamilyContactDetails(familyId: string) {
+    try {
+        logger.info("getFamilyContactDetails familyId:", familyId);
 
+        const airTableMainBase = mainBase.value();
+        const apiKey = born2winApiKey.value();
+             // Construct the URL
+        const url = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("אנשי קשר")}`;
+
+        // Make the request
+        const response = await axios.get(url, {
+            headers: {
+                "Authorization": `Bearer ${apiKey}`,
+            },
+        });
+        const records = response.data.records;
+
+        // Filter the records by familyId in either "משפחות רשומות" or "משפחות רשומות 2"
+        const filteredRecords = records.filter((record: any) =>
+            (record.fields["משפחות רשומות"] && record.fields["משפחות רשומות"].includes(familyId)) ||
+            (record.fields["משפחות רשומות 2"] && record.fields["משפחות רשומות 2"].includes(familyId))
+        );
+
+        // Check if any records were found
+        if (filteredRecords.length > 0) {
+            return {
+                name: filteredRecords[0].fields["Name"],
+                phone: filteredRecords[0].fields["טלפון"],
+                relationToPatient: filteredRecords[0].fields["סוג הקשר לחולה"],
+                error: null,
+            };
+        } else {
+            return {
+                error: "No contact details found for the given familyId",
+            };
+        }
+    } catch (error) {
+        console.error("Error fetching contact details:", error);
+        return {
+            error: (error as any).message,
+        };
+    }
+}
 /**
  * WEB HOOKS
  */

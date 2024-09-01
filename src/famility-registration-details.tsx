@@ -150,6 +150,11 @@ export function FamilyDetailsComponent({ family, onClose, detailsOnly, showToast
                 </li>
                 <li><strong>שימו לב! ימי הבישול הם:</strong> {familyDetails.cookingDays?.join(", ") || ""}</li>
 
+                <li><strong>איש קשר:</strong> {familyDetails.contactName}</li>
+                {isNotEmpty(familyDetails.relationToPatient) && (
+                    <li><strong>סוג הקשר לחולה:</strong> {familyDetails.relationToPatient}</li>
+                )}
+                <li><strong>מספר טלפון:</strong> <a href={`https://wa.me/${familyDetails.phone}?text=${encodeURIComponent("")}`} target="_blank" rel="noopener noreferrer">{familyDetails.phone}</a></li>
             </ul>}
 
         </div>

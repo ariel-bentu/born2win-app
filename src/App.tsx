@@ -374,6 +374,29 @@ function App() {
             }
         });
     }
+    // allow showing notification even if not ready
+    const isNotificationTab = activeIndex === 0;
+    let appReady =
+        (isPWA || isDev) &&
+        !error &&
+        (
+            isNotEmpty(volunteerId) || //loged in and set
+            (isNotEmpty(currentVolId) && isNotificationTab) // inprocess of login, allow showing notification tab
+        ) &&
+        !readyToInstall &&
+        !phoneFlow;
+
+
+    const isAdmin = userInfo?.isAdmin && userInfo?.districts?.length;
+
+    /*
+    header = 65
+    divider = 32
+    notificationMessage = 120 - ?
+    tab = 54
+    */
+    const showRegToMessages = appReady && userInfo && !userInfo?.notificationToken;
+    const tabContentsTop = 161 + (showRegToMessages ? 120 : 0);
 
     if (oldUrlParamID) {
         // OLD URL SUPPORT - to remove after app launch
@@ -383,6 +406,7 @@ function App() {
 
             {(isNotEmpty(volunteerId) && !error) ?
                 <RegistrationComponent
+                    topPosition={tabContentsTop}
                     standalone={true}
                     openDemands={getOpenDemands()}
                     openDemandsTS={openDemands?.fetchedTS.toISOString() || ""} showToast={showToast} actualUserId={oldUrlParamID}
@@ -410,29 +434,7 @@ function App() {
         </div>
     </div>
 
-    // allow showing notification even if not ready
-    const isNotificationTab = activeIndex === 0;
-    let appReady =
-        (isPWA || isDev) &&
-        !error &&
-        (
-            isNotEmpty(volunteerId) || //loged in and set
-            (isNotEmpty(currentVolId) && isNotificationTab) // inprocess of login, allow showing notification tab
-        ) &&
-        !readyToInstall &&
-        !phoneFlow;
 
-
-    const isAdmin = userInfo?.isAdmin && userInfo?.districts?.length;
-
-    /*
-    header = 65
-    divider = 32
-    notificationMessage = 120 - ?
-    tab = 54
-    */
-    const showRegToMessages = appReady && userInfo && !userInfo?.notificationToken;
-    const tabContentsTop = 161 + (showRegToMessages ? 120 : 0);
     console.log("render App")
     return (
         <div className="App">
@@ -474,7 +476,9 @@ function App() {
                         <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} topPosition={tabContentsTop} />
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="שיבוצים">
-                        {activeIndex == 1 && <RegistrationComponent openDemands={getOpenDemands()} openDemandsTS={openDemands?.fetchedTS.toISOString() || ""} showToast={showToast} actualUserId={actualUserId}
+                        {activeIndex == 1 && <RegistrationComponent openDemands={getOpenDemands()} openDemandsTS={openDemands?.fetchedTS.toISOString() || ""}
+                            showToast={showToast} actualUserId={actualUserId}
+                            topPosition={tabContentsTop}
                             reloadOpenDemands={() => {
                                 getOpenDemands(true);
                             }} />}

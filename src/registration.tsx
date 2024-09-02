@@ -14,6 +14,7 @@ import { InProgress } from './common-ui';
 import { City, FamilyCompact, FamilyDemand, ShowToast } from './types';
 import OneLine from './one-line';
 import { getUniqueFamilies } from './utils';
+import { ScrollPanel } from 'primereact/scrollpanel';
 
 
 interface RegistrationComponentProps {
@@ -23,9 +24,11 @@ interface RegistrationComponentProps {
     openDemandsTS: string;
     reloadOpenDemands: () => void;
     standalone?: boolean;
+    topPosition: number;
 }
 
-function RegistrationComponent({ openDemands, showToast, actualUserId, openDemandsTS, reloadOpenDemands, standalone }: RegistrationComponentProps) {
+function RegistrationComponent({ openDemands, showToast, actualUserId, openDemandsTS,
+    reloadOpenDemands, standalone, topPosition }: RegistrationComponentProps) {
     const [cities, setCities] = useState<City[]>([]);
     const [selectedCities, setSelectedCities] = useState<City[]>([]);
     const [familyDemands, setFamilyDemands] = useState<FamilyDemand[] | null>(null);
@@ -98,24 +101,26 @@ function RegistrationComponent({ openDemands, showToast, actualUserId, openDeman
 
             </div>}
             <div className={standalone ? 'standalone-dynamic-host' : "w-full"}>
-                <div className={standalone ? 'standalone-card' : "w-full"}>
+                <ScrollPanel style={{ width: "100%", height: window.innerHeight - topPosition }}
+                    pt={{
+                        wrapper: { className: "registration-scroller-wrapper" },
+                        content: { className: "registration-scroller-content " + (standalone ? "standalone-card" : "") }  // Pass class to the content
+                    }}
+
+                >
                     {selectedFamily ?
                         <FamilyDetailsComponent familyId={selectedFamily.familyId} family={selectedFamily} onClose={() => setSelectedFamily(null)}
                             showToast={showToast} demands={selectedFamilyDemand || []}
                             reloadOpenDemands={reloadOpenDemands} includeContacts={false} /> :
-
                         <>
-                            <div className="city-selection">
-                                <MultiSelect
-                                    value={selectedCities}
-                                    options={cities.map(city => ({ label: city.name, value: city }))}
-                                    onChange={(e) => setSelectedCities(e.value)}
-                                    placeholder="סינון לפי עיר"
-                                    className="w-full md:w-20rem"
-                                    display="chip"
-                                />
-                            </div>
-
+                            <MultiSelect
+                                value={selectedCities}
+                                options={cities.map(city => ({ label: city.name, value: city }))}
+                                onChange={(e) => setSelectedCities(e.value)}
+                                placeholder="סינון לפי עיר"
+                                className="w-11 m-2"// md:w-20rem"
+                                display="chip"
+                            />
                             {
                                 filteredFamilies.map((family, i) => (<OneLine
                                     key={i}
@@ -131,7 +136,8 @@ function RegistrationComponent({ openDemands, showToast, actualUserId, openDeman
                             }
                         </>
                     }
-                </div>
+                </ScrollPanel>
+
             </div>
 
             {standalone && <img src={footerImg} style={{ maxWidth: "100%" }} />}

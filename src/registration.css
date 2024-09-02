@@ -3,12 +3,21 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 100%;
 }
 
-.city-selection {
+.registration-scroller-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     width: 100%;
-    max-width: 800px;
-    margin-bottom: 2rem;
+}
+
+.registration-scroller-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: calc(100% - 18px);
 }
 
 .family-list {
@@ -22,8 +31,8 @@
 .available-day {
     background-color: #1A92A2;
     color: white;
-    display:flex;
-    align-items:center;
+    display: flex;
+    align-items: center;
     justify-content: center;
     width: 100%;
     height: 100%;
@@ -75,7 +84,7 @@
 .watermarked-no-dates td,
 .watermarked-no-dates th {
     position: relative;
-    z-index: 2; 
+    z-index: 2;
 }
 
 .standalone-title {

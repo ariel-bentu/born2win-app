@@ -66,7 +66,6 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
     spare 5
     */
     const channelsHeight = window.innerHeight - (143 + topPosition);
-    console.log("channelsHeight", channelsHeight, window.innerHeight)
     useEffect(() => {
         readAllNotifications().then(allNotifications => {
             allNotifications.sort((n1, n2) => n2.timestamp - n1.timestamp);

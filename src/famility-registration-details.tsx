@@ -4,13 +4,15 @@ import "./registration.css";
 
 
 import { getFamilyDetails, updateFamilityDemand } from "./api";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
 import { InProgress } from "./common-ui";
 import { FamilyCompact, FamilyDemand, FamilyDetails, ShowToast } from "./types";
 import { isNotEmpty } from "./utils";
 import { openPhoneDialer, openWhatsApp } from "./notification-actions";
+import { ScrollPanel } from "primereact/scrollpanel";
+import { ProgressSpinner } from "primereact/progressspinner";
 
 interface FamilyDetailsComponentProps {
     demands: FamilyDemand[];
@@ -38,7 +40,8 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
     const [reload, setReload] = useState<number>(0);
     const [saving, setSaving] = useState<boolean>(false);
 
-    const [viewVisibleMonth, setViewVisibleMonth] = useState<CalendarMonthChangeEvent | null>(null);
+    const [viewVisibleMonth, setViewVisibleMonth] = useState<CalendarMonthChangeEvent>({ year: dayjs().year(), month: dayjs().month() });
+    const divRef = useRef<HTMLUListElement>(null);
 
     const handleMonthChange = (e: CalendarMonthChangeEvent) => {
         console.log("Month changed", e)
@@ -64,6 +67,13 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
         );
     };
 
+
+    const handleScrollToDetails = () => {
+        if (divRef.current) {
+            divRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+
     const dateTemplate = (event: CalendarDateTemplateEvent) => {
         if (isDateAvailable(event)) {
             return (
@@ -79,21 +89,27 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
 
     const isAvailableDatesVisible = demands.some(av => {
         const availableDate = dayjs(av.date);
-        return availableDate.year() === viewVisibleMonth?.year && availableDate.month() == viewVisibleMonth?.month;
+        return availableDate.year() === viewVisibleMonth.year && availableDate.month() == viewVisibleMonth.month;
     });
 
     return (
-        <div className="surface-card shadow-2 p-3 border-round relative" style={{ minHeight: 250 }}>
-            <Button unstyled icon="pi pi-times" onClick={onClose} className="icon-btn-l" style={{ position: "absolute", left: 10, top: 0 }} />
+        <div  className="flex flex-column relative justify-content-center shadow-2 p-3" style={{ maxWidth: 700 }}>
+            <Button unstyled icon="pi pi-times" onClick={onClose} className="icon-btn-l" style={{ position: "absolute", right: 0, top: 0 }} />
             {!detailsOnly && <>
                 <div className="flex flex-column justify-content-center align-items-center " >
                     <div className="tm-5 pb-1 underline text-lg" style={{ maxWidth: "80%" }}>{family.familyLastName}</div>
-                    <div className=" ">{family.city}</div>
+                    <div className="flex flex-row w-full justify-content-between rm-2">
+                        <div><span className="m-2">עיר:</span><span>{family.city}</span></div>
+                        <div className="flex flex-row align-items-center">
+                            {loading && <ProgressSpinner style={{ height: 20, width: 20 }} />}
+                            <a href="#" onClick={loading?undefined:handleScrollToDetails}>פרטי משפחה</a>
+                        </div>
+                    </div>
 
                     <h3>לבחירת תאריך:</h3>
                     {demands.length == 0 && <div>אין תאריכים זמינים</div>}
                     <Calendar
-                        style={{ width: '400px' }}
+                        //style={{ width: '400px' }}
                         onMonthChange={handleMonthChange}
                         className={!isAvailableDatesVisible ? 'watermarked-no-dates' : ''}
                         value={selectedDate}
@@ -137,7 +153,7 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
             {error && <div>תקלה בקריאת פרטי משפחה</div>}
             {loading && <div className="mt-5"><InProgress /></div>}
             {familyDetails &&
-                <ul className="pl-4 list-disc text-right w-full">
+                <ul ref={divRef} className="pl-4 list-disc text-right w-full">
                     <div className="tm-5 pb-1 underline text-lg">שם: {familyDetails.familyLastName}</div>
                     <li>המשפחה בת <strong> {familyDetails.adultsCount}</strong> נפשות</li>
                     <li><strong>הרכב בני המשפחה:</strong> {familyDetails.familyStructure}</li>

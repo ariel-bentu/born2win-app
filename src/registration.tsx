@@ -11,7 +11,7 @@ import "./registration.css";
 import { FamilyDetailsComponent } from './famility-registration-details';
 
 import { InProgress } from './common-ui';
-import { City, FamilyCompact, FamilyDemand, ShowToast, UserInfo } from './types';
+import { AppServices, City, FamilyCompact, FamilyDemand, ShowToast, UserInfo } from './types';
 import OneLine from './one-line';
 import { getUniqueFamilies } from './utils';
 import { ScrollPanel } from 'primereact/scrollpanel';
@@ -21,14 +21,14 @@ interface RegistrationComponentProps {
     userInfo: UserInfo | null;
     openDemands: Promise<FamilyDemand[]>;
     actualUserId: string
-    showToast: ShowToast;
+    appServices: AppServices;
     openDemandsTS: string;
     reloadOpenDemands: () => void;
     standalone?: boolean;
     topPosition: number;
 }
 
-function RegistrationComponent({ openDemands, showToast, actualUserId, openDemandsTS,
+function RegistrationComponent({ openDemands, appServices, actualUserId, openDemandsTS,
     reloadOpenDemands, standalone, topPosition, userInfo }: RegistrationComponentProps) {
     const [cities, setCities] = useState<City[]>([]);
     const [selectedCities, setSelectedCities] = useState<City[]>([]);
@@ -94,8 +94,8 @@ function RegistrationComponent({ openDemands, showToast, actualUserId, openDeman
             {standalone && !selectedFamily && <img src={bunnerImg} alt="Registration Banner" style={{ maxWidth: "100%" }} />}
             {standalone && !selectedFamily && <div>
                 <div className='standalone-title bm-4'>נולדת לנצח - מחוז {userInfo && userInfo.districts && userInfo.districts.length && userInfo.districts[0].name}</div>
-                <div className='m-2'>{}
-                <div className='m-2'>{userInfo && (userInfo.firstName + " " + userInfo.lastName)}</div>
+                <div className='m-2'>{ }
+                    <div className='m-2'>{userInfo && (userInfo.firstName + " " + userInfo.lastName)}</div>
                     היי אנחנו מודים לך על הבחירה לחבק חולים ולהכניס להם נצנצים הביתה.
                     <br />
                     יש לבחור מטה את הערים שבהן תרצו לחבק משפחה. לאחר מכן בחרו משפחה כדי לראות באלו ימים ניתן למסור לה את הארוחות
@@ -111,8 +111,11 @@ function RegistrationComponent({ openDemands, showToast, actualUserId, openDeman
 
                 >
                     {selectedFamily ?
-                        <FamilyDetailsComponent familyId={selectedFamily.familyId} family={selectedFamily} onClose={() => setSelectedFamily(null)}
-                            showToast={showToast} demands={selectedFamilyDemand || []}
+                        <FamilyDetailsComponent familyId={selectedFamily.familyId} family={selectedFamily} onClose={() => {
+                            setSelectedFamily(null);
+                            appServices.popNavigationStep();
+                        }}
+                            appServices={appServices} demands={selectedFamilyDemand || []}
                             reloadOpenDemands={reloadOpenDemands} includeContacts={false} /> :
                         <>
                             <MultiSelect
@@ -132,6 +135,7 @@ function RegistrationComponent({ openDemands, showToast, actualUserId, openDeman
                                     onRead={() => {
                                         console.log("family click", family.familyLastName)
                                         setSelectedFamily(family)
+                                        appServices.pushNavigationStep("registration-family", () => setSelectedFamily(null))
                                     }}
                                     hideIcon={true}
                                 />))

@@ -22,7 +22,7 @@ import { NotificationActionHandler } from './notification-actions';
 import "./notifications.css"
 import { getNiceDateTime, isNotEmpty, limitText } from './utils';
 import { Divider } from 'primereact/divider';
-import { NotificationChannels, NotificationChannelsName } from './types';
+import { AppServices, NotificationChannels, NotificationChannelsName } from './types';
 import { ScrollPanel } from 'primereact/scrollpanel';
 
 dayjs.extend(isToday);
@@ -33,6 +33,7 @@ interface NotificationsComponentProps {
     updateUnreadCount: (count: number) => void;
     reload: number;
     topPosition: number;
+    appServices: AppServices;
 }
 const Filters = {
     ALL: 1,
@@ -48,7 +49,7 @@ interface Channel {
     notifications: NotificationRecord[];
 }
 
-const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateUnreadCount, reload, topPosition }) => {
+const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateUnreadCount, reload, topPosition, appServices }) => {
     const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
     const [channels, setChannels] = useState<Channel[]>([]);
     const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
@@ -172,18 +173,22 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                         <ChannelComponent key={i} index={i} channel={channel}
                             onClick={() => {
                                 setCurrentChannel(channel);
-                                // if (msgRef.current) {
-                                //     const scrollableElement = msgRef.current.getContent();
-                                //     scrollableElement.scrollTop = 100;
-                                // }
-                                // msgRef.current?.getElement().scrollTo(0, 50);//scrollPanelRef.current.content.scrollHeight;
+                                console.log("pushNavigationStep - channel", channel.name)
+                                appServices.pushNavigationStep("channel", () => {
+                                    setCurrentChannel(null);
+                                })
                             }}
                         />
                     ))
                 ) : (
                     // Full channel view
                     <div className='relative'>
-                        <ChannelHeader name={currentChannel.name} onBack={() => setCurrentChannel(null)} />
+                        <ChannelHeader name={currentChannel.name} onBack={() => {
+                            setCurrentChannel(null);
+                            console.log("popNavigationStep")
+                            appServices.popNavigationStep();
+                        }
+                        } />
                         <Divider />
                         <ScrollPanel style={{ width: '100%', height: channelsHeight }} ref={msgRef}>
                             {channelNotifications && channelNotifications.length > 0 ?
@@ -196,7 +201,7 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                                         try {
                                             buttons = JSON.parse(buttonStr);
                                         } catch (err) {
-                                            console.log("Button failed parse", buttonStr)
+                                            // console.log("Button failed parse", buttonStr)
                                         }
                                     }
                                     return <OneLine
@@ -218,8 +223,6 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                                         buttons={buttons}
                                         onLineButtonPressed={NotificationActionHandler}
                                         onRead={() => markAsRead(notification.id)}
-
-
                                     />
                                 }) :
                                 <div className='no-messages'>{getNoNotificationMessage(filter)}</div>

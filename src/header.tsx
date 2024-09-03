@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Sidebar } from "primereact/sidebar";
 import { Button } from "primereact/button";
-import { onClickEvent, ShowToast, UserInfo } from "./types";
+import { AppServices, onClickEvent, UserInfo } from "./types";
 import { MenuItem } from "primereact/menuitem";
 import { PanelMenu } from "primereact/panelmenu";
 import "./header.css";
@@ -23,12 +23,12 @@ interface HeaderProps {
     onLogout: () => void;
     actualUserId: string;
     setActualUserId: (newUserId: string) => void;
-    showToast: ShowToast;
+    appServices: AppServices;
     showLoading: boolean;
 }
 
 function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onSendTestNotificationClick, onSyncNotifications,
-    onLogout, userInfo, setActualUserId, volunteerId, showToast, showLoading, actualUserId }: HeaderProps) {
+    onLogout, userInfo, setActualUserId, volunteerId, appServices, showLoading, actualUserId }: HeaderProps) {
     const [sidebarVisible, setSidebarVisible] = useState(false);
     const [showTechInfo, setShowTechInfo] = useState<boolean>(false);
     const toggleText = () => {
@@ -136,7 +136,7 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
                     <h2 className="settings-title">הגדרות</h2>
                     <PanelMenu model={items} className="settings-menu" />
                     {userInfo?.isAdmin && <div dir="rtl" className="m-2 text-lg font-semibold">פעל בשם:</div>}
-                    <Impersonate isImpersonated={actualUserId != userInfo?.id} showToast={showToast} userInfo={userInfo} onChange={(userId, name) => {
+                    <Impersonate isImpersonated={actualUserId != userInfo?.id} appServices={appServices} userInfo={userInfo} onChange={(userId, name) => {
                         if (userId && name) {
                             impersonate(userId, name);
                             setActualUserId(userId);

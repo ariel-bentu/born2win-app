@@ -3,7 +3,7 @@ import { Chart } from 'primereact/chart';
 import { Calendar } from 'primereact/calendar';
 import { MultiSelect } from 'primereact/multiselect';
 import dayjs from 'dayjs';
-import { ShowToast, StatsData, UserInfo } from './types';
+import { AppServices, StatsData, UserInfo } from './types';
 import { getDemandStats } from './api';
 
 import { InProgress } from './common-ui';
@@ -28,7 +28,7 @@ const Modes = {
 
 interface StatsProps {
     userInfo: UserInfo,
-    showToast: ShowToast;
+    appServices: AppServices;
 
 }
 const empty = {
@@ -46,7 +46,7 @@ function simplifyFamilyName(name: string): string {
     return name;
 }
 
-export function Stats({ userInfo, showToast }: StatsProps) {
+export function Stats({ userInfo, appServices }: StatsProps) {
     const [loading, setLoading] = useState<boolean>(false);
     const [data, setData] = useState<StatsData>(empty);
     const [dateRange, setDateRange] = useState<[Date, Date | null] | null>(null);
@@ -136,7 +136,7 @@ export function Stats({ userInfo, showToast }: StatsProps) {
         message += `ניתן להשתבץ בלינק ב🤖
 מסתבכים? אני פה כדי לעזור`;
         navigator.clipboard.writeText(message)
-        showToast("success", "הודעה הוכנה והועתקה - הדבקו היכן שתרצו", "");
+        appServices.showMessage("success", "הודעה הוכנה והועתקה - הדבקו היכן שתרצו", "");
     }
 
     const handleDistrictChange = (e: any) => {

@@ -1,16 +1,17 @@
 import { Button } from "primereact/button";
 import { InputText } from "primereact/inputtext";
 import { useCallback, useState } from "react";
-import { ShowToast } from "./types";
+import { AppServices } from "./types";
 import { updateLoginInfo } from "./api";
 import { InProgress } from "./common-ui";
+import { isIOS } from "./App";
 
 interface PhoneRegistrationProps {
     onPhoneRegistrationComplete: (vid: string) => void;
-    showToast: ShowToast;
+    appServices: AppServices;
 }
 
-export default function PhoneRegistration({ showToast, onPhoneRegistrationComplete }: PhoneRegistrationProps) {
+export default function PhoneRegistration({ appServices, onPhoneRegistrationComplete }: PhoneRegistrationProps) {
     const [phoneInput, setPhoneInput] = useState<string>("");
     const [verificationCodeInput, setVerificationCodeInput] = useState<string>("");
     const [phonePhase, setPhonePhase] = useState<"phone" | "code">("phone");
@@ -23,10 +24,10 @@ export default function PhoneRegistration({ showToast, onPhoneRegistrationComple
         if (phonePhase == "phone") {
             // todo validate phone
             setLoading(true);
-            updateLoginInfo(undefined, undefined, undefined, phoneInput, true).then(() => {
+            updateLoginInfo(undefined, undefined, undefined, phoneInput, isIOS).then(() => {
                 setPhonePhase("code");
                 setVerificationCodeInput("");
-                showToast("success", "בקשתך התקבלה - תיכף תתקבל באמצעות ווטסאפ הודעה עם קוד אישור - עליך להקליד אותו ", "");
+                appServices.showMessage("success", "בקשתך התקבלה - תיכף תתקבל באמצעות ווטסאפ הודעה עם קוד אישור - עליך להקליד אותו ", "");
             }).catch((err: Error) => {
                 setError("תקלת הזדהות באמצעות טלפון. (" + err.message + ")");
                 console.log("Failed to start phone flow", err);
@@ -34,9 +35,9 @@ export default function PhoneRegistration({ showToast, onPhoneRegistrationComple
         } else {
             console.log("Sending verification code", phoneInput, verificationCodeInput);
             setLoading(true);
-            updateLoginInfo(undefined, verificationCodeInput, undefined, phoneInput, true).then((retVolId: string) => {
+            updateLoginInfo(undefined, verificationCodeInput, undefined, phoneInput, isIOS).then((retVolId: string) => {
                 onPhoneRegistrationComplete(retVolId);
-                showToast("success", "אימות הושלם בהצלחה", "");
+                appServices.showMessage("success", "אימות הושלם בהצלחה", "");
             }).catch((err: Error) => {
                 setError("תקלת הזדהות באמצעות קוד האימות. " + err.message);
                 console.log("Failed to verify code in phone flow", err);

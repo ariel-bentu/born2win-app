@@ -1,7 +1,7 @@
 import { AutoComplete, AutoCompleteCompleteEvent } from "primereact/autocomplete";
 import { useState } from "react";
 import { isNotEmpty } from "./utils";
-import { ShowToast, UserInfo } from "./types";
+import { AppServices, ShowToast, UserInfo } from "./types";
 import { Button } from "primereact/button";
 import { generateInstallationLinkForUser, handleSearchUsers } from "./api";
 import { InProgress } from "./common-ui";
@@ -10,11 +10,11 @@ import { openWhatsApp } from "./notification-actions";
 interface ImpersonateProps {
     userInfo: UserInfo | null;
     onChange: (userId: string | undefined, name?: string) => void;
-    showToast: ShowToast;
+    appServices: AppServices;
     isImpersonated: boolean;
 }
 
-export default function Impersonate({ userInfo, onChange, showToast, isImpersonated }: ImpersonateProps) {
+export default function Impersonate({ userInfo, onChange, appServices, isImpersonated }: ImpersonateProps) {
     const [selectedUser, setSelectedUser] = useState<any | undefined>();
     const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -47,7 +47,7 @@ export default function Impersonate({ userInfo, onChange, showToast, isImpersona
             <Button disabled={!selectedUser || !selectedUser.id} label="שלח לינק להתקנה" onClick={async () => {
                 setLoading(true);
                 const link = await generateInstallationLinkForUser(selectedUser.id)
-                    .catch(err => showToast("error", "יצירת לינק נכשלה", err.message))
+                    .catch(err => appServices.showMessage("error", "יצירת לינק נכשלה", err.message))
                     .finally(() => setLoading(false));
                 if (link) {
                     setInstallLink(link);

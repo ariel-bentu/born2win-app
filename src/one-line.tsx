@@ -56,8 +56,10 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
         <div className="flex flex-row m-2 w-11" >
             <div className="surface-card shadow-2 p-3 border-round-xl w-12" onClick={onRead} >
                 <div className="flex justify-content-between mb-3 relative" >
-                    <div className="flex flex-column w-12 align-right">
-                        <div className={`text-right  text-xl font-xlarge mb-3 ${unread ? 'font-bold' : ''}`}>{title}</div>
+                    <div className="flex flex-column w-12">
+                        <div className={`text-right  text-xl font-xlarge mb-3 ${unread ? 'font-bold' : ''}`}>
+                            {title}
+                        </div>
                         <div className="w-12 text-900 font-medium text-lg">
                             {body.split('\n').map(renderMessagePart)}
                         </div>
@@ -65,7 +67,7 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
                     {unread && <div className='red-dot' />}
                     {!hideIcon && <div className="flex relative align-items-center justify-content-center bg-purple-100 border-round" style={{ width: '2.5rem', height: '2.5rem' }}>
                         <i className="pi pi-comment text-purple-500 text-xl"></i>
-                        
+
                     </div>}
                 </div>
 

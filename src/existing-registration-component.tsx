@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import { getUserRegistrations } from './api';
 import { SelectButton } from 'primereact/selectbutton';
-import { FamilyCompact, FamilyDemand, NavigationStep, ShowToast } from './types';
+import { AppServices, FamilyCompact, FamilyDemand, NavigationStep, ShowToast } from './types';
 
 import { InProgress } from './common-ui';
 import OneLine from './one-line';
@@ -19,12 +19,12 @@ const Filters = {
     ]
 }
 interface ExistingRegistrationsComponentProps {
-    showToast: ShowToast;
+    appServices: AppServices;
     navigationRequest?: NavigationStep,
     actualUserId: string
 }
 
-export function ExistingRegistrationsComponent({ showToast, navigationRequest, actualUserId }: ExistingRegistrationsComponentProps) {
+export function ExistingRegistrationsComponent({ appServices, navigationRequest, actualUserId }: ExistingRegistrationsComponentProps) {
     const [registrations, setRegistrations] = useState<FamilyDemand[] | undefined>();
     const [filter, setFilter] = useState(Filters.FUTURE);
     const [error, setError] = useState<any>(undefined);
@@ -46,6 +46,7 @@ export function ExistingRegistrationsComponent({ showToast, navigationRequest, a
             if (setCurrentRegistrationByNavigationRequest) {
                 const navTo = regs.find(reg => reg.id);
                 setCurrentRegistration(navTo);
+                appServices.pushNavigationStep("registration", ()=>setCurrentRegistration(undefined));
             }
         })
             .catch(err => setError(err))
@@ -78,8 +79,11 @@ export function ExistingRegistrationsComponent({ showToast, navigationRequest, a
             familyLastName: currentRegistration.familyLastName
         } as FamilyCompact;
         console.log("reg id", currentRegistration.id)
-        return <FamilyDetailsComponent detailsOnly={true} familyId={currentRegistration.familyRecordId} family={currentFamily} onClose={() => setCurrentRegistration(undefined)}
-            showToast={showToast} demands={registrations} reloadOpenDemands={() => { }} includeContacts={true}/>
+        return <FamilyDetailsComponent detailsOnly={true} familyId={currentRegistration.familyRecordId} family={currentFamily} onClose={() => {
+            setCurrentRegistration(undefined)
+            appServices.popNavigationStep();
+        }}
+            appServices={appServices} demands={registrations} reloadOpenDemands={() => { }} includeContacts={true}/>
     }
 
     if (showCancellationDialog) {
@@ -87,11 +91,12 @@ export function ExistingRegistrationsComponent({ showToast, navigationRequest, a
             onClose={() => setShowCancellationDialog(null)}
             onCancellationPerformed={() => {
                 setShowCancellationDialog(null);
-                showToast("success", "ביטול נקלט", "");
+                appServices.showMessage("success", "ביטול נקלט", "");
                 setCurrentRegistration(undefined);
+                appServices.popNavigationStep();
                 setReload(prev => prev + 1);
             }}
-            onError={(err) => showToast("error", "ביטול רישום נכשל", err.message)}
+            onError={(err) => appServices.showMessage("error", "ביטול רישום נכשל", err.message)}
             registration={showCancellationDialog}
         />;
     }
@@ -126,10 +131,14 @@ export function ExistingRegistrationsComponent({ showToast, navigationRequest, a
                                 unread={isInFuture(reg.date)}
                                 onRead={() => {
                                     setCurrentRegistration(reg);
+                                    appServices.pushNavigationStep("family-details-existing-reg", ()=>setCurrentRegistration(undefined));
                                 }}
                                 onDelete={dayjs(reg.date).isBefore(dayjs()) ?
                                     undefined : // only allow deleting future commitments
-                                    () => setShowCancellationDialog(reg)}
+                                    () => {
+                                        setShowCancellationDialog(reg)
+                                        appServices.pushNavigationStep("cancel-reg", ()=>setCurrentRegistration(undefined));
+                                    }}
                                 deleteLabel={"ביטול שיבוץ"}
                             />
                         )) :

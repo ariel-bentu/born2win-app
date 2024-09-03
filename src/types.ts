@@ -70,13 +70,13 @@ export interface TokenInfo {
 export interface UpdateUserLoginPayload {
     volunteerId?: string;
     fingerprint?: string;
-    phone?:string;
+    phone?: string;
     otp?: string;
     isIOS: boolean;
 }
 
 export interface UserInfo {
-    id:string;
+    id: string;
     notificationToken: TokenInfo | undefined,
     firstName: string,
     lastName: string,
@@ -98,7 +98,7 @@ export interface UserRecord {
     firstName: string;
     lastName: string;
     phone: string;
-    manychat_id:string;
+    manychat_id: string;
     uid?: string[];
     fingerpring?: string[];
     loginInfo?: LoginInfo[],
@@ -182,6 +182,19 @@ export interface SendNotificationStats {
 }
 
 export type ShowToast = (severity: "error" | "success" | "info" | "warn" | "secondary" | "contrast" | undefined, summary: string, detail: string) => void;
+
+export interface NavigationState {
+    label: string;
+    backCallback: (label: string) => void;
+}
+
+export type AppServices = {
+    showMessage: ShowToast;
+    pushNavigationStep: (label: string, backCallback: (label: string) => void) => void;
+    popNavigationStep: () => void;
+}
+
+
 
 export interface FamilyCompact {
     familyId: string;

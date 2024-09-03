@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
 import { InProgress } from "./common-ui";
-import { FamilyCompact, FamilyDemand, FamilyDetails, ShowToast } from "./types";
+import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails, ShowToast } from "./types";
 import { isNotEmpty } from "./utils";
 import { openPhoneDialer, openWhatsApp } from "./notification-actions";
 import { ScrollPanel } from "primereact/scrollpanel";
@@ -19,7 +19,7 @@ interface FamilyDetailsComponentProps {
     family: FamilyCompact;
     familyId: string; // added to avoid refresh when family object is recreated for the same family
     detailsOnly?: boolean;
-    showToast: ShowToast;
+    appServices: AppServices;
     onClose: () => void;
     reloadOpenDemands: () => void;
     includeContacts: boolean;
@@ -32,7 +32,7 @@ function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
         d.getFullYear() === event.year;
 }
 
-export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly, showToast, demands, reloadOpenDemands, includeContacts }: FamilyDetailsComponentProps) {
+export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts }: FamilyDetailsComponentProps) {
     const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
     const [selectedDate, setSelectedDate] = useState<Nullable<Date>>(null);
     const [error, setError] = useState<any>(undefined);
@@ -145,10 +145,10 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
                             if (availabilityRecord && familyDetails) {
                                 setSaving(true);
                                 updateFamilityDemand(availabilityRecord.id, familyDetails.familyId, familyDetails.cityId, true).then(() => {
-                                    showToast("success", "שיבוץ נקלט בהצלחה", "");
+                                    appServices.showMessage("success", "שיבוץ נקלט בהצלחה", "");
                                     reloadOpenDemands();
                                     setReload(prev => prev + 1);
-                                }).catch((err) => showToast("error", "תקלה ברישום (1) - ", err.message))
+                                }).catch((err) => appServices.showMessage("error", "תקלה ברישום (1) - ", err.message))
                                     .finally(() => setSaving(false));
                             }
                         }} className="mt-3 w-full" />

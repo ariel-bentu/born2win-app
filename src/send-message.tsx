@@ -4,19 +4,18 @@ import { InputTextarea } from 'primereact/inputtextarea';
 import { Dropdown } from 'primereact/dropdown';
 import { Button } from 'primereact/button';
 import { MultiSelect } from 'primereact/multiselect';
-import { Recipient, ShowToast, UserInfo } from './types';
+import { AppServices, Recipient, UserInfo } from './types';
 import { handleSearchUsers, searchUsers, sendMessage } from './api';
 import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete';
 import { getByDisplayValue } from '@testing-library/react';
-import { Toast } from 'primereact/toast';
 import { InProgress } from './common-ui';
 
 interface SendMessageProps {
     userInfo: UserInfo,
-    showToast: ShowToast,
+    appServices: AppServices,
 }
 
-export const SendMessage: React.FC<SendMessageProps> = ({ userInfo, showToast }) => {
+export const SendMessage: React.FC<SendMessageProps> = ({ userInfo, appServices }) => {
     const [title, setTitle] = useState<string>('');
     const [body, setBody] = useState<string>('');
     const [recipients, setRecipients] = useState<Recipient[] | undefined>();
@@ -27,8 +26,8 @@ export const SendMessage: React.FC<SendMessageProps> = ({ userInfo, showToast })
 
     const handleSend = useCallback(() => {
         setInProgress(true)
-        sendMessage(selectedDistricts, recipients, title, body || "").then(() => showToast("success", "נשלח", ""))
-            .catch((err) => showToast("error", "שליחה נכשלה", err.message))
+        sendMessage(selectedDistricts, recipients, title, body || "").then(() => appServices.showMessage("success", "נשלח", ""))
+            .catch((err) => appServices.showMessage("error", "שליחה נכשלה", err.message))
             .finally(() => setInProgress(false));
     }, [title, body, recipients]);
 

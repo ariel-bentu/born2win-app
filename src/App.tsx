@@ -9,7 +9,7 @@ import 'primeflex/primeflex.css';
 import './App.css';
 import * as api from './api';
 import { NextOrObserver, User } from 'firebase/auth';
-import { Cached, FamilyDemand, NavigationStep, NotificationActions, NotificationChannels, ShowToast, UserInfo } from './types';
+import { AppServices, Cached, FamilyDemand, NavigationState, NavigationStep, NotificationActions, NotificationChannels, ShowToast, UserInfo } from './types';
 import { ClientJS } from 'clientjs';
 import NotificationsComponent from './notifications-component';
 import { countUnreadNotifications } from './notifications';
@@ -57,7 +57,7 @@ const offline = !!urlParams.get('offline');
 const client = new ClientJS();
 const fingerprint = isIOS ? client.getFingerprint() + "" : "";
 let currentVolId: string | null = localStorage.getItem(VOL_ID_STORAGE_KEY);
-
+let exiting = false;
 /*
 Tests:
 Browser:
@@ -96,6 +96,7 @@ function App() {
     const [error, setError] = useState<string | undefined>();
     const [loggedOut, setLoggedOut] = useState<boolean>(false);
     const [phoneFlow, setPhoneFlow] = useState<boolean>(false);
+    const [navState, setNavState] = useState<NavigationState[]>([]);
 
     const onAuth: NextOrObserver<User> = (user: User | null) => {
         console.log("OnAuth - Login callback called", user);
@@ -107,12 +108,29 @@ function App() {
 
     const [navigationRequest, setNavigationRequest] = useState<NavigationStep | undefined>(undefined)
 
-    const showToast: ShowToast = (severity, summary, detail) => {
-        if (toast.current) {
-            toast.current.show({ severity, summary, detail });
-        }
-    };
 
+    const appServices: AppServices = {
+        showMessage: (severity, summary, detail) => {
+            if (toast.current) {
+                toast.current.show({ severity, summary, detail });
+            }
+        },
+        pushNavigationStep: (label, backCallback) => {
+            console.log("pushNavigationStep", label)
+            setNavState(prev => ([{ label, backCallback }, ...prev]))
+            //window.history.pushState({ label }, "");
+        },
+        popNavigationStep: () => {
+            setNavState(prev => {
+                if (prev.length) {
+                    console.log("popNavigationStep", prev[0].label);
+                    return prev.slice(1);
+                }
+                console.log("One too many popNavigationStep")
+                return prev;
+            });
+        },
+    }
 
     useEffect(() => {
         initializeNavigationRequester(setNavigationRequest);
@@ -302,7 +320,7 @@ function App() {
     useEffect(() => {
         const onPostMessage = (payload: any) => {
             console.log("Recieved Message", payload)
-            showToast("info", "הודעה חדשה התקבלה", "");
+            appServices.showMessage("info", "הודעה חדשה התקבלה", "");
             if (payload.data?.type == "newMessage") {
                 console.log("New Notification arrived");
                 setTimeout(() => setReloadNotifications(prev => prev + 1), 2000);
@@ -318,12 +336,44 @@ function App() {
             }
         };
 
+        const onPopState = (e: PopStateEvent) => {
+            console.log("pop state", e.state);
+            e.preventDefault();
+
+
+            setNavState(existing => {
+                if (existing.length) {
+                    existing[0].backCallback(existing[0].label);
+                    window.history.pushState({ root: (e.state?.root || 0) + 1 }, "");
+                    return existing.slice(1);
+                } else {
+                    if (!exiting) {
+                        confirmPopup({
+                            message: "האם לצאת מהאפליקציה?",
+                            icon: 'pi pi-exclamation-triangle',
+                            accept: () => {
+                                exiting = true;
+                                window.history.back();
+                                window.history.back();
+                            }
+                        });
+                    }
+                }
+                return [];
+            })
+        }
+
         navigator.serviceWorker?.addEventListener("message", onPostMessage);
         document.addEventListener('visibilitychange', onVisibilityChange);
+
+        window.history.pushState({ root: 1 }, "");
+        window.addEventListener('popstate', onPopState);
+
 
         return () => {
             navigator.serviceWorker.removeEventListener('message', onPostMessage);
             document.removeEventListener('visibilitychange', onVisibilityChange);
+            window.removeEventListener('popstate', onPopState);
         };
 
     }, []);
@@ -344,7 +394,7 @@ function App() {
         api.requestWebPushToken().then(token => {
             if (token) {
                 return api.updateUserNotification(true, token, isSafari).then(() => {
-                    showToast('success', 'נשמר בהצלחה', 'הודעות אושרו בהצלחה');
+                    appServices.showMessage('success', 'נשמר בהצלחה', 'הודעות אושרו בהצלחה');
                     setNotificationPermission("granted");
                     if (user && isNotEmpty(volunteerId)) {
                         api.getUserInfo().then(uInfo => setUserInfo(uInfo));
@@ -352,7 +402,7 @@ function App() {
                 });
             }
         })
-            .catch((err) => showToast('error', 'תקלה ברישום להודעות', err.message))
+            .catch((err) => appServices.showMessage('error', 'תקלה ברישום להודעות', err.message))
             .finally(() => setLoading(false));
     }
 
@@ -407,7 +457,7 @@ function App() {
                     topPosition={tabContentsTop}
                     standalone={true}
                     openDemands={getOpenDemands()}
-                    openDemandsTS={openDemands?.fetchedTS.toISOString() || ""} showToast={showToast} actualUserId={oldUrlParamID}
+                    openDemandsTS={openDemands?.fetchedTS.toISOString() || ""} appServices={appServices} actualUserId={oldUrlParamID}
                     reloadOpenDemands={() => {
                         getOpenDemands(true);
                     }} /> :
@@ -433,7 +483,6 @@ function App() {
     </div>
 
 
-    console.log("render App")
     return (
         <div className="App">
             <ConfirmPopup />
@@ -441,7 +490,7 @@ function App() {
             <Header
                 userName={userInfo ? userInfo.firstName : ""}
                 actualUserId={actualUserId}
-                showToast={showToast}
+                appServices={appServices}
                 volunteerId={volunteerId || ""}
                 logoSrc={header}
                 onLogout={handleLogout}
@@ -457,7 +506,7 @@ function App() {
             />
             {readyToInstall && !isDev && <PWAInstructions />}
             {phoneFlow && <PhoneRegistration
-                showToast={showToast}
+                appServices={appServices}
                 onPhoneRegistrationComplete={(vid: string) => {
                     setVolunteerId(vid);
                     localStorage.setItem(VOL_ID_STORAGE_KEY, vid);
@@ -471,29 +520,29 @@ function App() {
             {appReady &&
                 <TabView dir='rtl' renderActiveOnly={false} activeIndex={activeIndex} onTabChange={(e) => setActiveIndex(e.index)}>
                     <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
-                        <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} topPosition={tabContentsTop} />
+                        <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} topPosition={tabContentsTop} appServices={appServices} />
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="שיבוצים">
-                        {activeIndex == 1 && <RegistrationComponent 
+                        {activeIndex == 1 && <RegistrationComponent
                             userInfo={userInfo}
                             openDemands={getOpenDemands()} openDemandsTS={openDemands?.fetchedTS.toISOString() || ""}
-                            showToast={showToast} actualUserId={actualUserId}
+                            appServices={appServices} actualUserId={actualUserId}
                             topPosition={tabContentsTop}
                             reloadOpenDemands={() => {
                                 getOpenDemands(true);
                             }} />}
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="פרטי התנדבות">
-                        {activeIndex == 2 && <ExistingRegistrationsComponent showToast={showToast} navigationRequest={navigationRequest} actualUserId={actualUserId} />}
+                        {activeIndex == 2 && <ExistingRegistrationsComponent appServices={appServices} navigationRequest={navigationRequest} actualUserId={actualUserId} />}
                     </TabPanel>
                     {isAdmin &&
                         <TabPanel headerStyle={{ fontSize: 20 }} header="שליחה">
-                            {isAdmin && <SendMessage userInfo={userInfo} showToast={showToast} />}
+                            {isAdmin && <SendMessage userInfo={userInfo} appServices={appServices} />}
                         </TabPanel>}
                     {isAdmin &&
                         <TabPanel headerStyle={{ fontSize: 20 }} header="ניהול שיבוצים">
 
-                            {isAdmin && <Stats showToast={showToast} userInfo={userInfo} />}
+                            {isAdmin && <Stats appServices={appServices} userInfo={userInfo} />}
                         </TabPanel>
                     }
                 </TabView>}

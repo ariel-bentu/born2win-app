@@ -26,9 +26,6 @@ import { SendMessage } from './send-message';
 import { confirmPopup, ConfirmPopup } from 'primereact/confirmpopup';
 import { isNotEmpty } from './utils';
 import { DisposeNavigationRequester, initializeNavigationRequester } from './notification-actions';
-import { userInfo } from 'os';
-import { Button } from 'primereact/button';
-import { getDB } from './db';
 import PhoneRegistration from './phone-registration';
 
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
@@ -197,13 +194,13 @@ function App() {
 
     useEffect(() => {
         if (user && user.uid) {
-            console.log("Login passed, initializing...", currentVolId);
 
             if (oldUrlParamID) {
                 console.log("Compatibility to old UI, vid=", oldUrlParamID);
                 setVolunteerId(oldUrlParamID);
                 return;
             }
+            console.log("Login passed, initializing...", currentVolId);
 
             if (isPWA && isNotEmpty(currentVolId)) {
                 // all set, user is known
@@ -285,7 +282,7 @@ function App() {
     }, [user]);
 
     useEffect(() => {
-        if (!oldUrlParamID && (!offline && (isPWA || isDev) && user && isNotEmpty(volunteerId))) {
+        if (!offline && (isPWA || isDev || oldUrlParamID) && user && isNotEmpty(volunteerId)) {
             console.log("Loading UserInfo ");
             api.getUserInfo().then((uInfo) => {
                 console.log("UserInfo set to", uInfo.firstName);
@@ -406,6 +403,7 @@ function App() {
 
             {(isNotEmpty(volunteerId) && !error) ?
                 <RegistrationComponent
+                    userInfo={userInfo}
                     topPosition={tabContentsTop}
                     standalone={true}
                     openDemands={getOpenDemands()}
@@ -476,7 +474,9 @@ function App() {
                         <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} topPosition={tabContentsTop} />
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="שיבוצים">
-                        {activeIndex == 1 && <RegistrationComponent openDemands={getOpenDemands()} openDemandsTS={openDemands?.fetchedTS.toISOString() || ""}
+                        {activeIndex == 1 && <RegistrationComponent 
+                            userInfo={userInfo}
+                            openDemands={getOpenDemands()} openDemandsTS={openDemands?.fetchedTS.toISOString() || ""}
                             showToast={showToast} actualUserId={actualUserId}
                             topPosition={tabContentsTop}
                             reloadOpenDemands={() => {

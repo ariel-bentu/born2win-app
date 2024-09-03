@@ -11,13 +11,14 @@ import "./registration.css";
 import { FamilyDetailsComponent } from './famility-registration-details';
 
 import { InProgress } from './common-ui';
-import { City, FamilyCompact, FamilyDemand, ShowToast } from './types';
+import { City, FamilyCompact, FamilyDemand, ShowToast, UserInfo } from './types';
 import OneLine from './one-line';
 import { getUniqueFamilies } from './utils';
 import { ScrollPanel } from 'primereact/scrollpanel';
 
 
 interface RegistrationComponentProps {
+    userInfo: UserInfo | null;
     openDemands: Promise<FamilyDemand[]>;
     actualUserId: string
     showToast: ShowToast;
@@ -28,7 +29,7 @@ interface RegistrationComponentProps {
 }
 
 function RegistrationComponent({ openDemands, showToast, actualUserId, openDemandsTS,
-    reloadOpenDemands, standalone, topPosition }: RegistrationComponentProps) {
+    reloadOpenDemands, standalone, topPosition, userInfo }: RegistrationComponentProps) {
     const [cities, setCities] = useState<City[]>([]);
     const [selectedCities, setSelectedCities] = useState<City[]>([]);
     const [familyDemands, setFamilyDemands] = useState<FamilyDemand[] | null>(null);
@@ -92,8 +93,9 @@ function RegistrationComponent({ openDemands, showToast, actualUserId, openDeman
             </div>
             {standalone && !selectedFamily && <img src={bunnerImg} alt="Registration Banner" style={{ maxWidth: "100%" }} />}
             {standalone && !selectedFamily && <div>
-                <div className='standalone-title bm-4'>נולדת לנצח - מחוז יהודה ושומרון</div>
-                <div className='m-2'>
+                <div className='standalone-title bm-4'>נולדת לנצח - מחוז {userInfo && userInfo.districts && userInfo.districts.length && userInfo.districts[0].name}</div>
+                <div className='m-2'>{}
+                <div className='m-2'>{userInfo && (userInfo.firstName + " " + userInfo.lastName)}</div>
                     היי אנחנו מודים לך על הבחירה לחבק חולים ולהכניס להם נצנצים הביתה.
                     <br />
                     יש לבחור מטה את הערים שבהן תרצו לחבק משפחה. לאחר מכן בחרו משפחה כדי לראות באלו ימים ניתן למסור לה את הארוחות

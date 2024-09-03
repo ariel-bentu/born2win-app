@@ -373,10 +373,10 @@ async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
             notificationOn: data.notificationOn,
         } as UserInfo;
 
+        const allDistricts = await getDestricts();
         return db.collection(Collections.Admins).doc(doc.id).get().then(async (adminDoc) => {
             if (adminDoc.exists) {
                 response.isAdmin = true;
-                const allDistricts = await getDestricts();
                 if (adminDoc.data()?.districts.length > 0 && adminDoc.data()?.districts[0] === "all") {
                     response.districts = allDistricts.map(d => ({ id: d.id, name: d.name }));
                 } else {
@@ -386,10 +386,18 @@ async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
                         if (district) {
                             response.districts?.push({
                                 id: did,
-                                name: district.id,
+                                name: district.name,
                             });
                         }
                     });
+                }
+            } else {
+                const district = allDistricts.find(d => d.id == doc.data().mahoz);
+                if (district) {
+                    response.districts = [{
+                        id: district.id,
+                        name: district.name,
+                    }];
                 }
             }
             return response;

@@ -1336,10 +1336,10 @@ async function syncBorn2WinUsers(sinceDate?: any) {
     let countActive = 0;
     const airTableMainBase = mainBase.value();
     const apiKey = born2winApiKey.value();
-    let notifyForNewUsers = true;
+    // let notifyForNewUsers = true;
     if (!sinceDate) {
         sinceDate = dayjs().subtract(25, "hour");
-        notifyForNewUsers = false;
+        // notifyForNewUsers = false;
     }
     const now = dayjs().format("YYYY-MM-DD HH:mm:ss[z]");
     const newLinksToAdmin = [] as {
@@ -1454,7 +1454,8 @@ exports.GetDemandStats = onCall({ cors: true }, async (request): Promise<StatsDa
         const gdsp = request.data as GetDemandStatPayload;
         const totalDemandsMap: { [key: string]: number } = {};
         const fulfilledDemandsMap: { [key: string]: number } = {};
-        const openDemands = [] as FamilyDemand[];
+        const openFamilyDemands = [] as FamilyDemand[];
+        const fulfilledFamilyDemands = [] as FamilyDemand[];
 
         const startDate = dayjs(gdsp.from).startOf("day");
         const endDate = dayjs(gdsp.to).endOf("day");
@@ -1495,8 +1496,9 @@ exports.GetDemandStats = onCall({ cors: true }, async (request): Promise<StatsDa
 
                             if (record.fields["זמינות שיבוץ"] === "תפוס" && record.fields.volunteer_id) {
                                 fulfilledDemandsMap[weekLabel] += 1;
+                                fulfilledFamilyDemands.push(demandAirtable2FamilyDemand(record, district.id));
                             } else if (record.fields["זמינות שיבוץ"] === "זמין") {
-                                openDemands.push(demandAirtable2FamilyDemand(record, district.id));
+                                openFamilyDemands.push(demandAirtable2FamilyDemand(record, district.id));
                             }
                         });
                     } while (offset);
@@ -1511,8 +1513,9 @@ exports.GetDemandStats = onCall({ cors: true }, async (request): Promise<StatsDa
             totalDemands,
             fulfilledDemands,
             labels,
-            openDemands,
+            openFamilyDemands,
+            fulfilledFamilyDemands,
         };
     }
-    return { totalDemands: [0], fulfilledDemands: [0], labels: [""], openDemands: [] };
+    return { totalDemands: [0], fulfilledDemands: [0], labels: [""], openFamilyDemands: [], fulfilledFamilyDemands: [] };
 });

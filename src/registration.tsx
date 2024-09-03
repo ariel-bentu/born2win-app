@@ -80,7 +80,7 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
     );
 
     if (familyDemands.length == 0) return (
-        <div>לא נמצאו נתונים...</div>
+        <div>לא נותרו משפחות לשיבוץ לתקופה הקרובה - אם מישהו יבטל תקבלו הודעה </div>
     )
 
     const selectedFamilyDemand = selectedFamily ? familyDemands.filter(fd => fd.familyRecordId === selectedFamily.familyId) : undefined;

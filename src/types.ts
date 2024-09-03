@@ -133,7 +133,8 @@ export interface StatsData {
     totalDemands: number[];
     fulfilledDemands: number[];
     labels: string[];
-    openDemands: FamilyDemand[];
+    openFamilyDemands: FamilyDemand[];
+    fulfilledFamilyDemands: FamilyDemand[];
 }
 
 export interface GetDemandStatPayload {

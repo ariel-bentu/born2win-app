@@ -15,14 +15,17 @@ import { setSelectionRange } from '@testing-library/user-event/dist/utils';
 
 interface DemandChartProps {
     data: StatsData;
+    isShowOpen?: boolean;
 }
 
 const Modes = {
-    Details: 1,
-    Chart: 2,
+    Open: 1,
+    Fulfilled: 2,
+    Chart: 3,
     array: [
         { name: 'חסרים', value: 1 },
-        { name: 'גרפים', value: 2 },
+        { name: 'משובצים', value: 2 },
+        { name: 'גרף', value: 3 },
     ]
 }
 
@@ -35,8 +38,9 @@ const empty = {
     totalDemands: [],
     fulfilledDemands: [],
     labels: [],
-    openDemands: [],
-}
+    openFamilyDemands: [],
+    fulfilledFamilyDemands: [],
+} as StatsData;
 
 function simplifyFamilyName(name: string): string {
     const match = name.match(/משפחת\s(.+?)\s-/);
@@ -53,7 +57,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
     const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
     const calendar = useRef<Calendar>(null);
-    const [mode, setMode] = useState(Modes.Details);
+    const [mode, setMode] = useState(Modes.Open);
 
     useEffect(() => {
         if (userInfo?.isAdmin && dateRange && selectedDistricts.length > 0) {
@@ -88,7 +92,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
         const groupedByCityAndFamily: any = {};
 
         // Group families by city and family name
-        data.openDemands.forEach((family) => {
+        data.openFamilyDemands.forEach((family) => {
             const city = family.city;
             const familyName = simplifyFamilyName(family.familyLastName);
 
@@ -187,22 +191,24 @@ export function Stats({ userInfo, appServices }: StatsProps) {
                         </div>
                     )}
                 />
-                {mode == Modes.Details && <Button disabled={data.openDemands.length == 0} className="btn-on-the-right" label="הכן הודעה" onClick={handlePrepareMessageToSend} />}
+                {mode == Modes.Open && <Button disabled={data.openFamilyDemands.length == 0} className="btn-on-the-right" label="הכן הודעה" onClick={handlePrepareMessageToSend} />}
             </div>
 
             {error && <small style={{ color: 'red' }}>{error}</small>}
 
-            {mode == Modes.Details ?
-                <DemandList data={data} /> :
+            {mode == Modes.Open || Modes.Fulfilled ?
+                <DemandList data={data} isShowOpen={mode == Modes.Open} /> :
                 <DemandChart data={data} />
             }
         </div>
     );
 }
 
-export const DemandList: React.FC<DemandChartProps> = ({ data }) => {
+export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen }) => {
+    const demands = (isShowOpen ? data.openFamilyDemands : data.fulfilledFamilyDemands);
+
     return <div>
-        {data.openDemands.map((family, i) => (<OneLine
+        {demands.map((family, i) => (<OneLine
             key={i}
             title={family.familyLastName}
             body={`עיר: ${family.city}`}

@@ -226,7 +226,8 @@ export function getUserRegistrations(): Promise<FamilyDemand[]> {
 
 
 export async function getDemandStats(dateRange: [Date | null, Date | null], districts: string[]): Promise<StatsData> {
-    if (!dateRange[0] || !dateRange[1]) return { totalDemands: [0], fulfilledDemands: [0], labels: [""], openDemands: [] }
+    if (!dateRange[0] || !dateRange[1]) return { totalDemands: [0], fulfilledDemands: [0], labels: [""], 
+        openFamilyDemands: [], fulfilledFamilyDemands: [] }
 
     // No impersonation
     const getDemandStatsFunc = httpsCallable(functions, 'GetDemandStats');

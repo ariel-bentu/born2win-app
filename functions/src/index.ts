@@ -1152,9 +1152,11 @@ async function getFamilyContactDetails(familyId: string) {
 
         // Filter the records by familyId in either "משפחות רשומות" or "משפחות רשומות 2"
         const filteredRecords = records.filter((record: any) =>
-            (record.fields["משפחות רשומות"] && record.fields["משפחות רשומות"].includes(familyId)) ||
-            (record.fields["משפחות רשומות 2"] && record.fields["משפחות רשומות 2"].includes(familyId))
+            ((record.fields["משפחות רשומות"] && record.fields["משפחות רשומות"].includes(familyId)) ||
+            (record.fields["משפחות רשומות 2"] && record.fields["משפחות רשומות 2"].includes(familyId))) &&
+            record.fields["תפקיד"].includes("איש קשר לוגיסטי")
         );
+
 
         // Check if any records were found
         if (filteredRecords.length > 0) {

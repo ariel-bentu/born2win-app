@@ -789,9 +789,13 @@ async function authenticate(request: CallableRequest<any>): Promise<QueryDocumen
 
 
     const doc = await findUserByUID(uid);
-    if (!doc || !doc.data().active) {
+    if (!doc) {
         throw new HttpsError("unauthenticated", "unauthorized user");
     }
+    if (!doc.data().active) {
+        throw new HttpsError("unauthenticated", "Inactive user");
+    }
+    
     if (request.data && impersonateUser) {
         const adminDoc = await db.collection(Collections.Admins).doc(doc.id).get();
         if (!adminDoc.exists) {

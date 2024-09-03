@@ -196,7 +196,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
 
             {error && <small style={{ color: 'red' }}>{error}</small>}
 
-            {mode == Modes.Open || Modes.Fulfilled ?
+            {mode == Modes.Open || mode == Modes.Fulfilled ?
                 <DemandList data={data} isShowOpen={mode == Modes.Open} /> :
                 <DemandChart data={data} />
             }
@@ -208,6 +208,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen }) => 
     const demands = (isShowOpen ? data.openFamilyDemands : data.fulfilledFamilyDemands);
 
     return <div>
+        <strong>{isShowOpen? 'סה״כ חסרים:': 'סה״כ משובצים:'}</strong><span className='m-2'>{demands.length}</span>
         {demands.map((family, i) => (<OneLine
             key={i}
             title={family.familyLastName}

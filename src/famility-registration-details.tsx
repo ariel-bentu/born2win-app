@@ -74,6 +74,10 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
         }
     };
 
+    const getAddress = (fd: FamilyDetails) => {
+        return fd.street + " " + fd.streatNumber + ", " + " דירה " + fd.appartment + " קומה " + fd.floor + ", " + fd.city;
+    }
+
     const dateTemplate = (event: CalendarDateTemplateEvent) => {
         if (isDateAvailable(event)) {
             return (
@@ -93,7 +97,7 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
     });
 
     return (
-        <div  className="flex flex-column relative justify-content-center shadow-2 p-3" style={{ maxWidth: 700 }}>
+        <div className="flex flex-column relative justify-content-center shadow-2 p-3" style={{ maxWidth: 700 }}>
             <Button unstyled icon="pi pi-times" onClick={onClose} className="icon-btn-l" style={{ position: "absolute", right: 0, top: 0 }} />
             {!detailsOnly && <>
                 <div className="flex flex-column justify-content-center align-items-center " >
@@ -102,7 +106,7 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
                         <div><span className="m-2">עיר:</span><span>{family.city}</span></div>
                         <div className="flex flex-row align-items-center">
                             {loading && <ProgressSpinner style={{ height: 20, width: 20 }} />}
-                            <a href="#" onClick={loading?undefined:handleScrollToDetails}>פרטי משפחה</a>
+                            <a href="#" onClick={loading ? undefined : handleScrollToDetails}>פרטי משפחה</a>
                         </div>
                     </div>
 
@@ -170,6 +174,7 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
                     </li>
                     <li><strong>שימו לב! ימי הבישול הם:</strong> {familyDetails.cookingDays?.join(", ") || ""}</li>
                     {includeContacts && <>
+                        <li><strong>כתובת:</strong>{getAddress(familyDetails)}</li>
                         <li><strong>איש קשר:</strong> {familyDetails.contactName}</li>
                         {isNotEmpty(familyDetails.relationToPatient) && (
                             <li><strong>סוג הקשר לחולה:</strong> {familyDetails.relationToPatient}</li>

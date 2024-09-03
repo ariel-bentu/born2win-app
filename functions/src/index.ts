@@ -795,7 +795,7 @@ async function authenticate(request: CallableRequest<any>): Promise<QueryDocumen
     if (!doc.data().active) {
         throw new HttpsError("unauthenticated", "Inactive user");
     }
-    
+
     if (request.data && impersonateUser) {
         const adminDoc = await db.collection(Collections.Admins).doc(doc.id).get();
         if (!adminDoc.exists) {
@@ -1007,15 +1007,15 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
         };
 
         await axios.post(urlMainBase, newRegistrationRec, httpOptions).then(async (response) => {
-            // send notification to admins
-            const admins = await db.collection(Collections.Admins).get();
-            const adminsIds = admins.docs.map(doc => doc.id);
+            // send notification to admins - disabled for now
+//             const admins = await db.collection(Collections.Admins).get();
+//             const adminsIds = admins.docs.map(doc => doc.id);
 
-            await addNotificationToQueue("שיבוץ חדש", `תאריך: ${demandDate}
-משפחה: ${updatedRecord.fields.Name}
-מתנדב: ${doc.data().firstName + " " + doc.data().lastName}
-עיר: ${updatedRecord.fields["עיר"]}
-`, NotificationChannels.Registrations, [], adminsIds);
+//             await addNotificationToQueue("שיבוץ חדש", `תאריך: ${demandDate}
+// משפחה: ${updatedRecord.fields.Name}
+// מתנדב: ${doc.data().firstName + " " + doc.data().lastName}
+// עיר: ${updatedRecord.fields["עיר"]}
+// `, NotificationChannels.Registrations, [], adminsIds);
 
             logger.info("New registration added", response.data);
         });
@@ -1427,15 +1427,16 @@ async function syncBorn2WinUsers(sinceDate?: any) {
 
     return batch.commit().then(async () => {
         logger.info("Sync Users: obsered modified:", count, "observed Active", countActive, "registrationLinks", newLinksToAdmin, "duplicates:", duplicates);
-        if (notifyForNewUsers && newLinksToAdmin.length > 0) {
-            const admins = await db.collection(Collections.Admins).get();
-            const adminsIds = admins.docs.map(doc => doc.id);
+        // no need for now
+//         if (notifyForNewUsers && newLinksToAdmin.length > 0) {
+//             const admins = await db.collection(Collections.Admins).get();
+//             const adminsIds = admins.docs.map(doc => doc.id);
 
-            await Promise.all(newLinksToAdmin.map(link => addNotificationToQueue("לינק למשתמש", `שם: ${link.name}
-טלפון: ${link.phone}
-לינק לשליחה למשתמש: ${link.link}
-`, NotificationChannels.Links, [], adminsIds)));
-        }
+//             await Promise.all(newLinksToAdmin.map(link => addNotificationToQueue("לינק למשתמש", `שם: ${link.name}
+// טלפון: ${link.phone}
+// לינק לשליחה למשתמש: ${link.link}
+// `, NotificationChannels.Links, [], adminsIds)));
+//         }
         return;
     });
 }

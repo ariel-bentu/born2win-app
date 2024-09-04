@@ -175,10 +175,11 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
                     <li><strong>שימו לב! ימי הבישול הם:</strong> {familyDetails.cookingDays?.join(", ") || ""}</li>
                     {includeContacts && <>
                         <li><strong>כתובת:</strong>{getAddress(familyDetails)}</li>
-                        <li><strong>איש קשר:</strong> {familyDetails.contactName}</li>
+                        {isNotEmpty(familyDetails.contactName) && <li><strong>איש קשר:</strong> {familyDetails.contactName}</li>}
                         {isNotEmpty(familyDetails.relationToPatient) && (
                             <li><strong>סוג הקשר לחולה:</strong> {familyDetails.relationToPatient}</li>
                         )}
+                        {isNotEmpty(familyDetails.phone) && (
                         <li className="flex flex-row align-items-center">
                             <strong className="ml-2">מספר טלפון:</strong>{familyDetails.phone}
                             <Button
@@ -194,6 +195,7 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
                                 aria-label="Phone"
                             />
                         </li>
+                        )}
                     </>}
                 </ul>}
         </div>

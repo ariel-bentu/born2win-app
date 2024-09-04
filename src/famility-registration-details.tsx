@@ -178,9 +178,6 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
                         {isNotEmpty(familyDetails.contactName) && (
                             <li><strong>איש קשר:</strong> {familyDetails.contactName}</li>
                         )}
-                        {isNotEmpty(familyDetails.relationToPatient) && (
-                            <li><strong>סוג הקשר לחולה:</strong> {familyDetails.relationToPatient}</li>
-                        )}
                         {isNotEmpty(familyDetails.phone) && (
                         <li className="flex flex-row align-items-center">
                             <strong className="ml-2">מספר טלפון:</strong>{familyDetails.phone}

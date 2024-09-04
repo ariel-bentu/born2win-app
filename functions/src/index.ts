@@ -1086,7 +1086,6 @@ exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<Famil
         const rec = userRegistrations.data;
         const contactDetails = {
             name: "",
-            relationToPatient: "",
             phone: "",
         };
         if (gfp.includeContacts) {
@@ -1094,6 +1093,8 @@ exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<Famil
 
             try {
                 // Call the getFamilyContactDetails method
+                logger.info("getFamilyContactDetails gfp.familyId:", gfp.familyId);
+                logger.info("getFamilyContactDetails rec.fields.familyid:", rec.fields.familyid);
                 const fetchedDetails = await getFamilyContactDetails(rec.fields.familyid);
                 // Save the returned contact details as constants
                 contactDetails.name = fetchedDetails.name;
@@ -1127,7 +1128,6 @@ exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<Famil
             streatNumber: rec.fields["מספר דירה"], // todo verify the right number
             district: mahuzRec.id,
             contactName: contactDetails.name,
-            relationToPatient: contactDetails.relationToPatient,
             phone: contactDetails.phone,
         }) as FamilyDetails;
     }
@@ -1139,8 +1139,9 @@ async function getFamilyContactDetails(familyId: string) {
 
         const airTableMainBase = mainBase.value();
         const apiKey = born2winApiKey.value();
+
         // Construct the URL
-        const url = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("אנשי קשר")}`;
+        const url = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("משפחות רשומות")}/${familyId}`;
 
         // Make the request
         const response = await axios.get(url, {
@@ -1148,23 +1149,14 @@ async function getFamilyContactDetails(familyId: string) {
                 "Authorization": `Bearer ${apiKey}`,
             },
         });
-        const records = response.data.records;
+        // Check if the response has the fields you need
+        if (response.data && response.data.fields) {
+            const name = response.data.fields["שם איש קשר לוגיסטי"] ? response.data.fields["שם איש קשר לוגיסטי"][0] : "";
+            const phone = response.data.fields["טלפון איש קשר לוגיסטי"] ? response.data.fields["טלפון איש קשר לוגיסטי"][0] : "";
 
-        // Filter the records by familyId in either "משפחות רשומות" or "משפחות רשומות 2"
-        const filteredRecords = records.filter((record: any) =>
-            ((record.fields["משפחות רשומות"] && record.fields["משפחות רשומות"].includes(familyId)) ||
-            (record.fields["משפחות רשומות 2"] && record.fields["משפחות רשומות 2"].includes(familyId))) &&
-            record.fields["תפקיד"].includes("איש קשר לוגיסטי")
-        );
-
-
-        // Check if any records were found
-        if (filteredRecords.length > 0) {
             return {
-                name: filteredRecords[0].fields["Name"],
-                phone: filteredRecords[0].fields["טלפון"],
-                relationToPatient: filteredRecords[0].fields["סוג הקשר לחולה"],
-                error: null,
+                name,
+                phone,
             };
         } else {
             return {
@@ -1172,12 +1164,13 @@ async function getFamilyContactDetails(familyId: string) {
             };
         }
     } catch (error) {
-        console.error("Error fetching contact details:", error);
+        logger.error("Error fetching contact details:", error);
         return {
             error: (error as any).message,
         };
     }
 }
+
 /**
  * WEB HOOKS
  */

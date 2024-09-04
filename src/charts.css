@@ -1,0 +1,33 @@
+
+
+.family-demand-details {
+    direction: rtl;
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+    width: 100%;
+}
+
+.city-chip {
+    width: 90%;
+    text-align: start;
+    padding: 10px;
+    font-weight: bold;
+    background-color: gainsboro;
+
+}
+
+.family-chip {
+    display: flex;
+    flex-direction: row;
+    width: 90%;
+    text-align: start;
+    padding: 5px;
+    background-color: white;
+}
+
+.family-chip > label {
+    width: 85px;
+    margin-right: 10px;
+    margin-left: 15px;
+}

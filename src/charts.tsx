@@ -3,7 +3,7 @@ import { Chart } from 'primereact/chart';
 import { Calendar } from 'primereact/calendar';
 import { MultiSelect } from 'primereact/multiselect';
 import dayjs from 'dayjs';
-import { AppServices, StatsData, UserInfo } from './types';
+import { AppServices, FamilyDemand, StatsData, UserInfo } from './types';
 import { getDemandStats } from './api';
 
 import { InProgress } from './common-ui';
@@ -11,7 +11,7 @@ import { SelectButton } from 'primereact/selectbutton';
 import OneLine from './one-line';
 import { getNiceDate, getNiceDateTime } from './utils';
 import { Button } from 'primereact/button';
-import { setSelectionRange } from '@testing-library/user-event/dist/utils';
+import "./charts.css"
 
 interface DemandChartProps {
     data: StatsData;
@@ -34,6 +34,12 @@ interface StatsProps {
     appServices: AppServices;
 
 }
+interface GroupedData {
+    [city: string]: {
+        [familyName: string]: string[];
+    };
+}
+
 const empty = {
     totalDemands: [],
     fulfilledDemands: [],
@@ -50,12 +56,13 @@ function simplifyFamilyName(name: string): string {
     return name;
 }
 
+const sortByDate = (a: string, b: string) => dayjs(a).isBefore(b) ? -1 : 1;
+
 export function Stats({ userInfo, appServices }: StatsProps) {
     const [loading, setLoading] = useState<boolean>(false);
     const [data, setData] = useState<StatsData>(empty);
     const [dateRange, setDateRange] = useState<[Date, Date | null] | null>(null);
     const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
-    const [error, setError] = useState<string | null>(null);
     const calendar = useRef<Calendar>(null);
     const [mode, setMode] = useState(Modes.Open);
 
@@ -88,54 +95,31 @@ export function Stats({ userInfo, appServices }: StatsProps) {
     };
 
     const handlePrepareMessageToSend = () => {
-        // Initialize an object to group families by city and family name
-        const groupedByCityAndFamily: any = {};
+        const groupedData = groupByCityAndFamily(data.openFamilyDemands);
+        prepareMessageToSend(groupedData);
+    }
 
-        // Group families by city and family name
-        data.openFamilyDemands.forEach((family) => {
-            const city = family.city;
-            const familyName = simplifyFamilyName(family.familyLastName);
-
-            const dateFormatted = dayjs(family.date).format("DD.MM");
-
-            // If the city doesn't exist in the object, initialize it
-            if (!groupedByCityAndFamily[city]) {
-                groupedByCityAndFamily[city] = {};
-            }
-
-            // If the family doesn't exist under the city, initialize it
-            if (!groupedByCityAndFamily[city][familyName]) {
-                groupedByCityAndFamily[city][familyName] = [];
-            }
-
-            // Add the formatted date to the family's array under the city
-            groupedByCityAndFamily[city][familyName].push(dateFormatted);
-        });
-
-        // Sort cities alphabetically
-        const sortedCities = Object.keys(groupedByCityAndFamily).sort();
-
+    // Function to prepare the message using the structured data, including all dates per family
+    const prepareMessageToSend = (groupedData: GroupedData) => {
+        const sortedCities = Object.keys(groupedData).sort();
 
         let message = `היי קהילת נולדת לנצח💜
+    
+    מי יכול.ה לסייע בבישול בחודש הקרוב 🙏`;
 
-מי יכול.ה לסייע בבישול בחודש הקרוב 🙏
-
-
-`;
         sortedCities.forEach((city) => {
             message += `*${city}*\n`;
 
             // Sort families alphabetically within each city
-            const sortedFamilies = Object.keys(groupedByCityAndFamily[city]).sort();
+            const sortedFamilies = Object.keys(groupedData[city]).sort();
 
             sortedFamilies.forEach((familyName) => {
-                const dates = groupedByCityAndFamily[city][familyName].join(', ');
+                const dates = groupedData[city][familyName].join(', ');
                 message += `${familyName} - ${dates}\n`;
             });
 
             message += '\n'; // Add an extra newline after each city's group
         });
-
 
         message += `ניתן להשתבץ בלינק ב🤖
 מסתבכים? אני פה כדי לעזור`;
@@ -191,10 +175,12 @@ export function Stats({ userInfo, appServices }: StatsProps) {
                         </div>
                     )}
                 />
-                {mode == Modes.Open && <Button disabled={data.openFamilyDemands.length == 0} className="btn-on-the-right" label="הכן הודעה" onClick={handlePrepareMessageToSend} />}
+                {mode == Modes.Open && <Button disabled={data.openFamilyDemands.length == 0}
+                    className="btn-on-the-right" label="הכן הודעה"
+                    onClick={handlePrepareMessageToSend} />}
             </div>
 
-            {error && <small style={{ color: 'red' }}>{error}</small>}
+            {/* {error && <small style={{ color: 'red' }}>{error}</small>} */}
 
             {mode == Modes.Open || mode == Modes.Fulfilled ?
                 <DemandList data={data} isShowOpen={mode == Modes.Open} /> :
@@ -206,22 +192,32 @@ export function Stats({ userInfo, appServices }: StatsProps) {
 
 export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen }) => {
     const demands = (isShowOpen ? data.openFamilyDemands : data.fulfilledFamilyDemands);
+    const groupedData = groupByCityAndFamily(demands);
+
+    const sortedCities = Object.keys(groupedData).sort();
 
     return <div>
-        <strong>{isShowOpen? 'סה״כ חסרים:': 'סה״כ משובצים:'}</strong><span className='m-2'>{demands.length}</span>
-        {demands.map((family, i) => (<OneLine
-            key={i}
-            title={family.familyLastName}
-            body={`עיר: ${family.city}`}
-            unread={false}
-            onRead={() => { }}
-            footer={getNiceDate(family.date)}
-            //     console.log("family click", family.familyLastName)
-            //     setSelectedFamily(family)
-            // }}
-            hideIcon={true}
-        />))
+        <strong>{isShowOpen ? 'סה״כ חסרים:' : 'סה״כ משובצים:'}</strong><span className='m-2'>{demands.length}</span>
+        {
+            sortedCities.map(city => {
+                const sortedFamilies = Object.keys(groupedData[city]).sort();
+                return (
+
+                    <div className='family-demand-details'>
+                        <div className="city-chip">{city}</div>
+                        {
+                            sortedFamilies.map(family => (
+                                <div className="family-chip">
+                                    <label>{family}:</label>
+                                    <div>{groupedData[city][family].sort(sortByDate).map(d => dayjs(d).format("DD.MM")).join(" | ")}</div>
+                                </div>
+                            ))
+                        }
+                    </div>
+                )
+            })
         }
+
     </div>
 }
 
@@ -268,5 +264,31 @@ export const DemandChart: React.FC<DemandChartProps> = ({ data }) => {
     };
 
     return <Chart type="line" data={chartData} options={options} />;
+};
+
+
+// Function to group the data by city and family, with multiple dates for each family
+const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
+    const groupedByCityAndFamily: GroupedData = {};
+
+    familyDemands.forEach((family) => {
+        const city = family.city.replaceAll("\"", "");
+        const familyName = simplifyFamilyName(family.familyLastName);
+
+        // Initialize city if not exists
+        if (!groupedByCityAndFamily[city]) {
+            groupedByCityAndFamily[city] = {};
+        }
+
+        // Initialize family under the city if not exists
+        if (!groupedByCityAndFamily[city][familyName]) {
+            groupedByCityAndFamily[city][familyName] = [];
+        }
+
+        // Add the formatted date to the family's array under the city
+        groupedByCityAndFamily[city][familyName].push(family.date);
+    });
+
+    return groupedByCityAndFamily;
 };
 

@@ -149,7 +149,7 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
     const channelNotifications = currentChannel?.notifications
         .filter(notif => filter === Filters.ALL || notif.read == Filters.UNREAD)
     return (
-        <div>
+        <div style={{ overflowX: "hidden" }}>
             <Toast ref={toast} />
             <div className='flex flex-row relative justify-content-center align-items-center'>
                 <SelectButton

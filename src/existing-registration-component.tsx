@@ -7,7 +7,7 @@ import { AppServices, FamilyCompact, FamilyDemand, NavigationStep, ShowToast } f
 import { InProgress } from './common-ui';
 import OneLine from './one-line';
 import RegistrationCancellation from './registration-cancellation';
-import { NICE_DATE } from './utils';
+import { NICE_DATE, sortByDate, sortByDateDesc } from './utils';
 import { FamilyDetailsComponent } from './famility-registration-details';
 
 const Filters = {
@@ -40,7 +40,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
             ? navigationRequest.params[0] : undefined;
 
         getUserRegistrations().then((regs) => {
-            regs.sort((a, b) => a.date > b.date ? 1 : -1);
+            regs.sort((r1,r2)=>sortByDateDesc(r1.date, r2.date));
             console.log("registrations loaded", regs?.length)
             setRegistrations(regs);
             if (setCurrentRegistrationByNavigationRequest) {
@@ -54,7 +54,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
     }, [reload, actualUserId]);
 
     const isInFuture = (date: string) => {
-        return dayjs().diff(dayjs(date)) <= 0;
+        return dayjs().diff(date, "days") <= 0;
     }
 
     if (error) return (

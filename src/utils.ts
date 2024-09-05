@@ -43,3 +43,6 @@ export function getNiceDateTime(d: number | string) {
     }
     return theDate.format("[יום ]dddd, D [ב]MMMM HH:mm");
 }
+
+export const sortByDate = (a: string, b: string) => dayjs(a).isBefore(b) ? -1 : 1;
+export const sortByDateDesc = (a: string, b: string) => dayjs(a).isBefore(b) ? 1 : -1;

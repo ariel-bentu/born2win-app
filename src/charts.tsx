@@ -9,7 +9,7 @@ import { getDemandStats } from './api';
 import { InProgress } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
 import OneLine from './one-line';
-import { getNiceDate, getNiceDateTime } from './utils';
+import { getNiceDate, getNiceDateTime, sortByDate } from './utils';
 import { Button } from 'primereact/button';
 import "./charts.css"
 
@@ -56,7 +56,6 @@ function simplifyFamilyName(name: string): string {
     return name;
 }
 
-const sortByDate = (a: string, b: string) => dayjs(a).isBefore(b) ? -1 : 1;
 
 export function Stats({ userInfo, appServices }: StatsProps) {
     const [loading, setLoading] = useState<boolean>(false);
@@ -105,7 +104,9 @@ export function Stats({ userInfo, appServices }: StatsProps) {
 
         let message = `היי קהילת נולדת לנצח💜
     
-    מי יכול.ה לסייע בבישול בחודש הקרוב 🙏`;
+מי יכול.ה לסייע בבישול בחודש הקרוב 🙏
+    
+`;
 
         sortedCities.forEach((city) => {
             message += `*${city}*\n`;
@@ -114,7 +115,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
             const sortedFamilies = Object.keys(groupedData[city]).sort();
 
             sortedFamilies.forEach((familyName) => {
-                const dates = groupedData[city][familyName].join(', ');
+                const dates = groupedData[city][familyName].map(d=>dayjs(d).format("DD.MM")).join(', ');
                 message += `${familyName} - ${dates}\n`;
             });
 

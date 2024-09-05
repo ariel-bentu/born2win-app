@@ -103,8 +103,7 @@ function replaceAll(str: string, find: string, replace: string) {
 
     return str.replace(regex, replace);
 }
-
-function findUserByPhone(phone: string): Promise<QueryDocumentSnapshot | null> {
+function normilizePhone(phone: string): string {
     if (phone.startsWith("0")) {
         phone = "972" + phone.substring(1);
     } else if (phone.startsWith("+972")) {
@@ -112,6 +111,10 @@ function findUserByPhone(phone: string): Promise<QueryDocumentSnapshot | null> {
     }
     phone = replaceAll(phone, " ", "");
     phone = replaceAll(phone, "-", "");
+    return phone;
+}
+function findUserByPhone(phone: string): Promise<QueryDocumentSnapshot | null> {
+    phone = normilizePhone(phone);
 
     return db.collection(Collections.Users).where("phone", "==", phone).get().then(res => {
         if (res.empty) {
@@ -454,23 +457,31 @@ exports.SearchUsers = onCall({ cors: true }, async (request): Promise<Recipient[
         if (query.length < 0) {
             return [];
         }
-
+        const waitFor = [];
         const baseQuery = db.collection(Collections.Users).where("active", "==", true);
-        const firstNameQuery = baseQuery
-            .where("firstName", ">=", query)
-            .where("firstName", "<", query + "\uf8ff"); // The \uf8ff character is the last character in the Unicode range
+        if (query.startsWith("0") && /^[0-9]+$/.test(query)) {
+            if (query.length < 6) {
+                return [];
+            }
+            const phonePrefix = normilizePhone(query);
+            const phoneQuery = baseQuery
+                .where("phone", ">=", phonePrefix)
+                .where("phone", "<", phonePrefix + "\uf8ff"); // The \uf8ff character is the last character in the Unicode range
+            waitFor.push(phoneQuery.get());
+        } else {
+            const firstNameQuery = baseQuery
+                .where("firstName", ">=", query)
+                .where("firstName", "<", query + "\uf8ff");
+            const lastNameQuery = baseQuery
+                .where("lastName", ">=", query)
+                .where("lastName", "<", query + "\uf8ff");
+            waitFor.push(firstNameQuery.get());
+            waitFor.push(lastNameQuery.get());
+        }
 
-        const lastNameQuery = baseQuery
-            .where("lastName", ">=", query)
-            .where("lastName", "<", query + "\uf8ff");
-
-        const [firstNameSnapshot, lastNameSnapshot] = await Promise.all([firstNameQuery.get(), lastNameQuery.get()]);
-
+        const all = await Promise.all(waitFor);
         const users = new Map();
-
-        firstNameSnapshot.forEach(doc => users.set(doc.id, doc));
-        lastNameSnapshot.forEach(doc => users.set(doc.id, doc));
-
+        all.forEach(list => list.forEach(doc => users.set(doc.id, doc)));
         return Array.from(users.values()).map(u => ({
             name: u.data().firstName + " " + u.data().lastName,
             id: u.id,
@@ -1008,14 +1019,14 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
 
         await axios.post(urlMainBase, newRegistrationRec, httpOptions).then(async (response) => {
             // send notification to admins - disabled for now
-//             const admins = await db.collection(Collections.Admins).get();
-//             const adminsIds = admins.docs.map(doc => doc.id);
+            //             const admins = await db.collection(Collections.Admins).get();
+            //             const adminsIds = admins.docs.map(doc => doc.id);
 
-//             await addNotificationToQueue("שיבוץ חדש", `תאריך: ${demandDate}
-// משפחה: ${updatedRecord.fields.Name}
-// מתנדב: ${doc.data().firstName + " " + doc.data().lastName}
-// עיר: ${updatedRecord.fields["עיר"]}
-// `, NotificationChannels.Registrations, [], adminsIds);
+            //             await addNotificationToQueue("שיבוץ חדש", `תאריך: ${demandDate}
+            // משפחה: ${updatedRecord.fields.Name}
+            // מתנדב: ${doc.data().firstName + " " + doc.data().lastName}
+            // עיר: ${updatedRecord.fields["עיר"]}
+            // `, NotificationChannels.Registrations, [], adminsIds);
 
             logger.info("New registration added", response.data);
         });
@@ -1423,15 +1434,15 @@ async function syncBorn2WinUsers(sinceDate?: any) {
     return batch.commit().then(async () => {
         logger.info("Sync Users: obsered modified:", count, "observed Active", countActive, "registrationLinks", newLinksToAdmin, "duplicates:", duplicates);
         // no need for now
-//         if (notifyForNewUsers && newLinksToAdmin.length > 0) {
-//             const admins = await db.collection(Collections.Admins).get();
-//             const adminsIds = admins.docs.map(doc => doc.id);
+        //         if (notifyForNewUsers && newLinksToAdmin.length > 0) {
+        //             const admins = await db.collection(Collections.Admins).get();
+        //             const adminsIds = admins.docs.map(doc => doc.id);
 
-//             await Promise.all(newLinksToAdmin.map(link => addNotificationToQueue("לינק למשתמש", `שם: ${link.name}
-// טלפון: ${link.phone}
-// לינק לשליחה למשתמש: ${link.link}
-// `, NotificationChannels.Links, [], adminsIds)));
-//         }
+        //             await Promise.all(newLinksToAdmin.map(link => addNotificationToQueue("לינק למשתמש", `שם: ${link.name}
+        // טלפון: ${link.phone}
+        // לינק לשליחה למשתמש: ${link.link}
+        // `, NotificationChannels.Links, [], adminsIds)));
+        //         }
         return;
     });
 }

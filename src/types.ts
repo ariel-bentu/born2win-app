@@ -128,6 +128,10 @@ export interface FamilyDemand {
     volunteerId: string;
 }
 
+export interface OpenFamilyDemands {
+    demands: FamilyDemand[];
+    allDistrictCities: City[];
+}
 
 
 export interface StatsData {

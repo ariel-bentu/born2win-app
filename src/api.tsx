@@ -19,7 +19,7 @@ import {
 import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
-import { FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyDemand, FamilyDetails, GenerateLinkPayload, GetDemandStatPayload, NotificationChannels, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
+import { FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyDemand, FamilyDetails, GenerateLinkPayload, GetDemandStatPayload, NotificationChannels, NotificationUpdatePayload, OpenFamilyDemands, Recipient, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
 import { readAllNotifications } from "./notifications";
 import { getDB } from "./db";
 
@@ -192,8 +192,8 @@ function callFunctionWithImpersonation(functionName: string, payload?: any) {
 }
 
 
-export function getOpenDemands(): Promise<FamilyDemand[]> {
-    return callFunctionWithImpersonation('GetOpenDemands').then((res: any) => res.data as FamilyDemand[]);
+export function getOpenDemands(): Promise<OpenFamilyDemands> {
+    return callFunctionWithImpersonation('GetOpenDemands').then((res: any) => res.data as OpenFamilyDemands);
 }
 
 export function updateFamilityDemand(demandId: string, familyId: string, cityId: string, isRegistering: boolean, reason?: string) {

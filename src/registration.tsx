@@ -11,7 +11,7 @@ import "./registration.css";
 import { FamilyDetailsComponent } from './famility-registration-details';
 
 import { InProgress } from './common-ui';
-import { AppServices, City, FamilyCompact, FamilyDemand, ShowToast, UserInfo } from './types';
+import { AppServices, City, FamilyCompact, FamilyDemand, OpenFamilyDemands, ShowToast, UserInfo } from './types';
 import OneLine from './one-line';
 import { getUniqueFamilies } from './utils';
 import { ScrollPanel } from 'primereact/scrollpanel';
@@ -19,7 +19,7 @@ import { ScrollPanel } from 'primereact/scrollpanel';
 
 interface RegistrationComponentProps {
     userInfo: UserInfo | null;
-    openDemands: Promise<FamilyDemand[]>;
+    openDemands: Promise<OpenFamilyDemands>;
     actualUserId: string
     appServices: AppServices;
     openDemandsTS: string;
@@ -28,9 +28,15 @@ interface RegistrationComponentProps {
     topPosition: number;
 }
 
+interface CityAvailability {
+    id: string;
+    name: string;
+    available: boolean;
+}
+
 function RegistrationComponent({ openDemands, appServices, actualUserId, openDemandsTS,
     reloadOpenDemands, standalone, topPosition, userInfo }: RegistrationComponentProps) {
-    const [cities, setCities] = useState<City[]>([]);
+    const [cities, setCities] = useState<CityAvailability[]>([]);
     const [selectedCities, setSelectedCities] = useState<City[]>([]);
     const [familyDemands, setFamilyDemands] = useState<FamilyDemand[] | null>(null);
     const [families, setFamilies] = useState<FamilyCompact[]>([]);
@@ -39,34 +45,25 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
 
     useEffect(() => {
         setSelectedCities([])
-        openDemands.then().then((demands: FamilyDemand[]) => {
-            setFamilyDemands(demands);
-            const cities = getUniqueCities(demands);
+        openDemands.then().then((demands: OpenFamilyDemands) => {
+            setFamilyDemands(demands.demands);
+
+            // calculate the cities' availability
+            // const cities = getUniqueCities(demands.demands).map(city => ({ ...city, available: true }));
+            // console.log("cities", demands.allDistrictCities)
+            const cities = demands.allDistrictCities.map(city => ({ ...city, available: (demands.demands.some(d => d.city === city.name)) } as CityAvailability));
             setCities(cities);
             if (cities.length == 1) {
                 console.log("cities", cities)
                 setSelectedCities([cities[0]]);
             }
 
-            const uniqueFamilies = getUniqueFamilies(demands);
+            const uniqueFamilies = getUniqueFamilies(demands.demands);
             setFamilies(uniqueFamilies);
 
         }).catch(err => setError(err));
     }, [actualUserId, openDemandsTS]);
 
-
-    const getUniqueCities = (records: FamilyDemand[]): City[] => {
-        const result = [] as City[];
-        records.forEach((fd, i) => {
-            if (!result.find(f => f.name === fd.city)) {
-                result.push({
-                    id: i + "",
-                    name: fd.city,
-                })
-            }
-        })
-        return result;
-    };
 
     if (error) return (
         <div>תקלת טעינה - {error.message}</div>
@@ -84,7 +81,7 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
     )
 
     const selectedFamilyDemand = selectedFamily ? familyDemands.filter(fd => fd.familyRecordId === selectedFamily.familyId) : undefined;
-    const filteredFamilies = families.filter(family => selectedCities.some(sc => sc.name === family.city))
+    const filteredFamilies = families.filter(family => selectedCities.some(sc => sc.name === family.city));
 
     return (
         <div className="registration-component">
@@ -94,7 +91,7 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
             {standalone && !selectedFamily && <img src={bunnerImg} alt="Registration Banner" style={{ maxWidth: "100%" }} />}
             {standalone && !selectedFamily && <div>
                 <div className='standalone-title bm-4'>נולדת לנצח - מחוז {userInfo && userInfo.districts && userInfo.districts.length && userInfo.districts[0].name}</div>
-                <div className='m-2'>{ }
+                <div className='m-2 standalone-text-desc'>
                     <div className='m-2'>{userInfo && (userInfo.firstName + " " + userInfo.lastName)}</div>
                     היי אנחנו מודים לך על הבחירה לחבק חולים ולהכניס להם נצנצים הביתה.
                     <br />
@@ -118,14 +115,17 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
                             appServices={appServices} demands={selectedFamilyDemand || []}
                             reloadOpenDemands={reloadOpenDemands} includeContacts={false} /> :
                         <>
+                        {standalone && <span className='standalone-text-title'>אלו הערים שבהן ניתן לחבק משפחות החודש</span>}
                             <MultiSelect
                                 value={selectedCities}
-                                options={cities.map(city => ({ label: city.name, value: city }))}
+                                options={cities.map(city => ({ label: city.name + (city.available ? "" : " (אין התנדבות זמינה)"), value: city }))}
                                 onChange={(e) => setSelectedCities(e.value)}
                                 placeholder="סינון לפי עיר"
                                 className="w-11 m-2"// md:w-20rem"
                                 display="chip"
                             />
+                            {<span className='standalone-text-title'>רשימת משפחות</span>}
+                            {selectedCities.length == 0 && <span className='standalone-text-desc  w-11 mt-1 text-right'>יש לבחור עיר כדי לראות משפחות</span>}
                             {
                                 filteredFamilies.map((family, i) => (<OneLine
                                     key={i}

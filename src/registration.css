@@ -11,6 +11,22 @@
     flex-direction: column;
     align-items: center;
     width: 100%;
+    padding-top: 40px;
+}
+
+.standalone-text-desc {
+    font-family:Roboto, Arial, sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.standalone-text-title {
+    font-family:Roboto, Arial, sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin-top: 15px;
+    width:90%;
+    text-align: right;
 }
 
 .registration-scroller-content {

@@ -9,7 +9,7 @@ import 'primeflex/primeflex.css';
 import './App.css';
 import * as api from './api';
 import { NextOrObserver, User } from 'firebase/auth';
-import { AppServices, Cached, FamilyDemand, NavigationState, NavigationStep, NotificationActions, NotificationChannels, ShowToast, UserInfo } from './types';
+import { AppServices, Cached, FamilyDemand, NavigationState, NavigationStep, NotificationActions, NotificationChannels, OpenFamilyDemands, ShowToast, UserInfo } from './types';
 import { ClientJS } from 'clientjs';
 import NotificationsComponent from './notifications-component';
 import { countUnreadNotifications } from './notifications';
@@ -104,7 +104,7 @@ function App() {
         setUser(user);
     }
 
-    const [openDemands, setOpenDemands] = useState<Cached<FamilyDemand[]> | undefined>(undefined);
+    const [openDemands, setOpenDemands] = useState<Cached<OpenFamilyDemands> | undefined>(undefined);
 
     const [navigationRequest, setNavigationRequest] = useState<NavigationStep | undefined>(undefined)
 
@@ -146,17 +146,17 @@ function App() {
         }
     }, [navigationRequest]);
 
-    const getOpenDemands = useCallback(async (force?: boolean): Promise<FamilyDemand[]> => {
+    const getOpenDemands = useCallback(async (force?: boolean): Promise<OpenFamilyDemands> => {
         if (!force && openDemands && openDemands.userId === actualUserId && openDemands.fetchedTS.diff(dayjs(), "minutes") < 10) {
             return openDemands.data;
         }
-        const demands = await api.getOpenDemands();
+        const openDemandsResponse = await api.getOpenDemands();
         setOpenDemands({
-            data: demands,
+            data: openDemandsResponse,
             userId: actualUserId,
             fetchedTS: dayjs(),
         });
-        return demands;
+        return openDemandsResponse;
 
     }, [actualUserId, openDemands]);
 

@@ -161,7 +161,8 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
                     <div className="tm-5 pb-1 underline text-lg">שם: {familyDetails.familyLastName}</div>
                     <li>המשפחה בת <strong> {familyDetails.adultsCount}</strong> נפשות</li>
                     <li><strong>הרכב בני המשפחה:</strong> {familyDetails.familyStructure}</li>
-                    <li><strong>גילאי בני המשפחה:</strong> {familyDetails.familyMembersAge},{familyDetails.patientAge}</li>
+                    <li><strong>גילאי בני המשפחה:</strong> {familyDetails.familyMembersAge}</li>
+                    <li><strong>גיל החולה:</strong> {familyDetails.patientAge}</li>
                     <li><strong>כשרות:</strong> {familyDetails.kosherLevel}</li>
                     <li><strong>העדפה לסוג ארוחה:</strong> {familyDetails.prefferedMeal}</li>
                     <li><strong>העדפות בשר:</strong> {familyDetails.meatPreferences}</li>

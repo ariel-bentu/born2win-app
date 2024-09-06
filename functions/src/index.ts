@@ -26,6 +26,7 @@ import crypto = require("crypto");
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { IL_DATE } from "../../src/utils";
 import localeData = require("dayjs/plugin/localeData");
+import { Lock } from "./lock";
 
 // [END Imports]
 
@@ -983,6 +984,13 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
             "volunteer_id": fdup.isRegistering ? volunteerId : null,
         },
     };
+
+    // Add Locking - so only one user can update the same family & date
+    const lock = await Lock.acquire(db, fdup.demandId);
+    if (!lock) {
+        throw new HttpsError("already-exists", "מתנדב אחר מעדכן את הרשומה הזו ממש עכשיו");
+    }
+
     const url = `https://api.airtable.com/v0/${district.base_id}/${district.demandsTable}/${fdup.demandId}`;
     const httpOptions = {
         headers: {
@@ -1068,12 +1076,13 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
 מתנדב: ${doc.data().firstName + " " + doc.data().lastName}
 עיר: ${updatedRecord.fields["עיר"]}
 `, NotificationChannels.Registrations, [], adminsIds);
-
-                return;
+            } else {
+                logger.info("Unable to find registration id in main base", filterFormula);
             }
         }
-        logger.info("Unable to find registration id in main base", filterFormula);
     }
+
+    return lock.release();
 });
 
 

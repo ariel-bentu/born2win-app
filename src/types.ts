@@ -5,6 +5,7 @@ export const Collections = {
     Admins: "admins",
     Notifications: "notifications",
     Cancellations: "cancellations",
+    Locks:"locks",
 };
 
 export const NotificationActions = {

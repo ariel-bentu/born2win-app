@@ -106,8 +106,7 @@ export function resetImpersonation() {
 }
 
 export function getUserInfo(): Promise<UserInfo> {
-    const getUserInfoFunc = httpsCallable(functions, 'GetUserInfo');
-    return getUserInfoFunc().then(res => res.data as UserInfo);
+    return callFunctionWithImpersonation('GetUserInfo').then(res => res.data as UserInfo);
 }
 
 

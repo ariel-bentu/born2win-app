@@ -84,6 +84,7 @@ export interface UserInfo {
     notificationOn: boolean,
     phone: string,
     isAdmin: boolean,
+    userDistrict: { id: string, name: string },
     districts?: { id: string, name: string }[],
 }
 

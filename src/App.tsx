@@ -146,20 +146,51 @@ function App() {
         }
     }, [navigationRequest]);
 
-    const getOpenDemands = useCallback(async (force?: boolean): Promise<OpenFamilyDemands> => {
+    // const getCachedOpenDemands = useCallback(async (force?: boolean): Promise<OpenFamilyDemands> => {
+    //     if (!force && openDemands && openDemands.userId === actualUserId && openDemands.fetchedTS.diff(dayjs(), "minutes") < 10) {
+    //         return openDemands.data;
+    //     }
+    //     const openDemandsResponse = await api.getOpenDemands();
+    //     setOpenDemands({
+    //         data: openDemandsResponse,
+    //         userId: actualUserId,
+    //         fetchedTS: dayjs(),
+    //     });
+    //     return openDemandsResponse;
+
+    // }, [actualUserId, openDemands]);
+
+    const isFetchingOpenDemands = useRef<Promise<OpenFamilyDemands> | null>(null);
+
+    const getCachedOpenDemands = useCallback(async (force?: boolean): Promise<OpenFamilyDemands> => {
+        // If there is an ongoing request, return the ongoing promise
+        if (isFetchingOpenDemands.current) {
+            return isFetchingOpenDemands.current;
+        }
+
+        // If conditions are met and no force flag, return cached data
         if (!force && openDemands && openDemands.userId === actualUserId && openDemands.fetchedTS.diff(dayjs(), "minutes") < 10) {
             return openDemands.data;
         }
-        const openDemandsResponse = await api.getOpenDemands();
-        setOpenDemands({
-            data: openDemandsResponse,
-            userId: actualUserId,
-            fetchedTS: dayjs(),
-        });
-        return openDemandsResponse;
 
+        // Store the promise and make the API call
+        const fetchPromise = api.getOpenDemands()
+            .then((openDemandsResponse) => {
+                setOpenDemands({
+                    data: openDemandsResponse,
+                    userId: actualUserId,
+                    fetchedTS: dayjs(),
+                });
+                return openDemandsResponse;
+            })
+            .finally(() => {
+                isFetchingOpenDemands.current = null; // Reset after request completes
+            });
+
+        isFetchingOpenDemands.current = fetchPromise;
+
+        return fetchPromise;
     }, [actualUserId, openDemands]);
-
 
 
     // hack until Apple fix the postMessage not recieved when app is openned
@@ -456,10 +487,10 @@ function App() {
                     userInfo={userInfo}
                     topPosition={tabContentsTop}
                     standalone={true}
-                    openDemands={getOpenDemands()}
+                    openDemands={getCachedOpenDemands()}
                     openDemandsTS={openDemands?.fetchedTS.toISOString() || ""} appServices={appServices} actualUserId={oldUrlParamID}
                     reloadOpenDemands={() => {
-                        getOpenDemands(true);
+                        getCachedOpenDemands(true);
                     }} /> :
                 <InProgress />
             }
@@ -525,11 +556,11 @@ function App() {
                     <TabPanel headerStyle={{ fontSize: 20 }} header="שיבוצים">
                         {activeIndex == 1 && <RegistrationComponent
                             userInfo={userInfo}
-                            openDemands={getOpenDemands()} openDemandsTS={openDemands?.fetchedTS.toISOString() || ""}
+                            openDemands={getCachedOpenDemands()} openDemandsTS={openDemands?.fetchedTS.toISOString() || ""}
                             appServices={appServices} actualUserId={actualUserId}
                             topPosition={tabContentsTop}
                             reloadOpenDemands={() => {
-                                getOpenDemands(true);
+                                getCachedOpenDemands(true);
                             }} />}
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="פרטי התנדבות">

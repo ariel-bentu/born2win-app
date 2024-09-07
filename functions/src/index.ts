@@ -19,6 +19,7 @@ import {
     FamilityDetailsPayload,
     NotificationChannels,
     GenerateLinkPayload,
+    OpenFamilyDemands,
 } from "../../src/types";
 import axios from "axios";
 import express = require("express");
@@ -367,6 +368,8 @@ async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
     const doc = await authenticate(request);
     if (doc) {
         const data = doc.data();
+        const allDistricts = await getDestricts();
+        const userDistrict = allDistricts.find(d => d.id === data.mahoz);
         const response = {
             id: doc.id,
             isAdmin: false,
@@ -374,10 +377,10 @@ async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
             firstName: data.firstName,
             lastName: data.lastName,
             phone: data.phone,
+            userDistrict: { id: data.mahoz, name: userDistrict?.name || "" },
             notificationOn: data.notificationOn,
         } as UserInfo;
 
-        const allDistricts = await getDestricts();
         return db.collection(Collections.Admins).doc(doc.id).get().then(async (adminDoc) => {
             if (adminDoc.exists) {
                 response.isAdmin = true;
@@ -395,14 +398,6 @@ async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
                         }
                     });
                 }
-            } else {
-                const district = allDistricts.find(d => d.id == doc.data().mahoz);
-                if (district) {
-                    response.districts = [{
-                        id: district.id,
-                        name: district.name,
-                    }];
-                }
             }
             return response;
         });
@@ -414,6 +409,7 @@ async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
         lastName: "",
         phone: "",
         notificationOn: false,
+        userDistrict: { id: "", name: "" },
         notificationToken: undefined,
     };
 }
@@ -860,6 +856,47 @@ async function getDestricts(): Promise<District[]> {
     return districts || [];
 }
 
+let cities: City[] | undefined = undefined;
+interface City {
+    id: string;
+    name: string;
+    district: string;
+}
+
+async function getCities(): Promise<City[]> {
+    if (!cities) {
+        const apiKey = born2winApiKey.value();
+        const airTableMainBase = mainBase.value();
+
+        let offset = null;
+        const headers = {
+            "Authorization": `Bearer ${apiKey}`,
+        };
+        cities = [];
+        do {
+            const query = `https://api.airtable.com/v0/${airTableMainBase}/ערים`;
+            const citiesResponse: any = await axios.get(query, {
+                headers,
+                params: {
+                    offset,
+                    filterByFormula: "{כמות משפחות פעילות בעיר}>0",
+                },
+            });
+            offset = citiesResponse.data.offset;
+            if (citiesResponse.data.records) {
+                citiesResponse.data.records.forEach((city: AirTableRecord) => (cities?.push({
+                    id: city.id,
+                    name: city.fields["שם"],
+                    district: city.fields["מחוז"][0],
+                    // numOfFamilies: city.fields["כמות משפחות פעילות בעיר"],
+                })));
+            }
+        } while (offset);
+    }
+    return cities || [];
+}
+
+
 exports.GetMealRequests = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);
     const mahoz = doc.data().mahoz;
@@ -946,11 +983,13 @@ function getSafeFirstArrayElement(arr: any[], defaultValue: any) {
 }
 
 
-exports.GetOpenDemands = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
+exports.GetOpenDemands = onCall({ cors: true }, async (request): Promise<OpenFamilyDemands> => {
     const doc = await authenticate(request);
 
     const district = doc.data().mahoz;
-    return getDemands(district, "זמין", 45);
+    const cities = await getCities();
+    const demands = await getDemands(district, "זמין", 45);
+    return { demands, allDistrictCities: cities.filter(city => city.district === district) };
 });
 
 

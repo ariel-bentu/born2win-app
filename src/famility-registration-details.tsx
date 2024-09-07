@@ -106,7 +106,7 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
                         <div><span className="m-2">עיר:</span><span>{family.city}</span></div>
                         <div className="flex flex-row align-items-center">
                             {loading && <ProgressSpinner style={{ height: 20, width: 20 }} />}
-                            <a href="#" onClick={loading ? undefined : handleScrollToDetails}>פרטי משפחה</a>
+                            <span  className="clickable-span" onClick={loading ? undefined : handleScrollToDetails}>פרטי משפחה</span>
                         </div>
                     </div>
 

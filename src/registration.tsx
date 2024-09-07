@@ -90,7 +90,7 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
             </div>
             {standalone && !selectedFamily && <img src={bunnerImg} alt="Registration Banner" style={{ maxWidth: "100%" }} />}
             {standalone && !selectedFamily && <div>
-                <div className='standalone-title bm-4'>נולדת לנצח - מחוז {userInfo && userInfo.districts && userInfo.districts.length && userInfo.districts[0].name}</div>
+                <div className='standalone-title bm-4'>נולדת לנצח - מחוז {userInfo && userInfo.userDistrict.name}</div>
                 <div className='m-2 standalone-text-desc'>
                     <div className='m-2'>{userInfo && (userInfo.firstName + " " + userInfo.lastName)}</div>
                     היי אנחנו מודים לך על הבחירה לחבק חולים ולהכניס להם נצנצים הביתה.
@@ -102,7 +102,7 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
             <div className={standalone ? 'standalone-dynamic-host' : "w-full"}>
                 <ScrollPanel style={{ width: "100%", height: window.innerHeight - topPosition }}
                     pt={{
-                        wrapper: { className: "registration-scroller-wrapper" },
+                        wrapper: { className: "registration-scroller-wrapper", style: { paddingTop: standalone ? 40 : 0 } },
                         content: { className: "registration-scroller-content " + (standalone ? "standalone-card" : "") }  // Pass class to the content
                     }}
 
@@ -115,7 +115,8 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
                             appServices={appServices} demands={selectedFamilyDemand || []}
                             reloadOpenDemands={reloadOpenDemands} includeContacts={false} /> :
                         <>
-                        {standalone && <span className='standalone-text-title'>אלו הערים שבהן ניתן לחבק משפחות החודש</span>}
+                            {standalone && <span className='standalone-text-title'>אלו הערים שבהן ניתן לחבק משפחות החודש</span>}
+                            {!standalone && !selectedFamily && <img src={bunnerImg} alt="Registration Banner" style={{ maxWidth: "70%" }} />}
                             <MultiSelect
                                 value={selectedCities}
                                 options={cities.map(city => ({ label: city.name + (city.available ? "" : " (אין התנדבות זמינה)"), value: city }))}
@@ -135,7 +136,9 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
                                     onRead={() => {
                                         console.log("family click", family.familyLastName)
                                         setSelectedFamily(family)
-                                        appServices.pushNavigationStep("registration-family", () => setSelectedFamily(null))
+                                        appServices.pushNavigationStep("registration-family", () => {
+                                            setSelectedFamily(null)
+                                        })
                                     }}
                                     hideIcon={true}
                                 />))

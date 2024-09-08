@@ -1130,7 +1130,15 @@ exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<Famil
     const gfp = request.data as FamilityDetailsPayload;
     const mahoz = doc.data().mahoz;
 
-    const mahuzRec = (await getDestricts()).find((d: any) => d.id === mahoz);
+    if (gfp.district !== mahoz) {
+        // verify the user is admin of that district
+        const userInfo = await getUserInfo(request);
+        if (!userInfo.isAdmin || !userInfo.districts?.find(d=>d.id === gfp.district)) {
+            throw new HttpsError("permission-denied", "Unauthorized to read Family details from this district");
+        }
+    }
+
+    const mahuzRec = (await getDestricts()).find((d: any) => d.id === gfp.district);
     if (mahuzRec) {
         const apiKey = born2winApiKey.value();
         const headers = {

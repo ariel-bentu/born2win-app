@@ -207,9 +207,9 @@ export function updateFamilityDemand(demandId: string, familyId: string, cityId:
     return callFunctionWithImpersonation('UpdateFamilityDemand', payload);
 }
 
-export function getFamilyDetails(familyId: string, includeContacts: boolean): Promise<FamilyDetails> {
+export function getFamilyDetails(familyId: string, district: string, includeContacts: boolean): Promise<FamilyDetails> {
     const payload = {
-        familyId, includeContacts
+        familyId, district, includeContacts
     } as FamilityDetailsPayload;
 
     return callFunctionWithImpersonation('GetFamilyDetails', payload)
@@ -225,8 +225,10 @@ export function getUserRegistrations(): Promise<FamilyDemand[]> {
 
 
 export async function getDemandStats(dateRange: [Date | null, Date | null], districts: string[]): Promise<StatsData> {
-    if (!dateRange[0] || !dateRange[1]) return { totalDemands: [0], fulfilledDemands: [0], labels: [""], 
-        openFamilyDemands: [], fulfilledFamilyDemands: [] }
+    if (!dateRange[0] || !dateRange[1]) return {
+        totalDemands: [0], fulfilledDemands: [0], labels: [""],
+        openFamilyDemands: [], fulfilledFamilyDemands: []
+    }
 
     // No impersonation
     const getDemandStatsFunc = httpsCallable(functions, 'GetDemandStats');

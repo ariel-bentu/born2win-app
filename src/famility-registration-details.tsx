@@ -52,7 +52,8 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
     useEffect(() => {
         if (familyId) {
             setLoading(true);
-            getFamilyDetails(family.familyId, includeContacts)
+            console.log("get family details", familyId)
+            getFamilyDetails(family.familyId, family.district, includeContacts)
                 .then(res => setFamilyDetails(res))
                 .catch(err => setError(err))
                 .finally(() => setLoading(false));

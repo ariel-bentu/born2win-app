@@ -46,7 +46,6 @@ interface DateInfo {
 
 interface GroupedFamily extends FamilyCompact {
     dates: DateInfo[];
-    familyRecordId: string;
 }
 
 interface GroupedData {
@@ -217,10 +216,10 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
     const [filteredUsers, setFilteredUsers] = useState<any | undefined>();
 
     if (showFilterByVolunteer && filterByVolunteer?.id) {
-        demands = demands.filter(d=>d.volunteerId === filterByVolunteer.id);
+        demands = demands.filter(d => d.volunteerId === filterByVolunteer.id);
     }
 
-    const groupedData = groupByCityAndFamily(demands, );
+    const groupedData = groupByCityAndFamily(demands,);
     const sortedCities = Object.keys(groupedData).sort();
 
     if (showFamilyDetails) {
@@ -347,8 +346,8 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
                 dates: [],
                 familyLastName: familyName,
                 familyId: family.familyRecordId,
-                familyRecordId: family.familyRecordId,
                 city: family.city,
+                district: family.district,
             };
         }
 

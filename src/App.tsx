@@ -154,8 +154,8 @@ function App() {
                         accept: () => {
                             window.location.reload();
                         },
-                        acceptLabel:"לטעון עכשיו",
-                        rejectLabel:"לא עכשיו"
+                        acceptLabel: "לטעון עכשיו",
+                        rejectLabel: "לא עכשיו"
 
                     });
                 }
@@ -167,7 +167,7 @@ function App() {
         // Check every 30 minutes
         const intervalId = setInterval(() => {
             checkForUpdate();
-        },  30 * 60 * 1000); // 30 minutes
+        }, 30 * 60 * 1000); // 30 minutes
 
         // Initial check when the app loads
         checkForUpdate();
@@ -610,15 +610,15 @@ function App() {
                         {activeIndex == 2 && <ExistingRegistrationsComponent appServices={appServices} navigationRequest={navigationRequest} actualUserId={actualUserId} />}
                     </TabPanel>
                     {isAdmin &&
-                        <TabPanel headerStyle={{ fontSize: 20 }} header="שליחה">
-                            {isAdmin && <SendMessage userInfo={userInfo} appServices={appServices} />}
-                        </TabPanel>}
-                    {isAdmin &&
                         <TabPanel headerStyle={{ fontSize: 20 }} header="ניהול שיבוצים">
 
                             {isAdmin && <Stats appServices={appServices} userInfo={userInfo} />}
                         </TabPanel>
                     }
+                    {isAdmin &&
+                        <TabPanel headerStyle={{ fontSize: 20 }} header="שליחה">
+                            {isAdmin && <SendMessage userInfo={userInfo} appServices={appServices} />}
+                        </TabPanel>}
                 </TabView>}
         </div >
     );

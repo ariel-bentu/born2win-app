@@ -5,7 +5,7 @@ export const Collections = {
     Admins: "admins",
     Notifications: "notifications",
     Cancellations: "cancellations",
-    Locks:"locks",
+    Locks: "locks",
 };
 
 export const NotificationActions = {
@@ -44,6 +44,7 @@ export interface NotificationUpdatePayload {
 
 export interface FamilityDetailsPayload {
     familyId: string;
+    district: string;
     includeContacts: boolean;
 }
 
@@ -205,6 +206,7 @@ export type AppServices = {
 
 export interface FamilyCompact {
     familyId: string;
+    district: string;
     familyLastName: string;
     city: string;
 }

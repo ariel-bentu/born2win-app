@@ -97,6 +97,7 @@ function App() {
     const [loggedOut, setLoggedOut] = useState<boolean>(false);
     const [phoneFlow, setPhoneFlow] = useState<boolean>(false);
     const [navState, setNavState] = useState<NavigationState[]>([]);
+    const [latestVersion, setLatestVersion] = useState<string | undefined>();
 
     const onAuth: NextOrObserver<User> = (user: User | null) => {
         console.log("OnAuth - Login callback called", user);
@@ -131,6 +132,48 @@ function App() {
             });
         },
     }
+
+
+    useEffect(() => {
+        const checkForUpdate = async () => {
+            try {
+                const response = await fetch('/version.json', {
+                    headers: {
+                        'Cache-Control': 'no-cache', // Ensure fresh copy is fetched
+                    }
+                });
+                const data = await response.json();
+                if (!latestVersion) {
+                    console.log("version Loaded:", data.version);
+                    setLatestVersion(data.version);
+                } else if (data.version && data.version !== latestVersion) {
+                    // New version detected
+                    confirmPopup({
+                        message: "קיימת גרסא חדשה לאפליקציה, האם לטעון כעת?",
+                        icon: 'pi pi-exclamation-triangle',
+                        accept: () => {
+                            window.location.reload();
+                        },
+                        acceptLabel:"לטעון עכשיו",
+                        rejectLabel:"לא עכשיו"
+
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching version.json:', error);
+            }
+        };
+
+        // Check every 30 minutes
+        const intervalId = setInterval(() => {
+            checkForUpdate();
+        },  30 * 60 * 1000); // 30 minutes
+
+        // Initial check when the app loads
+        checkForUpdate();
+
+        return () => clearInterval(intervalId); // Clean up on unmount
+    }, [latestVersion]);
 
     useEffect(() => {
         initializeNavigationRequester(setNavigationRequest);

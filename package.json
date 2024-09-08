@@ -1,6 +1,6 @@
 {
-  "name": "my-app",
-  "version": "0.1.0",
+  "name": "born2win",
+  "version": "0.2.1",
   "private": true,
   "dependencies": {
     "@testing-library/jest-dom": "^5.17.0",
@@ -28,7 +28,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build-sw": "webpack --config webpack.sw.config.js",
-    "build": "npm run build-sw && react-scripts build",
+    "build": "npm run build-sw && node generate-version.js && react-scripts build",
     "deploy": "firebase deploy --only hosting",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

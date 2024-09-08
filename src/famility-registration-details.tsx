@@ -39,6 +39,7 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
     const [loading, setLoading] = useState<boolean>(false);
     const [reload, setReload] = useState<number>(0);
     const [saving, setSaving] = useState<boolean>(false);
+    const [viewDate, setViewDate] = useState(new Date());
 
     const [viewVisibleMonth, setViewVisibleMonth] = useState<CalendarMonthChangeEvent>({ year: dayjs().year(), month: dayjs().month() });
     const divRef = useRef<HTMLUListElement>(null);
@@ -113,8 +114,12 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
                     <h3>לבחירת תאריך:</h3>
                     {demands.length == 0 && <div>אין תאריכים זמינים</div>}
                     <Calendar
-                        //style={{ width: '400px' }}
-                        onMonthChange={handleMonthChange}
+                        onViewDateChange={(e)=>{
+                            setViewDate(e.value);
+                            const newViewDate = dayjs(e.value);
+                            handleMonthChange({month: newViewDate.month(), year: newViewDate.year()});
+                        }}
+                        viewDate={viewDate}
                         className={!isAvailableDatesVisible ? 'watermarked-no-dates' : ''}
                         value={selectedDate}
                         enabledDates={availableDates}

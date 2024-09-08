@@ -303,3 +303,8 @@ async function getDemands(district, status, daysAhead) {
 //alertUpcomingCooking()
 
 //sendNotification("hi", "2", { "a": "b" }, "")
+
+// מחוז דרום
+// getDemands("rechovsphUJb3r6hS", "תפוס", 45).then(d=>{
+//     console.log(d)
+// })

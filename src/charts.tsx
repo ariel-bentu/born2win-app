@@ -3,19 +3,23 @@ import { Chart } from 'primereact/chart';
 import { Calendar } from 'primereact/calendar';
 import { MultiSelect } from 'primereact/multiselect';
 import dayjs from 'dayjs';
-import { AppServices, FamilyDemand, StatsData, UserInfo } from './types';
-import { getDemandStats } from './api';
+import { AppServices, FamilyCompact, FamilyDemand, StatsData, UserInfo } from './types';
+import { getDemandStats, handleSearchUsers } from './api';
 
 import { InProgress } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
-import OneLine from './one-line';
-import { getNiceDate, getNiceDateTime, sortByDate } from './utils';
+import { sortByDate } from './utils';
 import { Button } from 'primereact/button';
 import "./charts.css"
+import { FamilyDetailsComponent } from './famility-registration-details';
+import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete';
 
 interface DemandChartProps {
     data: StatsData;
     isShowOpen?: boolean;
+    appServices: AppServices;
+    userInfo: UserInfo;
+    showFilterByVolunteer?: boolean;
 }
 
 const Modes = {
@@ -34,9 +38,20 @@ interface StatsProps {
     appServices: AppServices;
 
 }
+
+interface DateInfo {
+    date: string;
+    volunteerId: string;
+}
+
+interface GroupedFamily extends FamilyCompact {
+    dates: DateInfo[];
+    familyRecordId: string;
+}
+
 interface GroupedData {
     [city: string]: {
-        [familyName: string]: string[];
+        [familyId: string]: GroupedFamily;
     };
 }
 
@@ -64,6 +79,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
     const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
     const calendar = useRef<Calendar>(null);
     const [mode, setMode] = useState(Modes.Open);
+    const [showFilterByVolunteer, setShowFilterByVolunteer] = useState<boolean>(false);
 
     useEffect(() => {
         if (userInfo?.isAdmin && dateRange && selectedDistricts.length > 0) {
@@ -112,11 +128,10 @@ export function Stats({ userInfo, appServices }: StatsProps) {
             message += `*${city}*\n`;
 
             // Sort families alphabetically within each city
-            const sortedFamilies = Object.keys(groupedData[city]).sort();
-
-            sortedFamilies.forEach((familyName) => {
-                const dates = groupedData[city][familyName].map(d=>dayjs(d).format("DD.MM")).join(', ');
-                message += `${familyName} - ${dates}\n`;
+            const sortedFamilies = sortFamilies(groupedData[city]);
+            sortedFamilies.forEach((family) => {
+                const dates = family.dates.map(d => dayjs(d.date).format("DD.MM")).join(', ');
+                message += `${family.familyLastName} - ${dates}\n`;
             });
 
             message += '\n'; // Add an extra newline after each city's group
@@ -179,38 +194,83 @@ export function Stats({ userInfo, appServices }: StatsProps) {
                 {mode == Modes.Open && <Button disabled={data.openFamilyDemands.length == 0}
                     className="btn-on-the-right" label="הכן הודעה"
                     onClick={handlePrepareMessageToSend} />}
+                {mode == Modes.Fulfilled && <Button unstyled label="סנן" icon={"pi pi-filter" + (showFilterByVolunteer ? "-slash" : "")} className={"icon-btn icon-btn-withLabel"} onClick={(e) => {
+                    setShowFilterByVolunteer(!showFilterByVolunteer)
+                }} />}
+
             </div>
 
             {/* {error && <small style={{ color: 'red' }}>{error}</small>} */}
 
             {mode == Modes.Open || mode == Modes.Fulfilled ?
-                <DemandList data={data} isShowOpen={mode == Modes.Open} /> :
-                <DemandChart data={data} />
+                <DemandList data={data} isShowOpen={mode == Modes.Open} appServices={appServices} userInfo={userInfo} showFilterByVolunteer={showFilterByVolunteer} /> :
+                <DemandChart data={data} appServices={appServices} userInfo={userInfo} />
             }
         </div>
     );
 }
 
-export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen }) => {
-    const demands = (isShowOpen ? data.openFamilyDemands : data.fulfilledFamilyDemands);
-    const groupedData = groupByCityAndFamily(demands);
+export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appServices, userInfo, showFilterByVolunteer }) => {
+    let demands = (isShowOpen ? data.openFamilyDemands : data.fulfilledFamilyDemands);
+    const [showFamilyDetails, setShowFamilyDetails] = useState<GroupedFamily | undefined>()
+    const [filterByVolunteer, setFilterByVolunteer] = useState<any | undefined>();
+    const [filteredUsers, setFilteredUsers] = useState<any | undefined>();
 
+    if (showFilterByVolunteer && filterByVolunteer?.id) {
+        demands = demands.filter(d=>d.volunteerId === filterByVolunteer.id);
+    }
+
+    const groupedData = groupByCityAndFamily(demands, );
     const sortedCities = Object.keys(groupedData).sort();
 
+    if (showFamilyDetails) {
+        return <FamilyDetailsComponent appServices={appServices} demands={demands} familyId={showFamilyDetails.familyId} family={showFamilyDetails}
+            includeContacts={true} onClose={() => {
+                setShowFamilyDetails(undefined);
+                // todo push nav state
+            }} reloadOpenDemands={() => { }} detailsOnly={true} />;
+    }
+
     return <div>
+        <div>
+            {!isShowOpen && showFilterByVolunteer && <AutoComplete
+                inputClassName="w-17rem md:w-20rem flex flex-row flex-wrap"
+                placeholder={!filterByVolunteer || filterByVolunteer.length == 0 ? "חיפוש לפי שם פרטי, משפחה או טלפון" : undefined}
+                delay={500}
+                value={filterByVolunteer}
+                field="name"
+                optionGroupLabel="districtName"
+                optionGroupChildren="users"
+                suggestions={filteredUsers}
+                completeMethod={async (event: AutoCompleteCompleteEvent) => {
+                    const newFilter = await handleSearchUsers(userInfo, event.query);
+                    setFilteredUsers(newFilter);
+                }}
+                onChange={(e) => setFilterByVolunteer(e.value)} />}
+        </div>
         <strong>{isShowOpen ? 'סה״כ חסרים:' : 'סה״כ משובצים:'}</strong><span className='m-2'>{demands.length}</span>
         {
-            sortedCities.map(city => {
-                const sortedFamilies = Object.keys(groupedData[city]).sort();
-                return (
+            sortedCities.map((city, i) => {
+                const sortedFamilies = sortFamilies(groupedData[city]);
 
-                    <div className='family-demand-details'>
+                return (
+                    <div className='family-demand-details' key={i}>
                         <div className="city-chip">{city}</div>
                         {
-                            sortedFamilies.map(family => (
-                                <div className="family-chip">
-                                    <label>{family}:</label>
-                                    <div>{groupedData[city][family].sort(sortByDate).map(d => dayjs(d).format("DD.MM")).join(" | ")}</div>
+                            sortedFamilies.map((family, j) => (
+                                <div className="family-chip" key={j}>
+                                    <span className="family-details-link clickable-span"
+                                        onClick={() => setShowFamilyDetails(family)}> {family.familyLastName}:</span>
+                                    <div>{
+                                        isShowOpen ?
+                                            family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map(d => dayjs(d.date).format("DD.MM")).join(" | ") :
+                                            family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map((d, k) => (
+                                                <span key={k}>
+                                                    <span className='clickable-span' onClick={() => { }}>{dayjs(d.date).format("DD.MM")}</span>
+                                                    <span className='m-1'>|</span>
+                                                </span>
+                                            ))
+                                    }</div>
                                 </div>
                             ))
                         }
@@ -282,14 +342,36 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
         }
 
         // Initialize family under the city if not exists
-        if (!groupedByCityAndFamily[city][familyName]) {
-            groupedByCityAndFamily[city][familyName] = [];
+        if (!groupedByCityAndFamily[city][family.familyId]) {
+            groupedByCityAndFamily[city][family.familyId] = {
+                dates: [],
+                familyLastName: familyName,
+                familyId: family.familyRecordId,
+                familyRecordId: family.familyRecordId,
+                city: family.city,
+            };
         }
 
         // Add the formatted date to the family's array under the city
-        groupedByCityAndFamily[city][familyName].push(family.date);
+        groupedByCityAndFamily[city][family.familyId].dates.push({
+            date: family.date,
+            volunteerId: family.volunteerId,
+        });
     });
 
     return groupedByCityAndFamily;
 };
 
+function sortFamilies(familiesMap: { [familyId: string]: GroupedFamily }) {
+    return Object.keys(familiesMap)
+        .map(familyId => familiesMap[familyId])
+        .sort((a, b) => {
+            if (a.familyLastName < b.familyLastName) {
+                return -1;
+            }
+            if (a.familyLastName > b.familyLastName) {
+                return 1;
+            }
+            return 0;
+        });
+}

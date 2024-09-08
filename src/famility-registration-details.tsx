@@ -76,7 +76,10 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
     };
 
     const getAddress = (fd: FamilyDetails) => {
-        return fd.street + " " + fd.streatNumber + ", " + " דירה " + fd.appartment + " קומה " + fd.floor + ", " + fd.city;
+        return fd.street + " " + fd.streatNumber +
+            (fd.appartment ? ", דירה " + fd.appartment : "") +
+            (fd.floor ? ", קומה " + fd.floor : "") +
+            ", " + fd.city;
     }
 
     const dateTemplate = (event: CalendarDateTemplateEvent) => {
@@ -107,17 +110,17 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
                         <div><span className="m-2">עיר:</span><span>{family.city}</span></div>
                         <div className="flex flex-row align-items-center">
                             {loading && <ProgressSpinner style={{ height: 20, width: 20 }} />}
-                            <span  className="clickable-span" onClick={loading ? undefined : handleScrollToDetails}>פרטי משפחה</span>
+                            <span className="clickable-span" onClick={loading ? undefined : handleScrollToDetails}>פרטי משפחה</span>
                         </div>
                     </div>
 
                     <h3>לבחירת תאריך:</h3>
                     {demands.length == 0 && <div>אין תאריכים זמינים</div>}
                     <Calendar
-                        onViewDateChange={(e)=>{
+                        onViewDateChange={(e) => {
                             setViewDate(e.value);
                             const newViewDate = dayjs(e.value);
-                            handleMonthChange({month: newViewDate.month(), year: newViewDate.year()});
+                            handleMonthChange({ month: newViewDate.month(), year: newViewDate.year() });
                         }}
                         viewDate={viewDate}
                         className={!isAvailableDatesVisible ? 'watermarked-no-dates' : ''}
@@ -185,21 +188,21 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
                             <li><strong>איש קשר:</strong> {familyDetails.contactName}</li>
                         )}
                         {isNotEmpty(familyDetails.phone) && (
-                        <li className="flex flex-row align-items-center">
-                            <strong className="ml-2">מספר טלפון:</strong>{familyDetails.phone}
-                            <Button
-                                icon="pi pi-whatsapp"
-                                className="p-button-rounded p-button-info m-2"
-                                onClick={() => openWhatsApp(familyDetails.phone, "")}
-                                aria-label="WhatsApp"
-                            />
-                            <Button
-                                icon="pi pi-phone"
-                                className="p-button-rounded p-button-success m-2"
-                                onClick={() => openPhoneDialer(familyDetails.phone)}
-                                aria-label="Phone"
-                            />
-                        </li>
+                            <li className="flex flex-row align-items-center">
+                                <strong className="ml-2">מספר טלפון:</strong>{familyDetails.phone}
+                                <Button
+                                    icon="pi pi-whatsapp"
+                                    className="p-button-rounded p-button-info m-2"
+                                    onClick={() => openWhatsApp(familyDetails.phone, "")}
+                                    aria-label="WhatsApp"
+                                />
+                                <Button
+                                    icon="pi pi-phone"
+                                    className="p-button-rounded p-button-success m-2"
+                                    onClick={() => openPhoneDialer(familyDetails.phone)}
+                                    aria-label="Phone"
+                                />
+                            </li>
                         )}
                     </>}
 

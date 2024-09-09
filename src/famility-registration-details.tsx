@@ -7,7 +7,7 @@ import { getFamilyDetails, updateFamilityDemand } from "./api";
 import { useEffect, useRef, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
-import { InProgress } from "./common-ui";
+import { InProgress, PhoneNumber } from "./common-ui";
 import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails, ShowToast } from "./types";
 import { isNotEmpty } from "./utils";
 import { openPhoneDialer, openWhatsApp } from "./notification-actions";
@@ -188,23 +188,9 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
                         {isNotEmpty(familyDetails.contactName) && (
                             <li><strong>איש קשר:</strong> {familyDetails.contactName}</li>
                         )}
-                        {isNotEmpty(familyDetails.phone) && (
-                            <li className="flex flex-row align-items-center">
-                                <strong className="ml-2">מספר טלפון:</strong>{familyDetails.phone}
-                                <Button
-                                    icon="pi pi-whatsapp"
-                                    className="p-button-rounded p-button-info m-2"
-                                    onClick={() => openWhatsApp(familyDetails.phone, "")}
-                                    aria-label="WhatsApp"
-                                />
-                                <Button
-                                    icon="pi pi-phone"
-                                    className="p-button-rounded p-button-success m-2"
-                                    onClick={() => openPhoneDialer(familyDetails.phone)}
-                                    aria-label="Phone"
-                                />
-                            </li>
-                        )}
+                        {isNotEmpty(familyDetails.phone) && (<li>
+                            <PhoneNumber phone={familyDetails.phone} />
+                        </li>)}
                     </>}
 
                 </ul>}

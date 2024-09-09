@@ -3,16 +3,19 @@ import { Chart } from 'primereact/chart';
 import { Calendar } from 'primereact/calendar';
 import { MultiSelect } from 'primereact/multiselect';
 import dayjs from 'dayjs';
-import { AppServices, FamilyCompact, FamilyDemand, StatsData, UserInfo } from './types';
-import { getDemandStats, handleSearchUsers } from './api';
+import { AppServices, FamilyCompact, FamilyDemand, StatsData, UserInfo, VolunteerInfo } from './types';
+import { getDemandStats, getVolunteerInfo, handleSearchUsers } from './api';
 
-import { InProgress } from './common-ui';
+import { InProgress, PhoneNumber } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
 import { sortByDate } from './utils';
 import { Button } from 'primereact/button';
 import "./charts.css"
 import { FamilyDetailsComponent } from './famility-registration-details';
 import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete';
+import { Tooltip } from 'primereact/tooltip';
+import { OverlayPanel } from 'primereact/overlaypanel';
+import { ProgressSpinner } from 'primereact/progressspinner';
 
 interface DemandChartProps {
     data: StatsData;
@@ -211,15 +214,29 @@ export function Stats({ userInfo, appServices }: StatsProps) {
 
 export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appServices, userInfo, showFilterByVolunteer }) => {
     let demands = (isShowOpen ? data.openFamilyDemands : data.fulfilledFamilyDemands);
-    const [showFamilyDetails, setShowFamilyDetails] = useState<GroupedFamily | undefined>()
+    const [showFamilyDetails, setShowFamilyDetails] = useState<GroupedFamily | undefined>();
     const [filterByVolunteer, setFilterByVolunteer] = useState<any | undefined>();
     const [filteredUsers, setFilteredUsers] = useState<any | undefined>();
+
+    const overlayPanelRef = useRef<any>(null);
+
+    const [selectedDateInfo, setSelectedDateInfo] = useState<DateInfo | undefined>();
+    const [volunteerInfo, setVolunteerInfo] = useState<VolunteerInfo | undefined>();
+
+    useEffect(() => {
+        if (selectedDateInfo) {
+            getVolunteerInfo(selectedDateInfo.volunteerId).then(info => {
+                setVolunteerInfo(info);
+            });
+        }
+    }, [selectedDateInfo]);
+
 
     if (showFilterByVolunteer && filterByVolunteer?.id) {
         demands = demands.filter(d => d.volunteerId === filterByVolunteer.id);
     }
 
-    const groupedData = groupByCityAndFamily(demands,);
+    const groupedData = groupByCityAndFamily(demands);
     const sortedCities = Object.keys(groupedData).sort();
 
     if (showFamilyDetails) {
@@ -230,56 +247,81 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
             }} reloadOpenDemands={() => { }} detailsOnly={true} />;
     }
 
-    return <div>
+    const handleDateClick = (e: any, dateInfo: DateInfo) => {
+        setVolunteerInfo(undefined);
+        setSelectedDateInfo(dateInfo); // Store the date info to render in the OverlayPanel
+        overlayPanelRef.current.toggle(e); // Open the OverlayPanel next to the clicked element
+    };
+
+    return (
         <div>
-            {!isShowOpen && showFilterByVolunteer && <AutoComplete
-                inputClassName="w-17rem md:w-20rem flex flex-row flex-wrap"
-                placeholder={!filterByVolunteer || filterByVolunteer.length == 0 ? "חיפוש לפי שם פרטי, משפחה או טלפון" : undefined}
-                delay={500}
-                value={filterByVolunteer}
-                field="name"
-                optionGroupLabel="districtName"
-                optionGroupChildren="users"
-                suggestions={filteredUsers}
-                completeMethod={async (event: AutoCompleteCompleteEvent) => {
-                    const newFilter = await handleSearchUsers(userInfo, event.query);
-                    setFilteredUsers(newFilter);
-                }}
-                onChange={(e) => setFilterByVolunteer(e.value)} />}
+            <div>
+                {!isShowOpen && showFilterByVolunteer && <AutoComplete
+                    inputClassName="w-17rem md:w-20rem flex flex-row flex-wrap"
+                    placeholder={!filterByVolunteer || filterByVolunteer.length == 0 ? "חיפוש לפי שם פרטי, משפחה או טלפון" : undefined}
+                    delay={500}
+                    value={filterByVolunteer}
+                    field="name"
+                    optionGroupLabel="districtName"
+                    optionGroupChildren="users"
+                    suggestions={filteredUsers}
+                    completeMethod={async (event: AutoCompleteCompleteEvent) => {
+                        const newFilter = await handleSearchUsers(userInfo, event.query);
+                        setFilteredUsers(newFilter);
+                    }}
+                    onChange={(e) => setFilterByVolunteer(e.value)} />}
+            </div>
+            <strong>{isShowOpen ? 'סה״כ חסרים:' : 'סה״כ משובצים:'}</strong><span className='m-2'>{demands.length}</span>
+            {
+                sortedCities.map((city, i) => {
+                    const sortedFamilies = sortFamilies(groupedData[city]);
+
+                    return (
+                        <div className='family-demand-details' key={i}>
+                            <div className="city-chip">{city}</div>
+                            {
+                                sortedFamilies.map((family, j) => (
+                                    <div className="family-chip" key={j}>
+                                        <span className="family-details-link clickable-span"
+                                            onClick={() => setShowFamilyDetails(family)}> {family.familyLastName}:</span>
+                                        <div>{
+                                            isShowOpen ?
+                                                family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map(d => dayjs(d.date).format("DD.MM")).join(" | ") :
+                                                family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map((d, k) => (
+                                                    <span key={k}>
+                                                        <span className='clickable-span' onClick={(e) => handleDateClick(e, d)}>{dayjs(d.date).format("DD.MM")}</span>
+                                                        <span className='m-1'>|</span>
+                                                    </span>
+                                                ))
+                                        }</div>
+                                    </div>
+                                ))
+                            }
+                        </div>
+                    )
+                })
+            }
+
+            {/* OverlayPanel for displaying additional info */}
+            <OverlayPanel ref={overlayPanelRef} showCloseIcon closeOnEscape
+                dismissable={true} >
+                    <div dir="rtl" style={{
+                    width: 280, display: "flex",
+                    flexDirection: "column",
+                    
+                }}>
+                {selectedDateInfo && (volunteerInfo ?
+                    <>
+                        <div><strong>שם</strong>: {volunteerInfo.firstName + " " + volunteerInfo.lastName}</div>
+                        <PhoneNumber phone={volunteerInfo.phone} />
+                    </> :
+                    <div><ProgressSpinner style={{ height: 50 }} /> טוען...</div>
+                )}
+                </div>
+            </OverlayPanel>
         </div>
-        <strong>{isShowOpen ? 'סה״כ חסרים:' : 'סה״כ משובצים:'}</strong><span className='m-2'>{demands.length}</span>
-        {
-            sortedCities.map((city, i) => {
-                const sortedFamilies = sortFamilies(groupedData[city]);
-
-                return (
-                    <div className='family-demand-details' key={i}>
-                        <div className="city-chip">{city}</div>
-                        {
-                            sortedFamilies.map((family, j) => (
-                                <div className="family-chip" key={j}>
-                                    <span className="family-details-link clickable-span"
-                                        onClick={() => setShowFamilyDetails(family)}> {family.familyLastName}:</span>
-                                    <div>{
-                                        isShowOpen ?
-                                            family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map(d => dayjs(d.date).format("DD.MM")).join(" | ") :
-                                            family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map((d, k) => (
-                                                <span key={k}>
-                                                    <span className='clickable-span' onClick={() => { }}>{dayjs(d.date).format("DD.MM")}</span>
-                                                    <span className='m-1'>|</span>
-                                                </span>
-                                            ))
-                                    }</div>
-                                </div>
-                            ))
-                        }
-                    </div>
-                )
-            })
-        }
-
-    </div>
-}
+    );
+};
 
 
 export const DemandChart: React.FC<DemandChartProps> = ({ data }) => {

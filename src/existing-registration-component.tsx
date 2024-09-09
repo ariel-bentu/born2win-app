@@ -76,7 +76,8 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
         const currentFamily = {
             city: currentRegistration.city,
             familyId: currentRegistration.familyRecordId,
-            familyLastName: currentRegistration.familyLastName
+            familyLastName: currentRegistration.familyLastName,
+            district: currentRegistration.district,
         } as FamilyCompact;
         console.log("reg id", currentRegistration.id)
         return <FamilyDetailsComponent detailsOnly={true} familyId={currentRegistration.familyRecordId} family={currentFamily} onClose={() => {
@@ -133,13 +134,13 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                                     setCurrentRegistration(reg);
                                     appServices.pushNavigationStep("family-details-existing-reg", ()=>setCurrentRegistration(undefined));
                                 }}
-                                onDelete={dayjs(reg.date).isBefore(dayjs()) ?
-                                    undefined : // only allow deleting future commitments
-                                    () => {
-                                        setShowCancellationDialog(reg)
-                                        appServices.pushNavigationStep("cancel-reg", ()=>setCurrentRegistration(undefined));
-                                    }}
-                                deleteLabel={"ביטול שיבוץ"}
+                                // onDelete={dayjs(reg.date).isBefore(dayjs()) ?
+                                //     undefined : // only allow deleting future commitments
+                                //     () => {
+                                //         setShowCancellationDialog(reg)
+                                //         appServices.pushNavigationStep("cancel-reg", ()=>setCurrentRegistration(undefined));
+                                //     }}
+                                // deleteLabel={"ביטול שיבוץ"}
                             />
                         )) :
                         <div className='no-messages'>אין רישומים</div>

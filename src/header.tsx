@@ -12,6 +12,7 @@ import { ProgressSpinner } from "primereact/progressspinner";
 import { WhatsAppPhoneNumber } from "./notification-actions";
 
 interface HeaderProps {
+    version:string | undefined;
     userName: string;
     volunteerId: string;
     userInfo: UserInfo | null,
@@ -28,7 +29,7 @@ interface HeaderProps {
 }
 
 function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onSendTestNotificationClick, onSyncNotifications,
-    onLogout, userInfo, setActualUserId, volunteerId, appServices, showLoading, actualUserId }: HeaderProps) {
+    onLogout, userInfo, setActualUserId, volunteerId, appServices, showLoading, actualUserId, version }: HeaderProps) {
     const [sidebarVisible, setSidebarVisible] = useState(false);
     const [showTechInfo, setShowTechInfo] = useState<boolean>(false);
     const toggleText = () => {
@@ -145,6 +146,7 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
                             setActualUserId(volunteerId);
                         }
                     }} />
+                    <div className="w-12 text-right mt-2" >גרסא:{version || ""}</div>
                 </Sidebar>
 
             </header>

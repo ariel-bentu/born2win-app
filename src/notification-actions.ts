@@ -1,4 +1,5 @@
 import { NavigationStep, NotificationActions } from "./types"
+import { normilizePhone } from "./utils";
 export const WhatsAppPhoneNumber = "+972522229135";
 let setNavigationRequest: undefined | ((ns: NavigationStep) => void);
 
@@ -8,19 +9,6 @@ export const AppTabs = {
     commitments: 2,
 }
 
-function normilizePhone(phone: string): string {
-    if (phone.startsWith("0")) {
-        phone = "+972" + phone.substring(1);
-    } else {
-        if (phone.startsWith("972")) {
-            phone = "+" + phone;
-        }
-    }
-
-    phone = phone.replaceAll(" ", "");
-    phone = phone.replaceAll("-", "");
-    return phone;
-}
 
 export function openWhatsApp(phone: string, text: string) {
     console.log("send to whatsapp", phone, text)

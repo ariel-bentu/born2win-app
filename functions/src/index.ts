@@ -20,6 +20,8 @@ import {
     NotificationChannels,
     GenerateLinkPayload,
     OpenFamilyDemands,
+    VolunteerInfo,
+    VolunteerInfoPayload,
 } from "../../src/types";
 import axios from "axios";
 import express = require("express");
@@ -1133,8 +1135,9 @@ exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<Famil
     if (gfp.district !== mahoz) {
         // verify the user is admin of that district
         const userInfo = await getUserInfo(request);
-        if (!userInfo.isAdmin || !userInfo.districts?.find(d=>d.id === gfp.district)) {
-            throw new HttpsError("permission-denied", "Unauthorized to read Family details from this district");
+        if (!userInfo.isAdmin || !userInfo.districts?.find(d => d.id === gfp.district)) {
+            logger.error("Permission denied to read family details", doc.id, mahoz, userInfo.isAdmin, gfp.district, "admin regions:", userInfo.districts);
+            throw new HttpsError("permission-denied", "Unauthorized to read family details from this district");
         }
     }
 
@@ -1156,12 +1159,10 @@ exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<Famil
             phone: "",
         };
         if (gfp.includeContacts) {
-            logger.info("includeContacts", gfp.includeContacts);
-
             try {
                 // Call the getFamilyContactDetails method
-                logger.info("getFamilyContactDetails gfp.familyId:", gfp.familyId);
-                logger.info("getFamilyContactDetails rec.fields.familyid:", rec.fields.familyid);
+                // logger.info("getFamilyContactDetails gfp.familyId:", gfp.familyId);
+                // logger.info("getFamilyContactDetails rec.fields.familyid:", rec.fields.familyid);
                 const fetchedDetails = await getFamilyContactDetails(rec.fields.familyid);
                 // Save the returned contact details as constants
                 contactDetails.name = fetchedDetails.name;
@@ -1200,6 +1201,7 @@ exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<Famil
     }
     throw new HttpsError("not-found", "Family not found");
 });
+
 async function getFamilyContactDetails(familyId: string) {
     try {
         logger.info("getFamilyContactDetails familyId:", familyId);
@@ -1237,6 +1239,30 @@ async function getFamilyContactDetails(familyId: string) {
         };
     }
 }
+
+exports.GetVolunteerInfo = onCall({ cors: true }, async (request): Promise<VolunteerInfo | undefined> => {
+    const userInfo = await getUserInfo(request);
+    if (userInfo.isAdmin) {
+        const vip = request.data as VolunteerInfoPayload;
+        const volunteerDoc = await db.collection(Collections.Users).doc(vip.volunteerId).get();
+        if (volunteerDoc && volunteerDoc.exists) {
+            const data = volunteerDoc.data();
+            if (data) {
+                const districts = await getDestricts();
+                const volunteerDistrict = districts.find(d => d.id === data.mahoz);
+                return {
+                    id: volunteerDoc.id,
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    district: { id: data.mahoz, name: volunteerDistrict ? volunteerDistrict.name : "" },
+                    phone: data.phone,
+                    active: data.active,
+                };
+            }
+        }
+    }
+    return;
+});
 
 /**
  * WEB HOOKS

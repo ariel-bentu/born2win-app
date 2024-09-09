@@ -19,7 +19,7 @@ import {
 import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
-import { FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyDemand, FamilyDetails, GenerateLinkPayload, GetDemandStatPayload, NotificationChannels, NotificationUpdatePayload, OpenFamilyDemands, Recipient, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo } from "./types";
+import { FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyDemand, FamilyDetails, GenerateLinkPayload, GetDemandStatPayload, NotificationChannels, NotificationUpdatePayload, OpenFamilyDemands, Recipient, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, VolunteerInfo, VolunteerInfoPayload } from "./types";
 import { readAllNotifications } from "./notifications";
 import { getDB } from "./db";
 
@@ -221,6 +221,13 @@ export function getFamilyDetails(familyId: string, district: string, includeCont
 export function getUserRegistrations(): Promise<FamilyDemand[]> {
     return callFunctionWithImpersonation('GetUserRegistrations')
         .then((res: any) => res.data);
+}
+
+export function getVolunteerInfo(volunteerId:string):Promise<VolunteerInfo> {
+    const getVolunteerInfoFunc = httpsCallable(functions, 'GetVolunteerInfo');
+    const vip = { volunteerId } as VolunteerInfoPayload;
+
+    return getVolunteerInfoFunc(vip).then(res => res.data as VolunteerInfo);
 }
 
 

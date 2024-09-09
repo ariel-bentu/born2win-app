@@ -48,6 +48,19 @@ export interface FamilityDetailsPayload {
     includeContacts: boolean;
 }
 
+export interface VolunteerInfoPayload {
+    volunteerId:string;
+}
+
+export interface VolunteerInfo {
+    id: string;
+    firstName: string;
+    lastName: string;
+    district: { id: string, name: string }
+    phone:string;
+    active:boolean;
+}
+
 export interface City {
     id: string;
     name: string;

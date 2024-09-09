@@ -47,3 +47,26 @@ export function getNiceDateTime(d: number | string) {
 
 export const sortByDate = (a: string, b: string) => dayjs(a).isBefore(b) ? -1 : 1;
 export const sortByDateDesc = (a: string, b: string) => dayjs(a).isBefore(b) ? 1 : -1;
+
+
+
+export function normilizePhone(phone: string): string {
+    if (phone.startsWith("0")) {
+        phone = "+972" + phone.substring(1);
+    } else {
+        if (phone.startsWith("972")) {
+            phone = "+" + phone;
+        }
+    }
+
+    phone = phone.replaceAll(" ", "");
+    phone = phone.replaceAll("-", "");
+    return phone;
+}
+
+export function nicePhone(phone: string): string {
+    if (phone.startsWith("972")) {
+        phone = "0" + phone.substring(3);
+    }
+    return phone;
+}

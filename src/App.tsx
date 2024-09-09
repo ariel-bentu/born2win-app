@@ -562,6 +562,7 @@ function App() {
             <ConfirmPopup />
             <Toast ref={toast} />
             <Header
+                version={latestVersion}
                 userName={userInfo ? userInfo.firstName : ""}
                 actualUserId={actualUserId}
                 appServices={appServices}

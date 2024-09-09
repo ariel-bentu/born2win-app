@@ -48,6 +48,11 @@ export function getNiceDateTime(d: number | string) {
 export const sortByDate = (a: string, b: string) => dayjs(a).isBefore(b) ? -1 : 1;
 export const sortByDateDesc = (a: string, b: string) => dayjs(a).isBefore(b) ? 1 : -1;
 
+export function replaceAll(str: string, find: string, replace: string) {
+    const regex = new RegExp(find, "g");
+
+    return str.replace(regex, replace);
+}
 
 
 export function normilizePhone(phone: string): string {
@@ -59,8 +64,8 @@ export function normilizePhone(phone: string): string {
         }
     }
 
-    phone = phone.replaceAll(" ", "");
-    phone = phone.replaceAll("-", "");
+    phone = replaceAll(phone, " ", "");
+    phone = replaceAll(phone, "-", "");
     return phone;
 }
 

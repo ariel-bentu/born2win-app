@@ -69,7 +69,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
     );
 
     if (registrations.length == 0) return (
-        <div>לא נמצאו נתונים...</div>
+        <div className='text-xl'>אין שיבוצים רשומים</div>
     )
 
     if (currentRegistration) {

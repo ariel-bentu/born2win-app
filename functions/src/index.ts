@@ -27,7 +27,7 @@ import axios from "axios";
 import express = require("express");
 import crypto = require("crypto");
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
-import { IL_DATE } from "../../src/utils";
+import { IL_DATE, replaceAll } from "../../src/utils";
 import localeData = require("dayjs/plugin/localeData");
 import { Lock } from "./lock";
 
@@ -102,11 +102,6 @@ function findUserByFingerprint(fingerprint: string): Promise<QueryDocumentSnapsh
     });
 }
 
-function replaceAll(str: string, find: string, replace: string) {
-    const regex = new RegExp(find, "g");
-
-    return str.replace(regex, replace);
-}
 function normilizePhone(phone: string): string {
     if (phone.startsWith("0")) {
         phone = "972" + phone.substring(1);
@@ -502,7 +497,7 @@ exports.SearchUsers = onCall({ cors: true }, async (request): Promise<Recipient[
  * @returns
  */
 
-async function addNotificationToQueue(title: string, body: string, channel: NotificationChannels, toDistricts: string[], toRecipients: string[], data?: { [key: string]: string }) {
+async function addNotificationToQueue(title: string, body: string, channel: NotificationChannels, toDistricts: string[], toRecipients: string[] | string, data?: { [key: string]: string }) {
     const docRef = db.collection(Collections.Notifications).doc();
     if (data) {
         data.channel = channel;
@@ -1060,7 +1055,7 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
                         "עיר": [
                             fdup.cityId,
                         ],
-                        "DATE": updatedRecord.fields["תאריך"],
+                        "DATE": demandDate,
                     },
                 },
             ],
@@ -1093,30 +1088,41 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
             const rec = findResult.data.records.find((r: AirTableRecord) => r.fields["משפחה"][0] == fdup.familyId && r.fields["מתנדב"][0] == volunteerId);
             if (rec) {
                 // Delete the records
-                const deleteUrl = `${urlMainBase}/${rec.id}`;
-                await axios.delete(deleteUrl, httpOptions);
-                logger.info("Existing registration removed", rec.id, "family", fdup.familyId, "vid", volunteerId);
+                const updateCancelUrl = `${urlMainBase}/${rec.id}`;
 
-                // Add cancellation record
-                const cancallationRec = await db.collection(Collections.Cancellations).doc();
-                await cancallationRec.create({
-                    cancelledAt: dayjs().utc().tz(JERUSALEM).format(DATE_TIME),
-                    demandDate: demandDate,
-                    reason: fdup.reason,
-                    demandId: rec.id,
-                    volunteerId,
-                    familyId: fdup.familyId,
-                });
+                const updateCancelFields = {
+                    fields: {
+                        "סטטוס": "בוטל",
+                        "סיבת ביטול": fdup.reason,
+                    },
+                };
 
-                // send notification to admins
-                const admins = await db.collection(Collections.Admins).get();
-                const adminsIds = admins.docs.map(doc => doc.id);
+                await axios.patch(updateCancelUrl, updateCancelFields, httpOptions);
+                logger.info("Existing registration was cancelled", rec.id, "family", fdup.familyId, "vid", volunteerId);
 
-                await addNotificationToQueue("שיבוץ בוטל!", `תאריך: ${demandDate}
+                // // Add cancellation record
+                // const cancallationRec = await db.collection(Collections.Cancellations).doc();
+                // await cancallationRec.create({
+                //     cancelledAt: dayjs().utc().tz(JERUSALEM).format(DATE_TIME),
+                //     demandDate: demandDate,
+                //     reason: fdup.reason,
+                //     demandId: rec.id,
+                //     volunteerId,
+                //     familyId: fdup.familyId,
+                // });
+
+                // send notification to admins - if date is less than 10 days:
+                const daysDiff = dayjs().diff(demandDate, "days");
+                if (Math.abs(daysDiff) <= 10) {
+                    const admins = await db.collection(Collections.Admins).get();
+                    const adminsIds = admins.docs.map(doc => doc.id);
+
+                    await addNotificationToQueue("שיבוץ בוטל!", `תאריך: ${demandDate}
 משפחה: ${updatedRecord.fields.Name}
 מתנדב: ${doc.data().firstName + " " + doc.data().lastName}
 עיר: ${updatedRecord.fields["עיר"]}
 `, NotificationChannels.Registrations, [], adminsIds);
+                }
             } else {
                 logger.info("Unable to find registration id in main base", filterFormula);
             }
@@ -1310,7 +1316,7 @@ exports.httpApp = onRequest(app);
 */
 
 const schedules = [
-    { desc: "Reminder on Sunday at 18:00", min: 0, hour: [18], weekDay: 1, callback: remindVolunteersToRegister },
+    { desc: "Reminder on Sunday at 10:30", min: 30, hour: [10], weekDay: 1, callback: remindVolunteersToRegister },
     { desc: "Refresh webhook registration", min: 0, hour: [0], weekDay: "*", callback: refreshWebhookToken },
     { desc: "Sync Born2Win users daily", min: 0, hour: [17], weekDay: "*", callback: syncBorn2WinUsers },
     { desc: "Alert 5 days ahead open demand", min: 40, hour: [13], weekDay: "*", callback: alertOpenDemands },
@@ -1349,9 +1355,9 @@ exports.doSchedule = onSchedule({
     await Promise.all(waitFor);
 });
 
-
 async function remindVolunteersToRegister() {
-    // TODO
+    await addNotificationToQueue("התחלנו שיבוצים!",
+        "הכנסו לבחור למי תתנו חיבוק החודש. ניתן להרשם באפליקציה", NotificationChannels.Registrations, [], "all");
 }
 
 async function alertOpenDemands() {
@@ -1364,11 +1370,17 @@ async function alertOpenDemands() {
         const openDemands = await getDemands(districts[i].id, "זמין", 5);
         let msgBody = "מחוז: " + districts[i].name + "\n";
         if (openDemands.length > 0) {
+            let found = false;
             openDemands.forEach(od => {
                 const daysLeft = Math.abs(dayjs().diff(od.date, "days"));
-                msgBody += `- ${od.familyLastName} (עוד ${daysLeft} ימים)` + "\n";
+                if (daysLeft > 0) {
+                    found = true;
+                    msgBody += `- ${od.familyLastName} (עוד ${daysLeft} ימים)` + "\n";
+                }
             });
-            waitFor.push(addNotificationToQueue("שיבוצים חסרים - 5 ימים קרובים", msgBody, NotificationChannels.Alerts, [], adminsIds));
+            if (found) {
+                waitFor.push(addNotificationToQueue("שיבוצים חסרים - 5 ימים קרובים", msgBody, NotificationChannels.Alerts, [districts[i].id], adminsIds));
+            }
         }
     }
     Promise.all(waitFor);

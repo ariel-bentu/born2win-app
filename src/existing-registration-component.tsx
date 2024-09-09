@@ -134,13 +134,13 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                                     setCurrentRegistration(reg);
                                     appServices.pushNavigationStep("family-details-existing-reg", ()=>setCurrentRegistration(undefined));
                                 }}
-                                // onDelete={dayjs(reg.date).isBefore(dayjs()) ?
-                                //     undefined : // only allow deleting future commitments
-                                //     () => {
-                                //         setShowCancellationDialog(reg)
-                                //         appServices.pushNavigationStep("cancel-reg", ()=>setCurrentRegistration(undefined));
-                                //     }}
-                                // deleteLabel={"ביטול שיבוץ"}
+                                onDelete={dayjs(reg.date).isBefore(dayjs()) ?
+                                    undefined : // only allow deleting future commitments
+                                    () => {
+                                        setShowCancellationDialog(reg)
+                                        appServices.pushNavigationStep("cancel-reg", ()=>setCurrentRegistration(undefined));
+                                    }}
+                                deleteLabel={"ביטול שיבוץ"}
                             />
                         )) :
                         <div className='no-messages'>אין רישומים</div>

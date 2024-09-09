@@ -16,6 +16,14 @@ import OneLine from './one-line';
 import { getUniqueFamilies } from './utils';
 import { ScrollPanel } from 'primereact/scrollpanel';
 
+function cleanseCityName(cityName: string) {
+    return cityName.replace(/["\n\s]/g, '');
+}
+
+function compareCities(c1: string, c2: string) {
+    return cleanseCityName(c1) === cleanseCityName(c2);
+}
+
 
 interface RegistrationComponentProps {
     userInfo: UserInfo | null;
@@ -51,7 +59,7 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
             // calculate the cities' availability
             // const cities = getUniqueCities(demands.demands).map(city => ({ ...city, available: true }));
             // console.log("cities", demands.allDistrictCities)
-            const cities = demands.allDistrictCities.map(city => ({ ...city, available: (demands.demands.some(d => d.city === city.name)) } as CityAvailability));
+            const cities = demands.allDistrictCities.map(city => ({ ...city, available: (demands.demands.some(d => compareCities(d.city ,city.name))) } as CityAvailability));
             setCities(cities);
             if (cities.length == 1) {
                 console.log("cities", cities)
@@ -80,8 +88,9 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
         <div>לא נותרו משפחות לשיבוץ לתקופה הקרובה - אם מישהו יבטל תקבלו הודעה </div>
     )
 
+
     const selectedFamilyDemand = selectedFamily ? familyDemands.filter(fd => fd.familyRecordId === selectedFamily.familyId) : undefined;
-    const filteredFamilies = families.filter(family => selectedCities.some(sc => sc.name === family.city));
+    const filteredFamilies = families.filter(family => selectedCities.some(sc => compareCities(sc.name, family.city)));
 
     return (
         <div className="registration-component">

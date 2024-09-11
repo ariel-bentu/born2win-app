@@ -242,7 +242,9 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
     if (showFamilyDetails) {
         return <FamilyDetailsComponent appServices={appServices} demands={demands} familyId={showFamilyDetails.familyId} family={showFamilyDetails}
             includeContacts={true} onClose={() => {
+                appServices.popNavigationStep();
                 setShowFamilyDetails(undefined);
+
                 // todo push nav state
             }} reloadOpenDemands={() => { }} detailsOnly={true} />;
     }
@@ -283,7 +285,10 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                                 sortedFamilies.map((family, j) => (
                                     <div className="family-chip" key={j}>
                                         <span className="family-details-link clickable-span"
-                                            onClick={() => setShowFamilyDetails(family)}> {family.familyLastName}:</span>
+                                            onClick={() => {
+                                                appServices.pushNavigationStep("family-details-management", ()=>setShowFamilyDetails(undefined));
+                                                setShowFamilyDetails(family)
+                                                }}> {family.familyLastName}:</span>
                                         <div>{
                                             isShowOpen ?
                                                 family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map(d => dayjs(d.date).format("DD.MM")).join(" | ") :

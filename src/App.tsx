@@ -57,7 +57,10 @@ const offline = !!urlParams.get('offline');
 const client = new ClientJS();
 const fingerprint = isIOS ? client.getFingerprint() + "" : "";
 let currentVolId: string | null = localStorage.getItem(VOL_ID_STORAGE_KEY);
-let exiting = false;
+let navState: { isExiting: boolean, navState: NavigationState[] } = {
+    isExiting: false,
+    navState: [],
+}
 /*
 Tests:
 Browser:
@@ -96,7 +99,6 @@ function App() {
     const [error, setError] = useState<string | undefined>();
     const [loggedOut, setLoggedOut] = useState<boolean>(false);
     const [phoneFlow, setPhoneFlow] = useState<boolean>(false);
-    const [navState, setNavState] = useState<NavigationState[]>([]);
     const [latestVersion, setLatestVersion] = useState<string | undefined>();
 
     const onAuth: NextOrObserver<User> = (user: User | null) => {
@@ -118,18 +120,15 @@ function App() {
         },
         pushNavigationStep: (label, backCallback) => {
             console.log("pushNavigationStep", label)
-            setNavState(prev => ([{ label, backCallback }, ...prev]))
-            //window.history.pushState({ label }, "");
+            navState.navState.push({ label, backCallback })
         },
         popNavigationStep: () => {
-            setNavState(prev => {
-                if (prev.length) {
-                    console.log("popNavigationStep", prev[0].label);
-                    return prev.slice(1);
-                }
-                console.log("One too many popNavigationStep")
-                return prev;
-            });
+            const top = navState.navState.pop();
+            if (top) {
+                console.log("popNavigationStep", top.label);
+            } else {
+                console.log("One too many popNavigationStep");
+            }
         },
     }
 
@@ -411,38 +410,45 @@ function App() {
         };
 
         const onPopState = (e: PopStateEvent) => {
-            console.log("pop state", e.state);
-            e.preventDefault();
+            console.log("pop-state-event", e.state);
+            const newState = { root: (e.state?.root || 0) + 1 };
+            if (!navState.isExiting) {
+                window.history.pushState(newState, "");
+                console.log("push-history-state", newState, "length", window.history.length);
+            } else {
+                console.log("pop-state - exiting");
+                return;
+            }
 
-
-            setNavState(existing => {
-                if (existing.length) {
-                    existing[0].backCallback(existing[0].label);
-                    window.history.pushState({ root: (e.state?.root || 0) + 1 }, "");
-                    return existing.slice(1);
-                } else {
-                    if (!exiting) {
-                        confirmPopup({
-                            message: "האם לצאת מהאפליקציה?",
-                            icon: 'pi pi-exclamation-triangle',
-                            accept: () => {
-                                exiting = true;
-                                window.history.back();
-                                window.history.back();
-                            }
-                        });
-                    }
+            if (navState.navState.length) {
+                const top = navState.navState.pop();
+                if (top) {
+                    top.backCallback(top.label);
                 }
-                return [];
-            })
+            } else {
+                navState.isExiting = true;
+                window.history.back();
+                // if (!exiting) {
+                //     confirmPopup({
+                //         message: "האם לצאת מהאפליקציה?",
+                //         icon: 'pi pi-exclamation-triangle',
+                //         accept: () => {
+                //             exiting = true;
+                //             window.history.go(-2);
+                //         }
+                //     });
+                // }
+            }
+
         }
 
         navigator.serviceWorker?.addEventListener("message", onPostMessage);
         document.addEventListener('visibilitychange', onVisibilityChange);
 
+        // important, otherwise back will exit immidiatly
         window.history.pushState({ root: 1 }, "");
         window.addEventListener('popstate', onPopState);
-
+        console.log("Init: Browser history state", window.history.state, "length", window.history.length);
 
         return () => {
             navigator.serviceWorker.removeEventListener('message', onPostMessage);

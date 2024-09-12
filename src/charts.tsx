@@ -289,7 +289,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                                                 appServices.pushNavigationStep("family-details-management", ()=>setShowFamilyDetails(undefined));
                                                 setShowFamilyDetails(family)
                                                 }}> {family.familyLastName}:</span>
-                                        <div>{
+                                        <div className='flex w-12 flex-wrap'>{
                                             isShowOpen ?
                                                 family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map(d => dayjs(d.date).format("DD.MM")).join(" | ") :
                                                 family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map((d, k) => (

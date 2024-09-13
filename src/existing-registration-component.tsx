@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import { getUserRegistrations } from './api';
 import { SelectButton } from 'primereact/selectbutton';
-import { AppServices, FamilyCompact, FamilyDemand, NavigationStep, ShowToast } from './types';
+import { AppServices, FamilyCompact, FamilyDemand, NavigationStep } from './types';
 
 import { InProgress } from './common-ui';
 import OneLine from './one-line';
 import RegistrationCancellation from './registration-cancellation';
-import { NICE_DATE, sortByDate, sortByDateDesc } from './utils';
+import { NICE_DATE, sortByDateDesc } from './utils';
 import { FamilyDetailsComponent } from './famility-registration-details';
 
 const Filters = {
@@ -51,7 +51,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
         })
             .catch(err => setError(err))
             .finally(() => setLoading(false));
-    }, [reload, actualUserId]);
+    }, [reload, actualUserId, navigationRequest, appServices]);
 
     const isInFuture = (date: string) => {
         return dayjs().diff(date, "days") <= 0;
@@ -68,7 +68,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
         </>
     );
 
-    if (registrations.length == 0) return (
+    if (registrations.length === 0) return (
         <div className='text-xl'>אין שיבוצים רשומים</div>
     )
 
@@ -101,7 +101,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
         />;
     }
 
-    const registrationsToShow = registrations?.filter(r => filter === Filters.ALL || filter === Filters.FUTURE && isInFuture(r.date));
+    const registrationsToShow = registrations?.filter(r => filter === Filters.ALL || (filter === Filters.FUTURE && isInFuture(r.date)));
     return (
         <div>
             <div className='flex flex-row justify-content-center relative'>

@@ -1,24 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Chart } from 'primereact/chart';
-import { Calendar } from 'primereact/calendar';
 import { MultiSelect } from 'primereact/multiselect';
 import dayjs from 'dayjs';
-import { AppServices, FamilyCompact, FamilyDemand, StatsData, UserInfo, VolunteerInfo } from './types';
-import { getDemandStats, getVolunteerInfo, handleSearchUsers } from './api';
+import { AppServices, FamilyCompact, FamilyDemand, UserInfo, VolunteerInfo } from './types';
+import { getDemands, getVolunteerInfo, handleSearchUsers } from './api';
 
-import { InProgress, PhoneNumber } from './common-ui';
+import { InProgress, PhoneNumber, WeekSelectorSlider } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
 import { sortByDate } from './utils';
 import { Button } from 'primereact/button';
 import "./charts.css"
 import { FamilyDetailsComponent } from './famility-registration-details';
 import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete';
-import { Tooltip } from 'primereact/tooltip';
 import { OverlayPanel } from 'primereact/overlaypanel';
 import { ProgressSpinner } from 'primereact/progressspinner';
 
 interface DemandChartProps {
-    data: StatsData;
+    data: FamilyDemand[];
     isShowOpen?: boolean;
     appServices: AppServices;
     userInfo: UserInfo;
@@ -57,14 +55,6 @@ interface GroupedData {
     };
 }
 
-const empty = {
-    totalDemands: [],
-    fulfilledDemands: [],
-    labels: [],
-    openFamilyDemands: [],
-    fulfilledFamilyDemands: [],
-} as StatsData;
-
 function simplifyFamilyName(name: string): string {
     const match = name.match(/משפחת\s(.+?)\s-/);
     if (match) {
@@ -73,46 +63,42 @@ function simplifyFamilyName(name: string): string {
     return name;
 }
 
+const filterOnlyOpen = (f: FamilyDemand) => f.status === "זמין";
+const filterOnlyFulfilled = (f: FamilyDemand) => f.status === "תפוס";
+
 
 export function Stats({ userInfo, appServices }: StatsProps) {
     const [loading, setLoading] = useState<boolean>(false);
-    const [data, setData] = useState<StatsData>(empty);
-    const [dateRange, setDateRange] = useState<[Date, Date | null] | null>(null);
+    const [data, setData] = useState<FamilyDemand[]>([]);
+    const [selectedWeeks, setSelectedWeeks] = useState<number[]>([0, 4]);
     const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
-    const calendar = useRef<Calendar>(null);
+    //const calendar = useRef<Calendar>(null);
     const [mode, setMode] = useState(Modes.Open);
     const [showFilterByVolunteer, setShowFilterByVolunteer] = useState<boolean>(false);
 
     useEffect(() => {
-        if (userInfo?.isAdmin && dateRange && selectedDistricts.length > 0) {
+        if (userInfo?.isAdmin && selectedWeeks && selectedDistricts.length > 0) {
             setLoading(true);
-            getDemandStats(dateRange, selectedDistricts).then(setData).finally(() => setLoading(false));
+
+            const range = selectedWeeks.map(d => dayjs().add(d, "week").toISOString()) as [string, string];
+            getDemands(range, selectedDistricts).then(demands => {
+                demands.sort((a, b) => sortByDate(a.date, b.date));
+                setData(demands);
+            }).finally(() => setLoading(false));
         } else {
-            setData(empty);
+            setData([]);
         }
-    }, [dateRange, selectedDistricts, userInfo]);
+    }, [selectedWeeks, selectedDistricts, userInfo]);
 
     useEffect(() => {
-        if (userInfo?.isAdmin && userInfo.districts?.length == 1) {
+        if (userInfo?.isAdmin && userInfo.districts?.length === 1) {
             setSelectedDistricts([userInfo.districts[0].id]);
         }
     }, [userInfo]);
 
-    const handleDateChange = (e: any) => {
-        if (!e.value || e.value.length !== 2) return;
-
-        const [start, end] = e.value;
-
-        const startOfWeek = dayjs(start).startOf('week').toDate();
-        const endOfWeek = end ? dayjs(end).endOf('week').toDate() : null;
-        setDateRange([startOfWeek, endOfWeek]);
-        if (endOfWeek) {
-            calendar.current?.hide();
-        }
-    };
 
     const handlePrepareMessageToSend = () => {
-        const groupedData = groupByCityAndFamily(data.openFamilyDemands);
+        const groupedData = groupByCityAndFamily(data.filter(filterOnlyOpen));
         prepareMessageToSend(groupedData);
     }
 
@@ -151,24 +137,24 @@ export function Stats({ userInfo, appServices }: StatsProps) {
 
     return (
         <div>
-            <div className='flex flex-row  justify-content-center align-items-center'>
-                <span className='ml-2'>תחום תאריכים</span>
+            <div className='flex flex-row  justify-content-center align-items-start' style={{ height: 75 }}>
+                {/* <span className='ml-2'>תחום תאריכים</span>
                 <Calendar
                     className="range-calender"
                     ref={calendar}
-                    value={dateRange}
+                    value={selectedWeeks}
                     onChange={handleDateChange}
                     selectionMode="range"
                     placeholder="בחר שבוע או מס׳ שבועות"
                     readOnlyInput
 
                     locale="he"
-                />
-                <Button label="חודש קדימה" unstyled icon="pi pi-calendar" className="icon-btn icon-btn-withLabel text-xs"
+                /> */}
+
+                <WeekSelectorSlider setSelectedWeeks={setSelectedWeeks} selectedWeeks={selectedWeeks} />
+                <Button label="חודש קדימה" unstyled icon="pi pi-calendar" className="icon-btn icon-btn-withLabel text-xs mr-3"
                     onClick={() => {
-                        const start = dayjs()
-                        const end = start.add(1, "month")
-                        setDateRange([start.toDate(), end.toDate()]);
+                        setSelectedWeeks([0, 4]);
                     }} />
             </div>
 
@@ -193,10 +179,10 @@ export function Stats({ userInfo, appServices }: StatsProps) {
                         </div>
                     )}
                 />
-                {mode == Modes.Open && <Button disabled={data.openFamilyDemands.length == 0}
+                {mode === Modes.Open && <Button disabled={!data.some(filterOnlyOpen)}
                     className="btn-on-the-right" label="הכן הודעה"
                     onClick={handlePrepareMessageToSend} />}
-                {mode == Modes.Fulfilled && <Button unstyled label="סנן" icon={"pi pi-filter" + (showFilterByVolunteer ? "-slash" : "")} className={"icon-btn icon-btn-withLabel"} onClick={(e) => {
+                {mode === Modes.Fulfilled && <Button unstyled label="סנן" icon={"pi pi-filter" + (showFilterByVolunteer ? "-slash" : "")} className={"icon-btn icon-btn-withLabel"} onClick={(e) => {
                     setShowFilterByVolunteer(!showFilterByVolunteer)
                 }} />}
 
@@ -204,8 +190,8 @@ export function Stats({ userInfo, appServices }: StatsProps) {
 
             {/* {error && <small style={{ color: 'red' }}>{error}</small>} */}
 
-            {mode == Modes.Open || mode == Modes.Fulfilled ?
-                <DemandList data={data} isShowOpen={mode == Modes.Open} appServices={appServices} userInfo={userInfo} showFilterByVolunteer={showFilterByVolunteer} /> :
+            {mode === Modes.Open || mode === Modes.Fulfilled ?
+                <DemandList data={data} isShowOpen={mode === Modes.Open} appServices={appServices} userInfo={userInfo} showFilterByVolunteer={showFilterByVolunteer} /> :
                 <DemandChart data={data} appServices={appServices} userInfo={userInfo} />
             }
         </div>
@@ -213,7 +199,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
 }
 
 export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appServices, userInfo, showFilterByVolunteer }) => {
-    let demands = (isShowOpen ? data.openFamilyDemands : data.fulfilledFamilyDemands);
+    let demands = data.filter(isShowOpen ? filterOnlyOpen : filterOnlyFulfilled);
     const [showFamilyDetails, setShowFamilyDetails] = useState<GroupedFamily | undefined>();
     const [filterByVolunteer, setFilterByVolunteer] = useState<any | undefined>();
     const [filteredUsers, setFilteredUsers] = useState<any | undefined>();
@@ -260,7 +246,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
             <div>
                 {!isShowOpen && showFilterByVolunteer && <AutoComplete
                     inputClassName="w-17rem md:w-20rem flex flex-row flex-wrap"
-                    placeholder={!filterByVolunteer || filterByVolunteer.length == 0 ? "חיפוש לפי שם פרטי, משפחה או טלפון" : undefined}
+                    placeholder={!filterByVolunteer || filterByVolunteer.length === 0 ? "חיפוש לפי שם פרטי, משפחה או טלפון" : undefined}
                     delay={500}
                     value={filterByVolunteer}
                     field="name"
@@ -286,9 +272,9 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                                     <div className="family-chip" key={j}>
                                         <span className="family-details-link clickable-span"
                                             onClick={() => {
-                                                appServices.pushNavigationStep("family-details-management", ()=>setShowFamilyDetails(undefined));
+                                                appServices.pushNavigationStep("family-details-management", () => setShowFamilyDetails(undefined));
                                                 setShowFamilyDetails(family)
-                                                }}> {family.familyLastName}:</span>
+                                            }}> {family.familyLastName}:</span>
                                         <div className='flex w-12 flex-wrap'>{
                                             isShowOpen ?
                                                 family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map(d => dayjs(d.date).format("DD.MM")).join(" | ") :
@@ -310,18 +296,18 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
             {/* OverlayPanel for displaying additional info */}
             <OverlayPanel ref={overlayPanelRef} showCloseIcon closeOnEscape
                 dismissable={true} >
-                    <div dir="rtl" style={{
+                <div dir="rtl" style={{
                     width: 280, display: "flex",
                     flexDirection: "column",
-                    
+
                 }}>
-                {selectedDateInfo && (volunteerInfo ?
-                    <>
-                        <div><strong>שם</strong>: {volunteerInfo.firstName + " " + volunteerInfo.lastName}</div>
-                        <PhoneNumber phone={volunteerInfo.phone} />
-                    </> :
-                    <div><ProgressSpinner style={{ height: 50 }} /> טוען...</div>
-                )}
+                    {selectedDateInfo && (volunteerInfo ?
+                        <>
+                            <div><strong>שם</strong>: {volunteerInfo.firstName + " " + volunteerInfo.lastName}</div>
+                            <PhoneNumber phone={volunteerInfo.phone} />
+                        </> :
+                        <div><ProgressSpinner style={{ height: 50 }} /> טוען...</div>
+                    )}
                 </div>
             </OverlayPanel>
         </div>
@@ -330,19 +316,42 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
 
 
 export const DemandChart: React.FC<DemandChartProps> = ({ data }) => {
+    const labels: string[] = []
+    const fulfilledDemands: number[] = []
+    const totalDemands: number[] = []
+    const today = dayjs().startOf("day");
+    data.forEach(demand => {
+        const recordDate = dayjs(demand.date).startOf("day");
+        const daysDiff = recordDate.diff(today, "days");
+        const daysRound2Week = Math.floor(daysDiff / 7);
+        const weekLabel = daysDiff >= 0 && daysDiff <= 6 ? "היום" : today.add(daysRound2Week * 7, "days").format("DD-MM");
+
+        let index = labels.findIndex(l => l === weekLabel);
+        if (index < 0) {
+            labels.push(weekLabel);
+            fulfilledDemands.push(0);
+            totalDemands.push(0);
+            index = labels.length - 1;
+        }
+
+        totalDemands[index]++;
+        if (demand.status === "תפוס") {
+            fulfilledDemands[index]++;
+        }
+    });
     const chartData = {
-        labels: data.labels,
+        labels: labels,
         datasets: [
             {
-                label: 'סה״כ ביקוש',
-                data: data.totalDemands,
+                label: 'סה״כ',
+                data: totalDemands,
                 fill: false,
                 borderColor: '#42A5F5',
                 tension: 0.1,
             },
             {
-                label: 'ביקוש שקיבל מענה',
-                data: data.fulfilledDemands,
+                label: 'שובצו',
+                data: fulfilledDemands,
                 fill: false,
                 borderColor: '#66BB6A',
                 tension: 0.1,

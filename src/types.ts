@@ -49,6 +49,7 @@ export interface FamilityDetailsPayload {
     familyDemandId: string;
 }
 
+
 export interface VolunteerInfoPayload {
     volunteerId:string;
 }
@@ -158,7 +159,7 @@ export interface StatsData {
     fulfilledFamilyDemands: FamilyDemand[];
 }
 
-export interface GetDemandStatPayload {
+export interface GetDemandsPayload {
     districts: string[];
     from: string;
     to: string;

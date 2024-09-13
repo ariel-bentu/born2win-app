@@ -14,14 +14,16 @@ import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
 import {
-    AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilyDemand, FamilyDetails, GetDemandStatPayload, LoginInfo,
-    NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord,
+    AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilyDemand, FamilyDetails, LoginInfo,
+    NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload,
+    SendNotificationStats, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord,
     FamilityDetailsPayload,
     NotificationChannels,
     GenerateLinkPayload,
     OpenFamilyDemands,
     VolunteerInfo,
     VolunteerInfoPayload,
+    GetDemandsPayload,
 } from "../../src/types";
 import axios from "axios";
 import express = require("express");
@@ -48,6 +50,7 @@ dayjs.locale("he");
 
 const JERUSALEM = "Asia/Jerusalem";
 const DATE_TIME = "YYYY-MM-DD HH:mm";
+const DATE_AT = "YYYY-MM-DD";
 const db = getFirestore();
 
 const appHost = "app.born2win.org.il";
@@ -932,7 +935,8 @@ exports.GetMealRequests = onCall({ cors: true }, async (request) => {
 async function getDemands(
     district: string,
     status: "תפוס" | "זמין" | undefined,
-    daysAhead: number | undefined,
+    dateStart?: string,
+    dateEnd?: string,
     volunteerId?: string,
     familyId?: string
 ): Promise<FamilyDemand[]> {
@@ -942,7 +946,9 @@ async function getDemands(
     };
     const mahuzRec = (await getDestricts()).find((d: any) => d.id === district);
     if (mahuzRec) {
+        let demantsResult: FamilyDemand[] = [];
         const baseId = mahuzRec.base_id;
+        const demandsTable = mahuzRec.demandsTable;
         const filters = [
             "({סטטוס בעמותה} = 'פעיל')",
         ];
@@ -953,24 +959,35 @@ async function getDemands(
         if (status) {
             filters.push(`{זמינות שיבוץ}='${status}'`);
         }
-        if (daysAhead !== undefined) {
+        if (dateStart !== undefined) {
             // eslint-disable-next-line quotes
-            filters.push(`IS_AFTER({תאריך},TODAY())`);
-            filters.push(`IS_BEFORE({תאריך},DATEADD(TODAY(),${daysAhead + 2},'days'))`);
+            filters.push(`IS_AFTER({תאריך},'${dateStart}')`);
+        }
+        if (dateEnd != undefined) {
+            filters.push(`IS_BEFORE({תאריך},'${dateEnd}')`);
         }
         if (volunteerId) {
             filters.push(`{volunteer_id}='${volunteerId}'`);
         }
 
-        const formula = encodeURIComponent(`AND(${filters.join(",")})`);
-        const query = `https://api.airtable.com/v0/${baseId}/דרישות לשיבוצים?filterByFormula=${formula}`;
+        const formula = `AND(${filters.join(",")})`;
+        const query = `https://api.airtable.com/v0/${baseId}/${demandsTable}`;
+        let offset;
+        do {
+            const demandsRespose: any = await axios.get(query, {
+                headers,
+                params: {
+                    offset: offset,
+                    filterByFormula: formula,
+                },
+            });
+            offset = demandsRespose.data.offset;
+            if (demandsRespose.data.records) {
+                demantsResult = demantsResult.concat(demandsRespose.data.records.map((demand: AirTableRecord) => demandAirtable2FamilyDemand(demand, district)));
+            }
+        } while (offset);
 
-        const demands = await axios.get(query, {
-            headers,
-        });
-        if (demands.data.records) {
-            return demands.data.records.map((demand: AirTableRecord) => demandAirtable2FamilyDemand(demand, district));
-        }
+        return demantsResult;
     }
     throw new HttpsError("not-found", "District not found");
 }
@@ -1018,16 +1035,35 @@ exports.GetOpenDemands = onCall({ cors: true }, async (request): Promise<OpenFam
 
     const district = doc.data().mahoz;
     const cities = await getCities();
-    const demands = await getDemands(district, "זמין", 45);
+    const demands = await getDemands(district, "זמין", dayjs().format(DATE_AT), dayjs().add(45, "days").format(DATE_AT));
     return { demands, allDistrictCities: cities.filter(city => city.district === district) };
 });
 
+exports.GetDemands = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
+    const userInfo = await getUserInfo(request);
+    if (userInfo.isAdmin) {
+        const gdp = request.data as GetDemandsPayload;
+        let resultDemands: FamilyDemand[] = [];
+
+        for (let i = 0; i < gdp.districts.length; i++) {
+            const requestedDistrict = gdp.districts[i];
+            // Verify the user is admin of that district
+            if (userInfo.districts?.find((d: any) => d.id === requestedDistrict)) {
+                const districtDemands = await getDemands(requestedDistrict, undefined, gdp.from, gdp.to);
+                resultDemands = resultDemands.concat(districtDemands);
+            }
+        }
+        return resultDemands;
+    }
+
+    throw new HttpsError("permission-denied", "Unauthorized user to read all demands");
+});
 
 exports.GetUserRegistrations = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
     const doc = await authenticate(request);
     const district = doc.data().mahoz;
     const volunteerId = doc.id;
-    return getDemands(district, "תפוס", undefined, volunteerId);
+    return getDemands(district, "תפוס", undefined, undefined, volunteerId);
 });
 
 
@@ -1405,7 +1441,7 @@ async function alertOpenDemands() {
     const waitFor = [];
 
     for (let i = 0; i < districts.length; i++) {
-        const openDemands = await getDemands(districts[i].id, "זמין", 5);
+        const openDemands = await getDemands(districts[i].id, "זמין", dayjs().format(DATE_AT), dayjs().add(5, "days").format(DATE_AT));
         let msgBody = "מחוז: " + districts[i].name + "\n";
         if (openDemands.length > 0) {
             let found = false;
@@ -1429,7 +1465,7 @@ async function alertUpcomingCooking() {
     const daysBefore = 3;
     for (let i = 0; i < districts.length; i++) {
         if (districts[i].id !== "recxuE1Cwav0kfA7g") continue; // only in test for now
-        const upcomingDemands = await getDemands(districts[i].id, "תפוס", daysBefore);
+        const upcomingDemands = await getDemands(districts[i].id, "תפוס", dayjs().format(DATE_AT), dayjs().add(daysBefore, "days").format(DATE_AT));
         for (let j = 0; j < upcomingDemands.length; j++) {
             const demand = upcomingDemands[j];
             const daysLeft = -dayjs().diff(demand.date, "days");
@@ -1594,78 +1630,3 @@ async function syncBorn2WinUsers(sinceDate?: any) {
 function getRegistrationLink(userId: string, otp: string): string {
     return `https://${appHost}?vid=${userId}&otp=${otp}`;
 }
-
-/**
- * ANALITICS
- */
-exports.GetDemandStats = onCall({ cors: true }, async (request): Promise<StatsData> => {
-    const userInfo = await getUserInfo(request);
-    if (userInfo.isAdmin) {
-        const gdsp = request.data as GetDemandStatPayload;
-        const totalDemandsMap: { [key: string]: number } = {};
-        const fulfilledDemandsMap: { [key: string]: number } = {};
-        const openFamilyDemands = [] as FamilyDemand[];
-        const fulfilledFamilyDemands = [] as FamilyDemand[];
-
-        const startDate = dayjs(gdsp.from).startOf("day");
-        const endDate = dayjs(gdsp.to).endOf("day");
-        const apiKey = born2winApiKey.value();
-        for (let i = 0; i < gdsp.districts.length; i++) {
-            const requestedDistrict = gdsp.districts[i];
-            // Verify the user is admin of that district
-            if (userInfo.districts?.find((d: any) => d.id === requestedDistrict)) {
-                // find district info
-                const district = (await getDestricts()).find(d => d.id === requestedDistrict);
-                if (district) {
-                    const url = `https://api.airtable.com/v0/${district.base_id}/${district.demandsTable}`;
-                    let offset = undefined;
-
-                    do {
-                        const response: any = await axios.get<{ records: any[] }>(url, {
-                            headers: {
-                                Authorization: `Bearer ${apiKey}`,
-                            },
-                            params: {
-                                offset: offset,
-                                filterByFormula: `AND(({סטטוס בעמותה} = 'פעיל'), IS_AFTER({תאריך}, '${startDate.format("YYYY-MM-DD")}'), IS_BEFORE({תאריך}, '${endDate.format("YYYY-MM-DD")}'))`,
-                            },
-                        });
-
-                        const records = response.data.records;
-                        offset = response.data.offset;
-
-                        records.forEach((record: any) => {
-                            const weekLabel = dayjs(record.fields["תאריך"]).startOf("week").format("YYYY-MM-DD");
-
-                            if (!totalDemandsMap[weekLabel]) {
-                                totalDemandsMap[weekLabel] = 0;
-                                fulfilledDemandsMap[weekLabel] = 0;
-                            }
-
-                            totalDemandsMap[weekLabel] += 1;
-
-                            if (record.fields["זמינות שיבוץ"] === "תפוס" && record.fields.volunteer_id) {
-                                fulfilledDemandsMap[weekLabel] += 1;
-                                fulfilledFamilyDemands.push(demandAirtable2FamilyDemand(record, district.id));
-                            } else if (record.fields["זמינות שיבוץ"] === "זמין") {
-                                openFamilyDemands.push(demandAirtable2FamilyDemand(record, district.id));
-                            }
-                        });
-                    } while (offset);
-                }
-            }
-        }
-        const labels = Object.keys(totalDemandsMap).sort();
-        const totalDemands = labels.map(label => totalDemandsMap[label]);
-        const fulfilledDemands = labels.map(label => fulfilledDemandsMap[label]);
-
-        return {
-            totalDemands,
-            fulfilledDemands,
-            labels,
-            openFamilyDemands,
-            fulfilledFamilyDemands,
-        };
-    }
-    return { totalDemands: [0], fulfilledDemands: [0], labels: [""], openFamilyDemands: [], fulfilledFamilyDemands: [] };
-});

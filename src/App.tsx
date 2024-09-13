@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { TabView, TabPanel } from 'primereact/tabview';
 import { Badge } from 'primereact/badge';
 import { Toast } from 'primereact/toast';
@@ -9,7 +9,7 @@ import 'primeflex/primeflex.css';
 import './App.css';
 import * as api from './api';
 import { NextOrObserver, User } from 'firebase/auth';
-import { AppServices, Cached, FamilyDemand, NavigationState, NavigationStep, NotificationActions, NotificationChannels, OpenFamilyDemands, ShowToast, UserInfo } from './types';
+import { AppServices, Cached, NavigationState, NavigationStep, OpenFamilyDemands, UserInfo } from './types';
 import { ClientJS } from 'clientjs';
 import NotificationsComponent from './notifications-component';
 import { countUnreadNotifications } from './notifications';
@@ -90,7 +90,7 @@ function App() {
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
     const [volunteerId, setVolunteerId] = useState<string | null>();
     const [actualUserId, setActualUserId] = useState<string>("");
-    const [notificationPermission, setNotificationPermission] = useState<string>((typeof Notification !== 'undefined') && Notification && Notification.permission || "unsupported");
+    const [notificationPermission, setNotificationPermission] = useState<string>(((typeof Notification !== 'undefined') && Notification && Notification.permission) || "unsupported");
     const [unreadCount, setUnreadCount] = useState(0);
     const [reloadNotifications, setReloadNotifications] = useState(0);
     const [loading, setLoading] = useState<boolean>(true);
@@ -113,7 +113,7 @@ function App() {
     const [navigationRequest, setNavigationRequest] = useState<NavigationStep | undefined>(undefined)
 
 
-    const appServices: AppServices = {
+    const appServices: AppServices = useMemo(()=>({
         showMessage: (severity, summary, detail) => {
             if (toast.current) {
                 toast.current.show({ severity, summary, detail });
@@ -131,7 +131,7 @@ function App() {
                 console.log("One too many popNavigationStep");
             }
         },
-    }
+    }),[]);
 
 
     useEffect(() => {
@@ -269,7 +269,7 @@ function App() {
     // LOGIN
     useEffect(() => {
         if (!loggedOut && init && !user) {
-            if (oldUrlParamID || isPWA || isDev || isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
+            if ((oldUrlParamID || isPWA || isDev || isNotEmpty(userPairingRequest)) && isNotEmpty(otpPairingRequest)) {
                 // Logs in annonymously and then user is set with user.uid
                 console.log("Logging in...")
                 setLoading(true);
@@ -283,7 +283,7 @@ function App() {
                 setReadyToInstall(true);
             }
         }
-    }, [init, user]);
+    }, [init, user,loggedOut]);
 
     useEffect(() => {
         if (user && user.uid) {
@@ -396,7 +396,7 @@ function App() {
         const onPostMessage = (payload: any) => {
             console.log("Recieved Message", payload)
             appServices.showMessage("info", "הודעה חדשה התקבלה", "");
-            if (payload.data?.type == "newMessage") {
+            if (payload.data?.type === "newMessage") {
                 console.log("New Notification arrived");
                 setTimeout(() => setReloadNotifications(prev => prev + 1), 2000);
             }
@@ -458,7 +458,7 @@ function App() {
             window.removeEventListener('popstate', onPopState);
         };
 
-    }, []);
+    }, [appServices]);
 
     useEffect(() => {
         countUnreadNotifications().then(updateUnreadCount);
@@ -608,7 +608,7 @@ function App() {
                         <NotificationsComponent updateUnreadCount={updateUnreadCount} reload={reloadNotifications} topPosition={tabContentsTop} appServices={appServices} />
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="שיבוצים">
-                        {activeIndex == 1 && <RegistrationComponent
+                        {activeIndex === 1 && <RegistrationComponent
                             userInfo={userInfo}
                             openDemands={getCachedOpenDemands()} openDemandsTS={openDemands?.fetchedTS.toISOString() || ""}
                             appServices={appServices} actualUserId={actualUserId}
@@ -618,7 +618,7 @@ function App() {
                             }} />}
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="פרטי התנדבות">
-                        {activeIndex == 2 && <ExistingRegistrationsComponent appServices={appServices} navigationRequest={navigationRequest} actualUserId={actualUserId} />}
+                        {activeIndex === 2 && <ExistingRegistrationsComponent appServices={appServices} navigationRequest={navigationRequest} actualUserId={actualUserId} />}
                     </TabPanel>
                     {isAdmin &&
                         <TabPanel headerStyle={{ fontSize: 20 }} header="ניהול שיבוצים">

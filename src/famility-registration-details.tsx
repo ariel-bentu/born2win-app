@@ -1,5 +1,5 @@
 import { Button } from "primereact/button";
-import { Calendar, CalendarDateTemplateEvent, CalendarMonthChangeEvent, CalendarViewChangeEvent } from "primereact/calendar";
+import { Calendar, CalendarDateTemplateEvent, CalendarMonthChangeEvent } from "primereact/calendar";
 import "./registration.css";
 
 
@@ -8,10 +8,8 @@ import { useEffect, useRef, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
 import { InProgress, PhoneNumber } from "./common-ui";
-import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails, ShowToast } from "./types";
+import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails } from "./types";
 import { isNotEmpty } from "./utils";
-import { openPhoneDialer, openWhatsApp } from "./notification-actions";
-import { ScrollPanel } from "primereact/scrollpanel";
 import { ProgressSpinner } from "primereact/progressspinner";
 
 interface FamilyDetailsComponentProps {
@@ -59,6 +57,7 @@ export function FamilyDetailsComponent({ familyId, family, familyDemandId, onClo
                 .catch(err => setError(err))
                 .finally(() => setLoading(false));
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [familyId, detailsOnly, reload]);
 
     const availableDates = demands.map(demand => new Date(demand.date));
@@ -99,7 +98,7 @@ export function FamilyDetailsComponent({ familyId, family, familyDemandId, onClo
 
     const isAvailableDatesVisible = demands.some(av => {
         const availableDate = dayjs(av.date);
-        return availableDate.year() === viewVisibleMonth.year && availableDate.month() == viewVisibleMonth.month;
+        return availableDate.year() === viewVisibleMonth.year && availableDate.month() === viewVisibleMonth.month;
     });
 
     return (
@@ -117,7 +116,7 @@ export function FamilyDetailsComponent({ familyId, family, familyDemandId, onClo
                     </div>
 
                     <h3>לבחירת תאריך:</h3>
-                    {demands.length == 0 && <div>אין תאריכים זמינים</div>}
+                    {demands.length === 0 && <div>אין תאריכים זמינים</div>}
                     <Calendar
                         onViewDateChange={(e) => {
                             setViewDate(e.value);

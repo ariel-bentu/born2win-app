@@ -1,5 +1,5 @@
 import { FirebaseApp, initializeApp } from "firebase/app";
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { getMessaging, getToken } from 'firebase/messaging';
 import {
     getAuth, onAuthStateChanged, signInAnonymously,
     signOut,
@@ -9,17 +9,16 @@ import {
     NextOrObserver,
     User
 } from "firebase/auth";
-import {
-    getFirestore, collection, getDocs, getDoc, doc,
-    query, where, orderBy, limit, startAfter,
-    updateDoc, setDoc, deleteDoc,
-    writeBatch,
-    Firestore
-} from 'firebase/firestore/lite';
+
 import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
-import { FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyDemand, FamilyDetails, GenerateLinkPayload, GetDemandStatPayload, NotificationChannels, NotificationUpdatePayload, OpenFamilyDemands, Recipient, SearchUsersPayload, SendMessagePayload, StatsData, TokenInfo, UpdateUserLoginPayload, UserInfo, VolunteerInfo, VolunteerInfoPayload } from "./types";
+import {
+    FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyDemand,
+    FamilyDetails, GenerateLinkPayload, GetDemandsPayload, NotificationChannels,
+    NotificationUpdatePayload, OpenFamilyDemands, Recipient, SearchUsersPayload,
+    SendMessagePayload, UpdateUserLoginPayload, UserInfo, VolunteerInfo, VolunteerInfoPayload
+} from "./types";
 import { readAllNotifications } from "./notifications";
 import { getDB } from "./db";
 
@@ -36,7 +35,6 @@ const firebaseConfig = {
 
 const VAPID_KEY = "BN_C98WkGcuT-h8cwniGtDjPwlJ1K_iP12wCgWPNehBfDLUiXALz98jZCLTGug_uoWI8ryoGJT-QxKHJjHIqEUE";
 let app: FirebaseApp;
-let db: Firestore;
 let auth: Auth;
 let functions: Functions;
 let serviceWorkerRegistration: any;
@@ -64,7 +62,6 @@ export function init(onAuth: NextOrObserver<User>) {
             });
         }
 
-        db = getFirestore(app);
         auth = getAuth(app);
 
         functions = getFunctions(app, 'europe-west1');
@@ -79,8 +76,8 @@ export function login() {
             console.log("User is authenticated", u.user.uid);
         })
         .catch((error) => {
-            const errorCode = error.code;
-            const errorMessage = error.message;
+            // const errorCode = error.code;
+            // const errorMessage = error.message;
             // ...
         });
 }
@@ -92,8 +89,8 @@ export function logout() {
             console.log("User is Now logged out");
         })
         .catch((error) => {
-            const errorCode = error.code;
-            const errorMessage = error.message;
+            // const errorCode = error.code;
+            // const errorMessage = error.message;
             // ...
         });
 }
@@ -135,7 +132,7 @@ export async function requestWebPushToken() {
             });
         } else {
             console.log("Permission denied to recieve notifications");
-            throw ("Permission denied to recieve notifications");
+            throw new Error("Permission denied to recieve notifications");
         }
     });
 }
@@ -231,20 +228,17 @@ export function getVolunteerInfo(volunteerId: string): Promise<VolunteerInfo> {
 }
 
 
-export async function getDemandStats(dateRange: [Date | null, Date | null], districts: string[]): Promise<StatsData> {
-    if (!dateRange[0] || !dateRange[1]) return {
-        totalDemands: [0], fulfilledDemands: [0], labels: [""],
-        openFamilyDemands: [], fulfilledFamilyDemands: []
-    }
+export async function getDemands(dateRange: [string, string], districts: string[]): Promise<FamilyDemand[]> {
+    if (!dateRange[0] || !dateRange[1]) return [];
 
     // No impersonation
-    const getDemandStatsFunc = httpsCallable(functions, 'GetDemandStats');
+    const getDemandsFunc = httpsCallable(functions, 'GetDemands');
     const payload = {
-        from: dateRange[0].toUTCString(),
-        to: dateRange[1].toUTCString(),
+        from: dateRange[0],
+        to: dateRange[1],
         districts
-    } as GetDemandStatPayload;
-    return getDemandStatsFunc(payload).then(res => res.data as StatsData);
+    } as GetDemandsPayload;
+    return getDemandsFunc(payload).then(res => res.data as FamilyDemand[]);
 }
 
 export async function sendMessage(districts: string[], recipient: Recipient[] | undefined, title: string, body: string) {
@@ -272,7 +266,7 @@ export async function syncNotifications() {
         for (let i = 0; i < serverNotifications.length; i++) {
             // check if the notificaitone exists already
             const oneServerNotif = serverNotifications[i];
-            if (!localNotifications.find(ln => ln.title == oneServerNotif.title && ln.body == oneServerNotif.body)) {
+            if (!localNotifications.find(ln => ln.title === oneServerNotif.title && ln.body === oneServerNotif.body)) {
 
                 let ch = NotificationChannels.General;
                 let dataObj: any = {};
@@ -326,7 +320,7 @@ export const handleSearchUsers = async (userInfo: UserInfo, query: string) => {
         let mahoz = districts.get(userMahuz);
         if (!mahoz) {
             mahoz = {
-                districtName: userInfo.districts?.find(d => d.id == userMahuz)?.name || "אחר",
+                districtName: userInfo.districts?.find(d => d.id === userMahuz)?.name || "אחר",
                 id: userMahuz,
                 users: [],
             }

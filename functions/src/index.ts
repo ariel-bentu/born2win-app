@@ -1391,7 +1391,7 @@ exports.httpApp = onRequest(app);
 
 const schedules = [
     { desc: "Reminder on Sunday at 10:30", min: 30, hour: [10], weekDay: 1, callback: remindVolunteersToRegister },
-    { desc: "Refresh webhook registration", min: 0, hour: [0], weekDay: "*", callback: refreshWebhookToken },
+    { desc: "Refresh webhook registration", min: 0, hour: [12], weekDay: "*", callback: refreshWebhookToken },
     { desc: "Sync Born2Win users daily", min: 0, hour: [17], weekDay: "*", callback: syncBorn2WinUsers },
     { desc: "Alert 5 days ahead open demand", min: 40, hour: [13], weekDay: "*", callback: alertOpenDemands },
     { desc: "Alert 72 hours before cooking", min: 0, hour: [16], weekDay: "*", callback: alertUpcomingCooking },
@@ -1499,7 +1499,7 @@ async function refreshWebhookToken() {
         "Authorization": `Bearer ${apiKey}`,
     };
 
-    return axios.post(`https://api.airtable.com/v0/bases/${airTableMainBase}/webhooks/${webhookID}/refresh`, {
+    return axios.post(`https://api.airtable.com/v0/bases/${airTableMainBase}/webhooks/${webhookID}/refresh`, {}, {
         headers,
     }).then(res => {
         if (res.status !== 200) {

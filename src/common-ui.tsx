@@ -28,6 +28,20 @@ export function RegisterToNotification({ onClick }: RegisterToNotificationProps)
     );
 }
 
+export function NewAppVersion({ onClick }: RegisterToNotificationProps) {
+    return (
+        <div className="notification-container">
+            <div className="notification-content">
+                <div className="notification-text">קיימת גרסא חדשה של האפליקציה</div>
+                <div className="button-container">
+                    <i className={`arrow-animation ${PrimeIcons.ANGLE_LEFT}`}></i>
+                    <Button  label="עדכן" icon="pi pi-refresh" disabled={!onClick} onClick={onClick} className="notification-button" style={{ gap: '8px', fontSize:24}} />
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export function PhoneNumber({ phone }: { phone: string }) {
     return <div className="flex flex-row align-items-center">
         <strong className="ml-2">טלפון:</strong>{nicePhone(phone)}

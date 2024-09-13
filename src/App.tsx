@@ -20,7 +20,7 @@ import PWAInstructions from './install-instruction';
 import { ExistingRegistrationsComponent } from './existing-registration-component';
 
 import { Stats } from './charts';
-import { InProgress, RegisterToNotification } from './common-ui';
+import { InProgress, NewAppVersion, RegisterToNotification } from './common-ui';
 import dayjs from 'dayjs';
 import { SendMessage } from './send-message';
 import { confirmPopup, ConfirmPopup } from 'primereact/confirmpopup';
@@ -100,6 +100,7 @@ function App() {
     const [loggedOut, setLoggedOut] = useState<boolean>(false);
     const [phoneFlow, setPhoneFlow] = useState<boolean>(false);
     const [latestVersion, setLatestVersion] = useState<string | undefined>();
+    const [newVersionExists, setNewVersionExists] = useState<boolean>(false);
 
     const onAuth: NextOrObserver<User> = (user: User | null) => {
         console.log("OnAuth - Login callback called", user);
@@ -147,16 +148,17 @@ function App() {
                     setLatestVersion(data.version);
                 } else if (data.version && data.version !== latestVersion) {
                     // New version detected
-                    confirmPopup({
-                        message: "קיימת גרסא חדשה לאפליקציה, האם לטעון כעת?",
-                        icon: 'pi pi-exclamation-triangle',
-                        accept: () => {
-                            window.location.reload();
-                        },
-                        acceptLabel: "לטעון עכשיו",
-                        rejectLabel: "לא עכשיו"
+                    // confirmPopup({
+                    //     message: "קיימת גרסא חדשה לאפליקציה, האם לטעון כעת?",
+                    //     icon: 'pi pi-exclamation-triangle',
+                    //     accept: () => {
+                    //         window.location.reload();
+                    //     },
+                    //     acceptLabel: "לטעון עכשיו",
+                    //     rejectLabel: "לא עכשיו"
 
-                    });
+                    // });
+                    setNewVersionExists(true);
                 }
             } catch (error) {
                 console.error('Error fetching version.json:', error);
@@ -519,11 +521,12 @@ function App() {
     /*
     header = 65
     divider = 32
-    notificationMessage = 120 - ?
+    notificationMessage/newVersionExists = 120 - ?
     tab = 54
     */
+
     const showRegToMessages = appReady && userInfo && !userInfo?.notificationToken;
-    const tabContentsTop = 161 + (showRegToMessages ? 120 : 0);
+    const tabContentsTop = 161 + (showRegToMessages || newVersionExists ? 120 : 0);
 
     if (oldUrlParamID) {
         // OLD URL SUPPORT - to remove after app launch
@@ -597,7 +600,8 @@ function App() {
 
             {error && <div>{error}</div>}
             {loading && !isNotificationTab && <InProgress />}
-            {showRegToMessages && <RegisterToNotification onClick={loading ? undefined : onAllowNotification} />}
+            {newVersionExists && <NewAppVersion onClick={() => window.location.reload()} />}
+            {showRegToMessages && !newVersionExists && <RegisterToNotification onClick={loading ? undefined : onAllowNotification} />}
             {appReady &&
                 <TabView dir='rtl' renderActiveOnly={false} activeIndex={activeIndex} onTabChange={(e) => setActiveIndex(e.index)}>
                     <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>

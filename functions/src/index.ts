@@ -26,7 +26,7 @@ import {
 import axios from "axios";
 import express = require("express");
 import crypto = require("crypto");
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { IL_DATE, replaceAll } from "../../src/utils";
 import localeData = require("dayjs/plugin/localeData");
 import { Lock } from "./lock";
@@ -363,52 +363,37 @@ exports.GetUserInfo = onCall({ cors: true }, getUserInfo);
 
 async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
     const doc = await authenticate(request);
-    if (doc) {
-        const data = doc.data();
-        const allDistricts = await getDestricts();
-        const userDistrict = allDistricts.find(d => d.id === data.mahoz);
-        const response = {
-            id: doc.id,
-            isAdmin: false,
-            notificationToken: data.notificationTokens?.find((tokenInfo: TokenInfo) => tokenInfo.uid === request.auth?.uid),
-            firstName: data.firstName,
-            lastName: data.lastName,
-            phone: data.phone,
-            userDistrict: { id: data.mahoz, name: userDistrict?.name || "" },
-            notificationOn: data.notificationOn,
-        } as UserInfo;
+    const data = doc.data();
+    const allDistricts = await getDestricts();
+    const userDistrict = allDistricts.find(d => d.id === data.mahoz);
+    let adminDistricts = undefined;
 
-        return db.collection(Collections.Admins).doc(doc.id).get().then(async (adminDoc) => {
-            if (adminDoc.exists) {
-                response.isAdmin = true;
-                if (adminDoc.data()?.districts.length > 0 && adminDoc.data()?.districts[0] === "all") {
-                    response.districts = allDistricts.map(d => ({ id: d.id, name: d.name }));
-                } else {
-                    response.districts = [];
-                    adminDoc.data()?.districts?.forEach((did: string) => {
-                        const district = allDistricts.find(d => d.id === did);
-                        if (district) {
-                            response.districts?.push({
-                                id: did,
-                                name: district.name,
-                            });
-                        }
-                    });
+    // Calculate the admin's districts
+    if (data.adminDistricts && data.adminDistricts.length > 0) {
+        if (data.adminDistricts[0] == "all") {
+            adminDistricts = allDistricts.map(district => ({ id: district.id, name: district.name }));
+        } else {
+            adminDistricts = [];
+            data.adminDistricts.forEach((ad: string) => {
+                const district = allDistricts.find(d => d.id === ad);
+                if (district) {
+                    adminDistricts.push({ id: district.id, name: district.name });
                 }
-            }
-            return response;
-        });
+            });
+        }
     }
+
     return {
-        id: "",
-        isAdmin: false,
-        firstName: "לא ידוע",
-        lastName: "",
-        phone: "",
-        notificationOn: false,
-        userDistrict: { id: "", name: "" },
-        notificationToken: undefined,
-    };
+        id: doc.id,
+        notificationOn: data.notificationOn,
+        notificationToken: data.notificationTokens?.find((tokenInfo: TokenInfo) => tokenInfo.uid === request.auth?.uid),
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        userDistrict: { id: data.mahoz, name: userDistrict?.name || "" },
+        isAdmin: (data.isAdmin == true),
+        districts: adminDistricts,
+    } as UserInfo;
 }
 
 exports.GenerateUserLink = onCall({ cors: true }, async (request) => {
@@ -554,6 +539,26 @@ exports.OnNotificationAdded = onDocumentCreated(`${Collections.Notifications}/{d
     return;
 });
 
+
+// Updates the "users" collection with admin info, on every change to "admins" collection
+exports.OnAdminChange = onDocumentWritten(`${Collections.Admins}/{docId}`, async (event) => {
+    logger.info("Admins changed", event);
+    if (event.data) {
+        const docAfter = event.data.after;
+        const updateUser: any = {};
+        if (docAfter.exists && docAfter.data()?.suspended !== true) {
+            updateUser.isAdmin = true;
+            updateUser.adminDistricts = docAfter.data()?.districts || [];
+        } else {
+            updateUser.isAdmin = false;
+            updateUser.adminDistricts = FieldValue.delete();
+        }
+
+        return db.collection(Collections.Users).doc(event.params.docId).update(updateUser);
+    }
+    return;
+});
+
 exports.LoadExistingNotifications = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);
     const mahoz = doc.data().mahoz;
@@ -642,6 +647,16 @@ async function getWebTokens(to: string | string[]): Promise<DeviceInfo[]> {
                 user.data().notificationTokens?.forEach((nt: TokenInfo) => {
                     webPushDevices.push({
                         ownerId: user.id,
+                        tokenInfo: nt,
+                    });
+                });
+            });
+        } else if (to.startsWith("admins")) {
+            const adminUsersSnapshot = await usersRef.where("isAdmin", "==", true).get();
+            adminUsersSnapshot.forEach(admin => {
+                admin.data().notificationTokens?.forEach((nt: TokenInfo) => {
+                    webPushDevices.push({
+                        ownerId: admin.id,
                         tokenInfo: nt,
                     });
                 });
@@ -791,7 +806,6 @@ async function authenticate(request: CallableRequest<any>): Promise<QueryDocumen
         }
         return impersonateDoc as QueryDocumentSnapshot;
     }
-
 
     const doc = await findUserByUID(uid);
     if (!doc) {
@@ -959,6 +973,25 @@ async function getDemands(
         }
     }
     throw new HttpsError("not-found", "District not found");
+}
+
+async function getDemand(district: string, familyDemandId: string): Promise<FamilyDemand> {
+    const apiKey = born2winApiKey.value();
+    const headers = {
+        "Authorization": `Bearer ${apiKey}`,
+    };
+    const districtRec = (await getDestricts()).find((d: any) => d.id === district);
+    if (districtRec) {
+        const query = `https://api.airtable.com/v0/${districtRec.base_id}/דרישות לשיבוצים/${familyDemandId}`;
+
+        const demand = await axios.get(query, {
+            headers,
+        });
+        if (demand.data) {
+            return demandAirtable2FamilyDemand(demand.data, district);
+        }
+    }
+    throw new HttpsError("not-found", "Family demand " + familyDemandId + " not found");
 }
 
 function demandAirtable2FamilyDemand(demand: AirTableRecord, district: string): FamilyDemand {
@@ -1134,17 +1167,14 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
 
 
 exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<FamilyDetails> => {
-    const doc = await authenticate(request);
+    const userInfo = await getUserInfo(request);
     const gfp = request.data as FamilityDetailsPayload;
-    const mahoz = doc.data().mahoz;
+    const district = userInfo.userDistrict.id;
 
-    if (gfp.district !== mahoz) {
-        // verify the user is admin of that district
-        const userInfo = await getUserInfo(request);
-        if (!userInfo.isAdmin || !userInfo.districts?.find(d => d.id === gfp.district)) {
-            logger.error("Permission denied to read family details", doc.id, mahoz, userInfo.isAdmin, gfp.district, "admin regions:", userInfo.districts);
-            throw new HttpsError("permission-denied", "Unauthorized to read family details from this district");
-        }
+    if (gfp.district !== district &&
+        (!userInfo.isAdmin || !userInfo.districts?.find(d => d.id === gfp.district))) {
+        logger.error("Permission denied to read family details", userInfo.id, userInfo.userDistrict, userInfo.isAdmin, gfp.district, "admin regions:", userInfo.districts);
+        throw new HttpsError("permission-denied", "Unauthorized to read family details from this district");
     }
 
     const mahuzRec = (await getDestricts()).find((d: any) => d.id === gfp.district);
@@ -1164,15 +1194,23 @@ exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<Famil
             name: "",
             phone: "",
         };
-        if (gfp.includeContacts) {
+        if (gfp.includeContacts && (userInfo.isAdmin || gfp.familyDemandId)) {
             try {
-                // Call the getFamilyContactDetails method
-                // logger.info("getFamilyContactDetails gfp.familyId:", gfp.familyId);
-                // logger.info("getFamilyContactDetails rec.fields.familyid:", rec.fields.familyid);
-                const fetchedDetails = await getFamilyContactDetails(rec.fields.familyid);
-                // Save the returned contact details as constants
-                contactDetails.name = fetchedDetails.name;
-                contactDetails.phone = fetchedDetails.phone;
+                let allowed = true;
+                if (!userInfo.isAdmin) {
+                    // read the demand and verify belongs to this user and not older that 7 days ago
+                    const demand = await getDemand(gfp.district, gfp.familyDemandId);
+                    if (demand.volunteerId !== userInfo.id || dayjs(demand.date).add(7, "days").isBefore(dayjs())) {
+                        allowed = false;
+                    }
+                }
+                if (allowed) {
+                    const fetchedDetails = await getFamilyContactDetails(rec.fields.familyid);
+
+                    // Save the returned contact details as constants
+                    contactDetails.name = fetchedDetails.name;
+                    contactDetails.phone = fetchedDetails.phone;
+                }
             } catch (error) {
                 logger.error("Error fetching contact details:", (error as any).message);
             }
@@ -1427,6 +1465,18 @@ async function refreshWebhookToken() {
 
     return axios.post(`https://api.airtable.com/v0/bases/${airTableMainBase}/webhooks/${webhookID}/refresh`, {
         headers,
+    }).then(res => {
+        if (res.status !== 200) {
+            logger.error("Refresh Webhook failed", res.status, res.statusText);
+            addNotificationToQueue("Refresh Webhook Failed", "AitTable Webhook refrsh Failed with status: " + res.status,
+                NotificationChannels.Alerts, [], "admins");
+        } else {
+            logger.error("Refresh Webhook Succeeded");
+        }
+    }).catch((err) => {
+        logger.error("Refresh Webhook failed", err);
+        addNotificationToQueue("Refresh Webhook Failed", "AitTable Webhook refrsh Failed with error: " + err.message,
+            NotificationChannels.Alerts, [], "admins");
     });
 }
 

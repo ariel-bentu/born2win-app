@@ -46,6 +46,7 @@ export interface FamilityDetailsPayload {
     familyId: string;
     district: string;
     includeContacts: boolean;
+    familyDemandId: string;
 }
 
 export interface VolunteerInfoPayload {
@@ -97,8 +98,8 @@ export interface UserInfo {
     lastName: string,
     notificationOn: boolean,
     phone: string,
-    isAdmin: boolean,
     userDistrict: { id: string, name: string },
+    isAdmin: boolean,
     districts?: { id: string, name: string }[],
 }
 

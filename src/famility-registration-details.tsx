@@ -17,6 +17,7 @@ import { ProgressSpinner } from "primereact/progressspinner";
 interface FamilyDetailsComponentProps {
     demands: FamilyDemand[];
     family: FamilyCompact;
+    familyDemandId?: string; // this is required only if not admin, so the server can check the user is indeed volunter of this demand and allow see details
     familyId: string; // added to avoid refresh when family object is recreated for the same family
     detailsOnly?: boolean;
     appServices: AppServices;
@@ -32,7 +33,7 @@ function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
         d.getFullYear() === event.year;
 }
 
-export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts }: FamilyDetailsComponentProps) {
+export function FamilyDetailsComponent({ familyId, family, familyDemandId, onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts }: FamilyDetailsComponentProps) {
     const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
     const [selectedDate, setSelectedDate] = useState<Nullable<Date>>(null);
     const [error, setError] = useState<any>(undefined);
@@ -53,7 +54,7 @@ export function FamilyDetailsComponent({ familyId, family, onClose, detailsOnly,
         if (familyId) {
             setLoading(true);
             console.log("get family details", familyId)
-            getFamilyDetails(family.familyId, family.district, includeContacts)
+            getFamilyDetails(family.familyId, family.district, familyDemandId, includeContacts)
                 .then(res => setFamilyDetails(res))
                 .catch(err => setError(err))
                 .finally(() => setLoading(false));

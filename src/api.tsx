@@ -207,9 +207,9 @@ export function updateFamilityDemand(demandId: string, familyId: string, cityId:
     return callFunctionWithImpersonation('UpdateFamilityDemand', payload);
 }
 
-export function getFamilyDetails(familyId: string, district: string, includeContacts: boolean): Promise<FamilyDetails> {
+export function getFamilyDetails(familyId: string, district: string, familyDemandId: string | undefined, includeContacts: boolean): Promise<FamilyDetails> {
     const payload = {
-        familyId, district, includeContacts
+        familyId, district, includeContacts, familyDemandId,
     } as FamilityDetailsPayload;
 
     return callFunctionWithImpersonation('GetFamilyDetails', payload)
@@ -223,7 +223,7 @@ export function getUserRegistrations(): Promise<FamilyDemand[]> {
         .then((res: any) => res.data);
 }
 
-export function getVolunteerInfo(volunteerId:string):Promise<VolunteerInfo> {
+export function getVolunteerInfo(volunteerId: string): Promise<VolunteerInfo> {
     const getVolunteerInfoFunc = httpsCallable(functions, 'GetVolunteerInfo');
     const vip = { volunteerId } as VolunteerInfoPayload;
 

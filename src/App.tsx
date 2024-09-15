@@ -269,7 +269,7 @@ function App() {
     // LOGIN
     useEffect(() => {
         if (!loggedOut && init && !user) {
-            if ((oldUrlParamID || isPWA || isDev || isNotEmpty(userPairingRequest)) && isNotEmpty(otpPairingRequest)) {
+            if (oldUrlParamID || isPWA || isDev || (isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest))) {
                 // Logs in annonymously and then user is set with user.uid
                 console.log("Logging in...")
                 setLoading(true);

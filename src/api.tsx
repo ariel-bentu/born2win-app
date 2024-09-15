@@ -21,6 +21,7 @@ import {
 } from "./types";
 import { readAllNotifications } from "./notifications";
 import { getDB } from "./db";
+import { isNotEmpty } from "./utils";
 
 
 const firebaseConfig = {
@@ -220,11 +221,21 @@ export function getUserRegistrations(): Promise<FamilyDemand[]> {
         .then((res: any) => res.data);
 }
 
-export function getVolunteerInfo(volunteerId: string): Promise<VolunteerInfo> {
+export async function getVolunteerInfo(volunteerId: string): Promise<VolunteerInfo> {
     const getVolunteerInfoFunc = httpsCallable(functions, 'GetVolunteerInfo');
-    const vip = { volunteerId } as VolunteerInfoPayload;
+    if (isNotEmpty(volunteerId)) {
+        const vip = { volunteerId } as VolunteerInfoPayload;
 
-    return getVolunteerInfoFunc(vip).then(res => res.data as VolunteerInfo);
+        return getVolunteerInfoFunc(vip).then(res => res.data as VolunteerInfo);
+    }
+    return ({
+        id: "",
+        firstName: "אין",
+        lastName: "",
+        district: { id: "", name: "אין" },
+        phone: "",
+        active: false,
+    } as VolunteerInfo)
 }
 
 

@@ -105,7 +105,7 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
                         <Button
                             icon="pi pi-facebook"
                             className="p-button-rounded p-button-primary p-mr-2"
-                            onClick={() => openLink('https://www.facebook.com/groups/409895932930832/')}
+                            onClick={() => openLink('https://www.facebook.com/BornToWinCancer?mibextid=ZbWKwL')}
                             aria-label="Facebook"
                         />
                         <Button

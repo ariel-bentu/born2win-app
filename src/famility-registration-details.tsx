@@ -106,7 +106,7 @@ export function FamilyDetailsComponent({ familyId, family, familyDemandId, onClo
             <Button unstyled icon="pi pi-times" onClick={onClose} className="icon-btn-l" style={{ position: "absolute", right: 0, top: 0 }} />
             {!detailsOnly && <>
                 <div className="flex flex-column justify-content-center align-items-center " >
-                    <div className="tm-5 pb-1 underline text-lg" style={{ maxWidth: "80%" }}>{family.familyLastName}</div>
+                    <div className="tm-5 pb-1 underline text-lg" style={{ maxWidth: "80%" }}>{family.familyLastName}{family.active?"":" - לא פעילה"}</div>
                     <div className="flex flex-row w-full justify-content-between rm-2">
                         <div><span className="m-2">עיר:</span><span>{family.city}</span></div>
                         <div className="flex flex-row align-items-center">

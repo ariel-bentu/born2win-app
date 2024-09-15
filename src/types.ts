@@ -143,6 +143,7 @@ export interface FamilyDemand {
     familyId: string;
     familyRecordId: string;
     volunteerId: string;
+    isFamilyActive: boolean;
 }
 
 export interface OpenFamilyDemands {
@@ -224,6 +225,7 @@ export interface FamilyCompact {
     district: string;
     familyLastName: string;
     city: string;
+    active: boolean;
 }
 
 

@@ -935,6 +935,7 @@ exports.GetMealRequests = onCall({ cors: true }, async (request) => {
 async function getDemands(
     district: string,
     status: "תפוס" | "זמין" | undefined,
+    includeNonActiveFamily: boolean,
     dateStart?: string,
     dateEnd?: string,
     volunteerId?: string,
@@ -949,9 +950,11 @@ async function getDemands(
         let demantsResult: FamilyDemand[] = [];
         const baseId = mahuzRec.base_id;
         const demandsTable = mahuzRec.demandsTable;
-        const filters = [
-            "({סטטוס בעמותה} = 'פעיל')",
-        ];
+        const filters = [];
+
+        if (!includeNonActiveFamily) {
+            filters.push("({סטטוס בעמותה} = 'פעיל')");
+        }
 
         if (familyId) {
             filters.push(`FIND("${familyId}",  ARRAYJOIN({record_id (from משפחה)})) > 0`);
@@ -1022,6 +1025,7 @@ function demandAirtable2FamilyDemand(demand: AirTableRecord, district: string): 
         familyId: getSafeFirstArrayElement(demand.fields.Family_id, ""),
         familyRecordId: getSafeFirstArrayElement(demand.fields["משפחה"], ""),
         volunteerId: demand.fields.volunteer_id,
+        isFamilyActive: demand.fields["סטטוס בעמותה"] == "פעיל",
     };
 }
 
@@ -1035,7 +1039,7 @@ exports.GetOpenDemands = onCall({ cors: true }, async (request): Promise<OpenFam
 
     const district = doc.data().mahoz;
     const cities = await getCities();
-    const demands = await getDemands(district, "זמין", dayjs().format(DATE_AT), dayjs().add(45, "days").format(DATE_AT));
+    const demands = await getDemands(district, "זמין", false, dayjs().format(DATE_AT), dayjs().add(45, "days").format(DATE_AT));
     return { demands, allDistrictCities: cities.filter(city => city.district === district) };
 });
 
@@ -1049,7 +1053,7 @@ exports.GetDemands = onCall({ cors: true }, async (request): Promise<FamilyDeman
             const requestedDistrict = gdp.districts[i];
             // Verify the user is admin of that district
             if (userInfo.districts?.find((d: any) => d.id === requestedDistrict)) {
-                const districtDemands = await getDemands(requestedDistrict, undefined, gdp.from, gdp.to);
+                const districtDemands = await getDemands(requestedDistrict, undefined, true, gdp.from, gdp.to);
                 resultDemands = resultDemands.concat(districtDemands);
             }
         }
@@ -1063,7 +1067,7 @@ exports.GetUserRegistrations = onCall({ cors: true }, async (request): Promise<F
     const doc = await authenticate(request);
     const district = doc.data().mahoz;
     const volunteerId = doc.id;
-    return getDemands(district, "תפוס", undefined, undefined, volunteerId);
+    return getDemands(district, "תפוס", true, undefined, undefined, volunteerId);
 });
 
 
@@ -1441,7 +1445,7 @@ async function alertOpenDemands() {
     const waitFor = [];
 
     for (let i = 0; i < districts.length; i++) {
-        const openDemands = await getDemands(districts[i].id, "זמין", dayjs().format(DATE_AT), dayjs().add(5, "days").format(DATE_AT));
+        const openDemands = await getDemands(districts[i].id, "זמין", false, dayjs().format(DATE_AT), dayjs().add(5, "days").format(DATE_AT));
         let msgBody = "מחוז: " + districts[i].name + "\n";
         if (openDemands.length > 0) {
             let found = false;
@@ -1465,7 +1469,7 @@ async function alertUpcomingCooking() {
     const daysBefore = 3;
     for (let i = 0; i < districts.length; i++) {
         if (districts[i].id !== "recxuE1Cwav0kfA7g") continue; // only in test for now
-        const upcomingDemands = await getDemands(districts[i].id, "תפוס", dayjs().format(DATE_AT), dayjs().add(daysBefore, "days").format(DATE_AT));
+        const upcomingDemands = await getDemands(districts[i].id, "תפוס", true, dayjs().format(DATE_AT), dayjs().add(daysBefore, "days").format(DATE_AT));
         for (let j = 0; j < upcomingDemands.length; j++) {
             const demand = upcomingDemands[j];
             const daysLeft = -dayjs().diff(demand.date, "days");

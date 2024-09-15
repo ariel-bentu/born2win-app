@@ -56,6 +56,7 @@ interface GroupedData {
 }
 
 function simplifyFamilyName(name: string): string {
+    if (!name) return "";
     const match = name.match(/משפחת\s(.+?)\s-/);
     if (match) {
         return match[1]; // Extracted family name
@@ -63,7 +64,7 @@ function simplifyFamilyName(name: string): string {
     return name;
 }
 
-const filterOnlyOpen = (f: FamilyDemand) => f.status === "זמין";
+const filterOnlyOpen = (f: FamilyDemand) => f.status === "זמין" && f.isFamilyActive === true;
 const filterOnlyFulfilled = (f: FamilyDemand) => f.status === "תפוס";
 
 
@@ -274,7 +275,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                                             onClick={() => {
                                                 appServices.pushNavigationStep("family-details-management", () => setShowFamilyDetails(undefined));
                                                 setShowFamilyDetails(family)
-                                            }}> {family.familyLastName}:</span>
+                                            }}> {family.familyLastName}{family.active?"":"-לא פעילה"}:</span>
                                         <div className='flex w-12 flex-wrap'>{
                                             isShowOpen ?
                                                 family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map(d => dayjs(d.date).format("DD.MM")).join(" | ") :
@@ -390,7 +391,7 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
     familyDemands.forEach((family) => {
         const city = family.city.replaceAll("\"", "");
         const familyName = simplifyFamilyName(family.familyLastName);
-
+        
         // Initialize city if not exists
         if (!groupedByCityAndFamily[city]) {
             groupedByCityAndFamily[city] = {};
@@ -404,6 +405,7 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
                 familyId: family.familyRecordId,
                 city: family.city,
                 district: family.district,
+                active: family.isFamilyActive,
             };
         }
 

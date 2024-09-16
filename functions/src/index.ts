@@ -1100,6 +1100,20 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
         throw new HttpsError("already-exists", "מתנדב אחר מעדכן את הרשומה הזו ממש עכשיו");
     }
 
+    // First read the recod to verify it is indeed free
+    const demand = await getDemand(district.id, fdup.demandId);
+    if (demand.status !== (fdup.isRegistering ?
+        "זמין" :
+        "תפוס")) {
+        logger.info("Attept to a duplicated update family demand", fdup);
+        await lock.release();
+        // record does not fit expected state, reject the action
+        throw new HttpsError("already-exists", fdup.isRegistering ?
+            "התאריך המבוקש עבור משפחה זו נתפס" :
+            "התאריך המבוטל כבר מסומן כפנוי"
+        );
+    }
+
     const url = `https://api.airtable.com/v0/${district.base_id}/${district.demandsTable}/${fdup.demandId}`;
     const httpOptions = {
         headers: {
@@ -1394,7 +1408,7 @@ exports.httpApp = onRequest(app);
 */
 
 const schedules = [
-    { desc: "Reminder on Sunday at 10:30", min: 30, hour: [10], weekDay: 1, callback: remindVolunteersToRegister },
+    { desc: "Reminder on Sunday at 10:30", min: 30, hour: [10], weekDay: 0, callback: remindVolunteersToRegister },
     { desc: "Refresh webhook registration", min: 0, hour: [12], weekDay: "*", callback: refreshWebhookToken },
     { desc: "Sync Born2Win users daily", min: 0, hour: [17], weekDay: "*", callback: syncBorn2WinUsers },
     { desc: "Alert 5 days ahead open demand", min: 40, hour: [13], weekDay: "*", callback: alertOpenDemands },

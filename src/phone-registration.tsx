@@ -71,11 +71,17 @@ export default function PhoneRegistration({ appServices, onPhoneRegistrationComp
                 <>
                     <div className="m-4 text-xl">נא להזין את מספר הטלפון הסלולרי, כולל קידומת</div>
                     <InputText autoFocus onKeyDown={handleKeyDownOnlyDigits} maxLength={10}
+                        keyfilter="pint"  // Use "num" for decimal numbers
+                        inputMode="numeric"
+                        type="text"
                         className="text-center text-3xl" onChange={(e) => setPhoneInput(e.currentTarget.value)} value={phoneInput} />
                 </> :
                 <>
                     <div className="m-2">קוד שנשלח אליך בווטסאפ</div>
                     <InputText onKeyDown={handleKeyDownOnlyDigits} maxLength={4}
+                        keyfilter="pint"  // Use "num" for decimal numbers
+                        inputMode="numeric"
+                        type="text"
                         className="text-center text-3xl" onChange={(e) => setVerificationCodeInput(e.currentTarget.value)} value={verificationCodeInput} />
                 </>
             }

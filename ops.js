@@ -215,11 +215,7 @@ async function searchMeals() {
         },
     };
     const filterFormula = `DATETIME_FORMAT({DATE}, 'YYYY-MM-DD')="2024-09-24"`;
-    // AND(
-    // FIND("${fdup.familyId}", ARRAYJOIN({משפחה})),
-    // FIND("${volunteerId}", ARRAYJOIN({מתנדב})),
-    // DATESTR({DATE})="${updatedRecord.fields["תאריך"]}"
-    // )`;
+    
 
     const findResult = await axios.get(urlMainBase, {
         ...httpOptions,
@@ -291,8 +287,8 @@ async function getDemands(district, status, daysAhead) {
                 familyLastName: demand.fields.Name,
                 district: district,
                 status: demand.fields["זמינות שיבוץ"],
-                familyId: demand.fields.Family_id[0],
-                familyRecordId: demand.fields["משפחה"][0],
+                mainBaseFamilyId: demand.fields.Family_id[0],
+                districtBaseFamilyId: demand.fields["משפחה"][0],
                 volunteerId: demand.fields.volunteer_id,
             }));
         }

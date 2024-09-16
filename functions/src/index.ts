@@ -939,7 +939,7 @@ async function getDemands(
     dateStart?: string,
     dateEnd?: string,
     volunteerId?: string,
-    familyId?: string
+    districtBaseFamilyId?: string
 ): Promise<FamilyDemand[]> {
     const apiKey = born2winApiKey.value();
     const headers = {
@@ -956,8 +956,8 @@ async function getDemands(
             filters.push("({סטטוס בעמותה} = 'פעיל')");
         }
 
-        if (familyId) {
-            filters.push(`FIND("${familyId}",  ARRAYJOIN({record_id (from משפחה)})) > 0`);
+        if (districtBaseFamilyId) {
+            filters.push(`FIND("${districtBaseFamilyId}",  ARRAYJOIN({record_id (from משפחה)})) > 0`);
         }
         if (status) {
             filters.push(`{זמינות שיבוץ}='${status}'`);
@@ -1022,8 +1022,8 @@ function demandAirtable2FamilyDemand(demand: AirTableRecord, district: string): 
         familyLastName: demand.fields.Name,
         district: district,
         status: demand.fields["זמינות שיבוץ"],
-        familyId: getSafeFirstArrayElement(demand.fields.Family_id, ""),
-        familyRecordId: getSafeFirstArrayElement(demand.fields["משפחה"], ""),
+        mainBaseFamilyId: getSafeFirstArrayElement(demand.fields.Family_id, ""), // The record ID of the main base table משפחות רשומות
+        districtBaseFamilyId: getSafeFirstArrayElement(demand.fields["משפחה"], ""), // The record ID in the district table of משפחות במחוז
         volunteerId: demand.fields.volunteer_id,
         isFamilyActive: demand.fields["סטטוס בעמותה"] == "פעיל",
     };
@@ -1134,7 +1134,7 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
                 {
                     "fields": {
                         "משפחה": [
-                            fdup.familyId,
+                            fdup.mainBaseFamilyId,
                         ],
                         "מתנדב": [
                             volunteerId,
@@ -1172,7 +1172,7 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
             },
         });
         if (findResult.data.records.length > 0) {
-            const rec = findResult.data.records.find((r: AirTableRecord) => r.fields["משפחה"][0] == fdup.familyId && r.fields["מתנדב"][0] == volunteerId);
+            const rec = findResult.data.records.find((r: AirTableRecord) => r.fields["משפחה"][0] == fdup.mainBaseFamilyId && r.fields["מתנדב"][0] == volunteerId);
             if (rec) {
                 // Delete the records
                 const updateCancelUrl = `${urlMainBase}/${rec.id}`;
@@ -1185,18 +1185,7 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
                 };
 
                 await axios.patch(updateCancelUrl, updateCancelFields, httpOptions);
-                logger.info("Existing registration was cancelled", rec.id, "family", fdup.familyId, "vid", volunteerId);
-
-                // // Add cancellation record
-                // const cancallationRec = await db.collection(Collections.Cancellations).doc();
-                // await cancallationRec.create({
-                //     cancelledAt: dayjs().utc().tz(JERUSALEM).format(DATE_TIME),
-                //     demandDate: demandDate,
-                //     reason: fdup.reason,
-                //     demandId: rec.id,
-                //     volunteerId,
-                //     familyId: fdup.familyId,
-                // });
+                logger.info("Existing registration was cancelled", rec.id, "main-base-family", fdup.mainBaseFamilyId, "vid", volunteerId);
 
                 // send notification to admins - if date is less than 10 days:
                 const daysDiff = dayjs().diff(demandDate, "days");
@@ -1240,7 +1229,7 @@ exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<Famil
         const baseId = mahuzRec.base_id;
         const familiesTable = mahuzRec.familiesTable;
 
-        const userRegistrations = await axios.get(`https://api.airtable.com/v0/${baseId}/${familiesTable}/${gfp.familyId}`, {
+        const userRegistrations = await axios.get(`https://api.airtable.com/v0/${baseId}/${familiesTable}/${gfp.districtBaseFamilyId}`, {
             headers,
         });
         const rec = userRegistrations.data;
@@ -1271,7 +1260,7 @@ exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<Famil
         }
         return ({
             id: rec.id,
-            familyId: rec.fields.familyid,
+            mainBaseFamilyId: rec.fields.familyid,
             familyLastName: rec.fields.Name,
             patientAge: rec.fields["גיל החולה"],
             prefferedMeal: rec.fields["העדפה לסוג ארוחה"],
@@ -1300,15 +1289,15 @@ exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<Famil
     throw new HttpsError("not-found", "Family not found");
 });
 
-async function getFamilyContactDetails(familyId: string) {
+async function getFamilyContactDetails(mainBaseFamilyId: string) {
     try {
-        logger.info("getFamilyContactDetails familyId:", familyId);
+        logger.info("getFamilyContactDetails main-base-familyId:", mainBaseFamilyId);
 
         const airTableMainBase = mainBase.value();
         const apiKey = born2winApiKey.value();
 
         // Construct the URL
-        const url = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("משפחות רשומות")}/${familyId}`;
+        const url = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("משפחות רשומות")}/${mainBaseFamilyId}`;
 
         // Make the request
         const response = await axios.get(url, {

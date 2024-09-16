@@ -618,7 +618,9 @@ function App() {
                             }} />}
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="פרטי התנדבות">
-                        {activeIndex === 2 && <ExistingRegistrationsComponent appServices={appServices} navigationRequest={navigationRequest} actualUserId={actualUserId} />}
+                        {activeIndex === 2 && <ExistingRegistrationsComponent 
+                        userInfo={userInfo}
+                        appServices={appServices} navigationRequest={navigationRequest} actualUserId={actualUserId} />}
                     </TabPanel>
                     {isAdmin &&
                         <TabPanel headerStyle={{ fontSize: 20 }} header="ניהול שיבוצים">

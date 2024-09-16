@@ -3,7 +3,7 @@ import { Chart } from 'primereact/chart';
 import { MultiSelect } from 'primereact/multiselect';
 import dayjs from 'dayjs';
 import { AppServices, FamilyCompact, FamilyDemand, UserInfo, VolunteerInfo } from './types';
-import { getDemands, getVolunteerInfo, handleSearchUsers } from './api';
+import { getDemands, getVolunteerInfo, handleSearchUsers, updateFamilityDemand } from './api';
 
 import { InProgress, PhoneNumber, WeekSelectorSlider } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
@@ -14,6 +14,8 @@ import { FamilyDetailsComponent } from './famility-registration-details';
 import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete';
 import { OverlayPanel } from 'primereact/overlaypanel';
 import { ProgressSpinner } from 'primereact/progressspinner';
+import { ProgressBar } from 'primereact/progressbar';
+import { confirmPopup } from 'primereact/confirmpopup';
 
 interface DemandChartProps {
     data: FamilyDemand[];
@@ -21,6 +23,7 @@ interface DemandChartProps {
     appServices: AppServices;
     userInfo: UserInfo;
     showFilterByVolunteer?: boolean;
+    onCancellationPerformed?: () => void;
 }
 
 const Modes = {
@@ -43,6 +46,9 @@ interface StatsProps {
 interface DateInfo {
     date: string;
     volunteerId: string;
+    demandId: string;
+    mainBaseFamilyId: string;
+    districtBaseFamilyId: string;
 }
 
 interface GroupedFamily extends FamilyCompact {
@@ -51,7 +57,7 @@ interface GroupedFamily extends FamilyCompact {
 
 interface GroupedData {
     [city: string]: {
-        [familyId: string]: GroupedFamily;
+        [districtBaseFamilyId: string]: GroupedFamily;
     };
 }
 
@@ -76,6 +82,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
     //const calendar = useRef<Calendar>(null);
     const [mode, setMode] = useState(Modes.Open);
     const [showFilterByVolunteer, setShowFilterByVolunteer] = useState<boolean>(false);
+    const [reload, setReload] = useState<number>(0);
 
     useEffect(() => {
         if (userInfo?.isAdmin && selectedWeeks && selectedDistricts.length > 0) {
@@ -89,7 +96,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
         } else {
             setData([]);
         }
-    }, [selectedWeeks, selectedDistricts, userInfo]);
+    }, [selectedWeeks, selectedDistricts, userInfo, reload]);
 
     useEffect(() => {
         if (userInfo?.isAdmin && userInfo.districts?.length === 1) {
@@ -192,18 +199,25 @@ export function Stats({ userInfo, appServices }: StatsProps) {
             {/* {error && <small style={{ color: 'red' }}>{error}</small>} */}
 
             {mode === Modes.Open || mode === Modes.Fulfilled ?
-                <DemandList data={data} isShowOpen={mode === Modes.Open} appServices={appServices} userInfo={userInfo} showFilterByVolunteer={showFilterByVolunteer} /> :
+                <DemandList data={data} isShowOpen={mode === Modes.Open} appServices={appServices} userInfo={userInfo}
+                    showFilterByVolunteer={showFilterByVolunteer}
+                    onCancellationPerformed={() => {
+                        appServices.showMessage("success", "בוטל בהצלחה", "")
+                        setReload(prev => prev + 1)
+                    }
+                    } /> :
                 <DemandChart data={data} appServices={appServices} userInfo={userInfo} />
             }
         </div>
     );
 }
 
-export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appServices, userInfo, showFilterByVolunteer }) => {
+export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appServices, userInfo, showFilterByVolunteer, onCancellationPerformed }) => {
     let demands = data.filter(isShowOpen ? filterOnlyOpen : filterOnlyFulfilled);
     const [showFamilyDetails, setShowFamilyDetails] = useState<GroupedFamily | undefined>();
     const [filterByVolunteer, setFilterByVolunteer] = useState<any | undefined>();
     const [filteredUsers, setFilteredUsers] = useState<any | undefined>();
+    const [cancelInProgress, setCancelInProgress] = useState<boolean>(false);
 
     const overlayPanelRef = useRef<any>(null);
 
@@ -227,7 +241,9 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
     const sortedCities = Object.keys(groupedData).sort();
 
     if (showFamilyDetails) {
-        return <FamilyDetailsComponent appServices={appServices} demands={demands} familyId={showFamilyDetails.familyId} family={showFamilyDetails}
+        return <FamilyDetailsComponent appServices={appServices} demands={demands} 
+            districtBaseFamilyId={showFamilyDetails.districtBaseFamilyId} 
+            family={showFamilyDetails}
             includeContacts={true} onClose={() => {
                 appServices.popNavigationStep();
                 setShowFamilyDetails(undefined);
@@ -275,7 +291,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                                             onClick={() => {
                                                 appServices.pushNavigationStep("family-details-management", () => setShowFamilyDetails(undefined));
                                                 setShowFamilyDetails(family)
-                                            }}> {family.familyLastName}{family.active?"":"-לא פעילה"}:</span>
+                                            }}> {family.familyLastName}{family.active ? "" : "-לא פעילה"}:</span>
                                         <div className='flex w-12 flex-wrap'>{
                                             isShowOpen ?
                                                 family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map(d => dayjs(d.date).format("DD.MM")).join(" | ") :
@@ -306,6 +322,20 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                         <>
                             <div><strong>שם</strong>: {volunteerInfo.firstName + " " + volunteerInfo.lastName}</div>
                             <PhoneNumber phone={volunteerInfo.phone} />
+                            <Button label="מחק התנדבות" onClick={() => {
+                                confirmPopup({
+                                    message: 'האם למחוק התנדבות זו?',
+                                    icon: 'pi pi-exclamation-triangle',
+                                    accept: async () => {
+                                        setCancelInProgress(true);
+                                        updateFamilityDemand(selectedDateInfo.demandId, selectedDateInfo.mainBaseFamilyId, "cityId(unknown)", false, `מנהל ${userInfo.firstName} ביטל.ה`)
+                                            .then(onCancellationPerformed)
+                                            .catch(err => appServices.showMessage("error", "ביטול נכשל", err.message))
+                                            .finally(() => setCancelInProgress(false));
+                                    }
+                                })
+                            }} />
+                            {cancelInProgress && <InProgress />}
                         </> :
                         <div><ProgressSpinner style={{ height: 50 }} /> טוען...</div>
                     )}
@@ -391,18 +421,18 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
     familyDemands.forEach((family) => {
         const city = family.city.replaceAll("\"", "");
         const familyName = simplifyFamilyName(family.familyLastName);
-        
+
         // Initialize city if not exists
         if (!groupedByCityAndFamily[city]) {
             groupedByCityAndFamily[city] = {};
         }
 
         // Initialize family under the city if not exists
-        if (!groupedByCityAndFamily[city][family.familyId]) {
-            groupedByCityAndFamily[city][family.familyId] = {
+        if (!groupedByCityAndFamily[city][family.districtBaseFamilyId]) {
+            groupedByCityAndFamily[city][family.districtBaseFamilyId] = {
                 dates: [],
                 familyLastName: familyName,
-                familyId: family.familyRecordId,
+                districtBaseFamilyId: family.districtBaseFamilyId,
                 city: family.city,
                 district: family.district,
                 active: family.isFamilyActive,
@@ -410,7 +440,10 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
         }
 
         // Add the formatted date to the family's array under the city
-        groupedByCityAndFamily[city][family.familyId].dates.push({
+        groupedByCityAndFamily[city][family.districtBaseFamilyId].dates.push({
+            demandId: family.id,
+            districtBaseFamilyId: family.districtBaseFamilyId,
+            mainBaseFamilyId: family.mainBaseFamilyId,
             date: family.date,
             volunteerId: family.volunteerId,
         });
@@ -419,9 +452,9 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
     return groupedByCityAndFamily;
 };
 
-function sortFamilies(familiesMap: { [familyId: string]: GroupedFamily }) {
+function sortFamilies(familiesMap: { [districtBaseFamilyId: string]: GroupedFamily }) {
     return Object.keys(familiesMap)
-        .map(familyId => familiesMap[familyId])
+        .map(districtBaseFamilyId => familiesMap[districtBaseFamilyId])
         .sort((a, b) => {
             if (a.familyLastName < b.familyLastName) {
                 return -1;

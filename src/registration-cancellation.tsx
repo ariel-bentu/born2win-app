@@ -3,19 +3,21 @@ import { Card } from "primereact/card";
 import { InputTextarea } from "primereact/inputtextarea";
 import { Button } from "primereact/button";
 import { updateFamilityDemand } from "./api";
-import { FamilyDemand } from "./types";
+import { FamilyDemand, UserInfo } from "./types";
 import { InProgress } from "./common-ui";
 import dayjs from "dayjs";
 import { openWhatsApp, WhatsAppPhoneNumber } from "./notification-actions";
+import { userInfo } from "os";
 
 interface RegistrationCancellationProps {
     onClose: () => void;
     onError: (err: Error) => void;
     onCancellationPerformed: () => void;
     registration: FamilyDemand;
+    userInfo:UserInfo|null;
 }
 
-export default function RegistrationCancellation({ onClose, onCancellationPerformed, registration, onError }: RegistrationCancellationProps) {
+export default function RegistrationCancellation({ onClose, onCancellationPerformed, registration, onError, userInfo }: RegistrationCancellationProps) {
     const [reason, setReason] = useState<string>("");
     const [isReasonValid, setIsReasonValid] = useState<boolean>(false);
     const [saving, setSaving] = useState<boolean>(false);
@@ -27,7 +29,7 @@ export default function RegistrationCancellation({ onClose, onCancellationPerfor
     };
 
     const daysLeft = dayjs().diff(registration.date, "days");
-    const blockCancellation = daysLeft >= -10;
+    const blockCancellation = daysLeft >= -10 && !userInfo?.isAdmin;
     console.log("daysLeft", daysLeft, blockCancellation)
 
     return (
@@ -77,7 +79,7 @@ export default function RegistrationCancellation({ onClose, onCancellationPerfor
                                     className="p-button-danger p-mr-2"
                                     onClick={() => {
                                         setSaving(true);
-                                        updateFamilityDemand(registration.id, registration.familyId, "cityId(unknown)", false, reason)
+                                        updateFamilityDemand(registration.id, registration.mainBaseFamilyId, "cityId(unknown)", false, reason)
                                             .then(onCancellationPerformed)
                                             .catch(onError)
                                             .finally(() => setSaving(false));

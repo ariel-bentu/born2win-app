@@ -12,7 +12,7 @@ import { ProgressSpinner } from "primereact/progressspinner";
 import { WhatsAppPhoneNumber } from "./notification-actions";
 
 interface HeaderProps {
-    version:string | undefined;
+    version: string | undefined;
     userName: string;
     volunteerId: string;
     userInfo: UserInfo | null,
@@ -136,6 +136,11 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
 
                     <h2 className="settings-title">הגדרות</h2>
                     <PanelMenu model={items} className="settings-menu" />
+                    {userInfo?.isAdmin && <Button className="w-12" label="לינק  כללי להתקנה" onClick={() => {
+                        navigator.clipboard.writeText("https://app.born2win.org.il");
+                        appServices.showMessage("success", "לינק כללי להתקנה הועתק - הדבקו היכן שתרצו", "");
+                    }} />}
+
                     {userInfo?.isAdmin && <div dir="rtl" className="m-2 text-lg font-semibold">פעל בשם:</div>}
                     <Impersonate isImpersonated={actualUserId != userInfo?.id} appServices={appServices} userInfo={userInfo} onChange={(userId, name) => {
                         if (userId && name) {

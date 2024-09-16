@@ -11,9 +11,9 @@ export const IL_DATE = "DD-MM-YYYY";
 export const getUniqueFamilies = (records: FamilyDemand[]): FamilyCompact[] => {
     const result = [] as FamilyCompact[];
     records.forEach(fd => {
-        if (!result.find(f => f.familyId === fd.familyRecordId)) {
+        if (!result.find(f => f.districtBaseFamilyId === fd.districtBaseFamilyId)) {
             result.push({
-                familyId: fd.familyRecordId,
+                districtBaseFamilyId: fd.districtBaseFamilyId,
                 familyLastName: fd.familyLastName,
                 city: fd.city,
                 district: fd.district,

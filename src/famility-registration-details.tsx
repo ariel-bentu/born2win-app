@@ -16,7 +16,7 @@ interface FamilyDetailsComponentProps {
     demands: FamilyDemand[];
     family: FamilyCompact;
     familyDemandId?: string; // this is required only if not admin, so the server can check the user is indeed volunter of this demand and allow see details
-    familyId: string; // added to avoid refresh when family object is recreated for the same family
+    districtBaseFamilyId: string; // added to avoid refresh when family object is recreated for the same family
     detailsOnly?: boolean;
     appServices: AppServices;
     onClose: () => void;
@@ -31,7 +31,7 @@ function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
         d.getFullYear() === event.year;
 }
 
-export function FamilyDetailsComponent({ familyId, family, familyDemandId, onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts }: FamilyDetailsComponentProps) {
+export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDemandId, onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts }: FamilyDetailsComponentProps) {
     const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
     const [selectedDate, setSelectedDate] = useState<Nullable<Date>>(null);
     const [error, setError] = useState<any>(undefined);
@@ -49,16 +49,16 @@ export function FamilyDetailsComponent({ familyId, family, familyDemandId, onClo
     };
 
     useEffect(() => {
-        if (familyId) {
+        if (districtBaseFamilyId) {
             setLoading(true);
-            console.log("get family details", familyId)
-            getFamilyDetails(family.familyId, family.district, familyDemandId, includeContacts)
+            console.log("get family details", districtBaseFamilyId)
+            getFamilyDetails(family.districtBaseFamilyId, family.district, familyDemandId, includeContacts)
                 .then(res => setFamilyDetails(res))
                 .catch(err => setError(err))
                 .finally(() => setLoading(false));
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [familyId, detailsOnly, reload]);
+    }, [districtBaseFamilyId, detailsOnly, reload]);
 
     const availableDates = demands.map(demand => new Date(demand.date));
     const isDateAvailable = (event: CalendarDateTemplateEvent) => {
@@ -153,7 +153,7 @@ export function FamilyDetailsComponent({ familyId, family, familyDemandId, onClo
                             setSelectedDate(null);
                             if (availabilityRecord && familyDetails) {
                                 setSaving(true);
-                                updateFamilityDemand(availabilityRecord.id, familyDetails.familyId, familyDetails.cityId, true).then(() => {
+                                updateFamilityDemand(availabilityRecord.id, familyDetails.mainBaseFamilyId, familyDetails.cityId, true).then(() => {
                                     appServices.showMessage("success", "שיבוץ נקלט בהצלחה", "");
                                     reloadOpenDemands();
                                     setReload(prev => prev + 1);

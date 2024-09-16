@@ -43,7 +43,7 @@ export interface NotificationUpdatePayload {
 }
 
 export interface FamilityDetailsPayload {
-    familyId: string;
+    districtBaseFamilyId: string;
     district: string;
     includeContacts: boolean;
     familyDemandId: string;
@@ -70,7 +70,7 @@ export interface City {
 
 export interface FamilityDemandUpdatePayload {
     demandId: string;
-    familyId: string;
+    mainBaseFamilyId: string;
     cityId: string;
     isRegistering: boolean; // true means register, false mean unregister
     reason?: string;
@@ -140,8 +140,8 @@ export interface FamilyDemand {
     district: string;
     status: string;
     familyLastName: string;
-    familyId: string;
-    familyRecordId: string;
+    mainBaseFamilyId: string;
+    districtBaseFamilyId: string;
     volunteerId: string;
     isFamilyActive: boolean;
 }
@@ -221,7 +221,7 @@ export type AppServices = {
 
 
 export interface FamilyCompact {
-    familyId: string;
+    districtBaseFamilyId: string;
     district: string;
     familyLastName: string;
     city: string;
@@ -231,7 +231,7 @@ export interface FamilyCompact {
 
 export interface FamilyDetails {
     id: string;
-    familyId: string;
+    mainBaseFamilyId: string;
     city: string;
     cityId: string;
     familyLastName: string;

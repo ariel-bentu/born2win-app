@@ -27,6 +27,7 @@ import { confirmPopup, ConfirmPopup } from 'primereact/confirmpopup';
 import { isNotEmpty } from './utils';
 import { DisposeNavigationRequester, initializeNavigationRequester } from './notification-actions';
 import PhoneRegistration from './phone-registration';
+import { Gallery } from './gallery';
 
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
@@ -85,6 +86,7 @@ https://app.born2win.org.il?dev=true -> show phone flow - for developers only te
 
 function App() {
     const [user, setUser] = useState<User | null>(offline ? { uid: "123" } as any : null);
+    const [isTokenAdmin, setIsTokenAdmin] = useState<boolean | undefined>();
     const [init, setInit] = useState<boolean>(false);
     const [readyToInstall, setReadyToInstall] = useState<boolean>(false);
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
@@ -104,6 +106,11 @@ function App() {
 
     const onAuth: NextOrObserver<User> = (user: User | null) => {
         console.log("OnAuth - Login callback called", user);
+        if (user) {
+            user.getIdTokenResult().then(token => {
+                setIsTokenAdmin(token.claims.isAdmin == true);
+            });
+        }
         setLoading(false);
         setUser(user);
     }
@@ -113,7 +120,7 @@ function App() {
     const [navigationRequest, setNavigationRequest] = useState<NavigationStep | undefined>(undefined)
 
 
-    const appServices: AppServices = useMemo(()=>({
+    const appServices: AppServices = useMemo(() => ({
         showMessage: (severity, summary, detail) => {
             if (toast.current) {
                 toast.current.show({ severity, summary, detail });
@@ -131,7 +138,7 @@ function App() {
                 console.log("One too many popNavigationStep");
             }
         },
-    }),[]);
+    }), []);
 
 
     useEffect(() => {
@@ -283,7 +290,7 @@ function App() {
                 setReadyToInstall(true);
             }
         }
-    }, [init, user,loggedOut]);
+    }, [init, user, loggedOut]);
 
     useEffect(() => {
         if (user && user.uid) {
@@ -373,6 +380,18 @@ function App() {
             }
         }
     }, [user]);
+
+
+    // Refresh token for admins
+    useEffect(() => {
+        if (user && userInfo && isTokenAdmin !== undefined) {
+            if (userInfo.isAdmin !== isTokenAdmin) {
+                console.log("Refresh user token");
+                // Force a token refresh
+                user.getIdToken(true);
+            }
+        }
+    }, [user, userInfo, isTokenAdmin])
 
     useEffect(() => {
         if (!offline && (isPWA || isDev || oldUrlParamID) && user && isNotEmpty(volunteerId)) {
@@ -555,6 +574,7 @@ function App() {
         <div>UserAgent: {navigator.userAgent}</div>
         <div>isAndroid: {isAndroid ? "Yes" : "No: "}</div>
         <div>isIOS: {isIOS ? "Yes" : "No: "}</div>
+        <div>Admin: {userInfo?.isAdmin ? "yes" : "no"} TokenAdmin: {isTokenAdmin ? "yes" : "no"}</div>
         <div>isChrome: {isChrome ? "Yes" : "No: "}</div>
         <div>Finger Print: {fingerprint}</div>
         <div>Login Status: {user ? "uid:" + user.uid : "Not logged in"}</div>
@@ -564,7 +584,6 @@ function App() {
         <div style={{ display: "flex", flexDirection: "column", width: 200, padding: 10 }}>
         </div>
     </div>
-
 
     return (
         <div className="App">
@@ -618,9 +637,9 @@ function App() {
                             }} />}
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="פרטי התנדבות">
-                        {activeIndex === 2 && <ExistingRegistrationsComponent 
-                        userInfo={userInfo}
-                        appServices={appServices} navigationRequest={navigationRequest} actualUserId={actualUserId} />}
+                        {activeIndex === 2 && <ExistingRegistrationsComponent
+                            userInfo={userInfo}
+                            appServices={appServices} navigationRequest={navigationRequest} actualUserId={actualUserId} />}
                     </TabPanel>
                     {isAdmin &&
                         <TabPanel headerStyle={{ fontSize: 20 }} header="ניהול שיבוצים">
@@ -632,6 +651,10 @@ function App() {
                         <TabPanel headerStyle={{ fontSize: 20 }} header="שליחה">
                             {isAdmin && <SendMessage userInfo={userInfo} appServices={appServices} />}
                         </TabPanel>}
+                    <TabPanel headerStyle={{ fontSize: 20 }} header="גלריה">
+                        {activeIndex === 5  &&
+                            <Gallery storagePath={"/gallery"} userInfo={userInfo} appServices={appServices} />}
+                    </TabPanel>
                 </TabView>}
         </div >
     );

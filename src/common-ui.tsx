@@ -9,7 +9,7 @@ import Slider from 'react-slider';
 import dayjs from "dayjs";
 
 export function InProgress() {
-    return <ProgressBar mode="indeterminate" style={{ height: '6px' }}></ProgressBar>;
+    return <ProgressBar mode="indeterminate" style={{ height: '6px', width:"100%" }}></ProgressBar>;
 }
 
 interface RegisterToNotificationProps {

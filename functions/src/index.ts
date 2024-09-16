@@ -557,7 +557,13 @@ exports.OnAdminChange = onDocumentWritten(`${Collections.Admins}/{docId}`, async
             updateUser.adminDistricts = FieldValue.delete();
         }
 
-        return db.collection(Collections.Users).doc(event.params.docId).update(updateUser);
+        const doc = await db.collection(Collections.Users).doc(event.params.docId).get();
+        if (doc.exists && doc.data()) {
+            const waitFor = doc.data()?.uid?.map((uid: string) => admin.auth().setCustomUserClaims(uid, { isAdmin: updateUser.isAdmin }));
+
+            waitFor.push(doc.ref.update(updateUser));
+            return Promise.all(waitFor);
+        }
     }
     return;
 });

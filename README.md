@@ -21,6 +21,20 @@ BORM2WIN_AT_WEBHOOK_USERS_ID=<webhook id>
 BORM2WIN_AT_WEBHOOK_USERS_MAC=<webhook secret>
 ```
 - Authentication: enable anonymous-logins
+- Storage: 
+  - enable the service
+  - create folder gallery
+  - change the rules to:
+  ```
+  service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+  }
+}
+```
 
 # Development Instructions
 ## Run locally 

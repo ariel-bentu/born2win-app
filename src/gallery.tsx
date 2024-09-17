@@ -4,12 +4,12 @@ import { Button } from 'primereact/button';
 import { Dialog } from 'primereact/dialog';
 import { FileUpload } from 'primereact/fileupload';
 import { AppServices, UserInfo } from './types';
-import { Galleria } from 'primereact/galleria';
 import { SelectButton } from 'primereact/selectbutton';
 import { InputText } from 'primereact/inputtext';
 import { InProgress } from './common-ui';
 import { confirmPopup } from 'primereact/confirmpopup';
-import { ProgressBar } from 'primereact/progressbar';
+import { Carousel } from 'primereact/carousel';
+import './gallery.css';
 
 
 interface GalleryProps {
@@ -44,6 +44,7 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
     const [fileFolderEditVisible, setFileFolderEditVisible] = useState<boolean>(false);
 
     const itemTemplate = (item: ImageItem) => {
+        console.log("render item", item.name)
         if (!item) return null;
         return <div>
             <div className='absolute w-12 text-center  text-black text-2xl font-bold p-3' style={{ backgroundColor: "rgba(255,255,255,0.3)" }}>{item.displayName}</div>
@@ -51,10 +52,21 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
         </div>;
     };
 
-    const thumbnailTemplate = (item: ImageItem) => {
+    const thumbnailTemplate = useCallback((item: ImageItem) => {
         if (!item) return null;
-        return <img src={item.url} alt={item.name} style={{ width: 70, display: 'block' }} />;
-    };
+        return <div onTouchEnd={() => {
+            console.log("Thumbnail clicked", item.name)
+            const currFolder = folders.find(f => f.name === currentFolder);
+            const currIndex = currFolder?.items.findIndex(i => i.name === item.name);
+            if (currIndex !== undefined && currIndex >= 0) {
+                setActiveIndex(currIndex)
+            }
+
+        }
+        }><img src={item.url} alt={item.name} style={{ width: 70, display: 'block' }} /></div>;
+    }, [folders, currentFolder]);
+
+
     useEffect(() => {
         const loadFolders = async () => {
             const path = `${storagePath}`;
@@ -78,6 +90,7 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
 
     // Function to load the folder's content lazily
     const handleFolderClick = async (_folders: Folder[], folderName: string) => {
+        console.log("folder clicked ", folderName)
         const folderIndex = _folders.findIndex(f => f.name === folderName);
         if (folderIndex < 0) return;
         const selectedFolder = _folders[folderIndex];
@@ -102,7 +115,7 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
 
                 // Use displayName from metadata, fallback to the original name
                 const displayName = metadata.customMetadata?.displayName || getFileNameWithoutExtension(fileRef.name);
-                loadedItems.push({ name:fileRef.name, displayName, url });
+                loadedItems.push({ name: fileRef.name, displayName, url });
             }
         }
 
@@ -209,7 +222,7 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
     }, [folders, currentFolder, newFolderName]);
 
     const handleRenameImage = useCallback(async () => {
-        if (!currentFolder || activeIndex === null || !newFileName) return;
+        if (!currentFolder || activeIndex === null) return;
         const folderObj = folders.find(f => f.name === currentFolder);
         if (!folderObj || !folderObj.items[activeIndex]) return;
 
@@ -220,7 +233,7 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
             // Update only the displayName metadata
             const newMetadata = {
                 customMetadata: {
-                    displayName: newFileName, // Set new display name
+                    displayName: newFileName || "", // Set new display name
                 }
             };
 
@@ -229,7 +242,7 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
 
             appServices.showMessage('success', 'שם התמונה שונה בהצלחה', '');
 
-            folderObj.items[activeIndex].displayName = newFileName;
+            folderObj.items[activeIndex].displayName = newFileName || "";
             setFolders([...folders]);
         } catch (error) {
             console.error('Error updating metadata:', error);
@@ -246,7 +259,7 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
         // Create metadata object with the custom name
         const metadata = {
             customMetadata: {
-                displayName: newFileName || originalFileName, // Store the entered name as metadata
+                displayName: newFileName || "", // Store the entered name as metadata
             }
         };
 
@@ -274,6 +287,8 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
 
     const currFolder = folders.find(f => f.name == currentFolder);
 
+    console.log("gallery", currentFolder, activeIndex);
+
     return (
         <div className='flex flex-column relative justify-content-center align-items-center w-12 overflow-x-hidden'>
             {busy && <InProgress />}
@@ -287,7 +302,7 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
                     <Button unstyled icon="pi pi-file-edit" onClick={() => {
                         setNewFolderName(currFolder?.name || "");
                         if (currFolder && currFolder.items.length) {
-                            setNewFileName(getFileNameWithoutExtension(currFolder?.items[activeIndex].name));
+                            setNewFileName(getFileNameWithoutExtension(currFolder?.items[activeIndex].displayName));
                         } else {
                             setNewFileName(undefined);
                         }
@@ -316,22 +331,51 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
             {currentFolder && (
                 <div dir='ltr'>
 
-                    {currFolder && currFolder.items.length ? <Galleria
-                        value={currFolder.items}
-                        className='mt-2'
-                        showThumbnails={true}
-                        thumbnail={thumbnailTemplate}
-                        thumbnailsPosition="top"
-                        numVisible={4}
-                        changeItemOnIndicatorHover
-                        showIndicatorsOnItem
-                        indicatorsPosition="top"
-                        item={itemTemplate}
-                        activeIndex={activeIndex}
-                        onItemChange={(e) => {
-                            setActiveIndex(e.index)
-                        }}
-                    /> : <div className='text-xl mt-5'>אין עדיין תמונות</div>}
+                    {currFolder && currFolder.items.length ?
+
+                        // <Galleria
+                        //     value={currFolder.items}
+                        //     className='mt-2'
+                        //     showThumbnails={true}
+                        //     thumbnail={thumbnailTemplate}
+                        //     thumbnailsPosition="top"
+                        //     numVisible={4}
+                        //     item={itemTemplate}
+                        //     activeIndex={activeIndex}
+                        // // onItemChange={(e) => {
+                        // //     console.log("item in gallery changed", e)
+                        // //     setActiveIndex(e.index)
+                        // // }}
+                        // /> 
+                        <div className="carousel-container">
+                            <div className="carousel-indicators-container">
+                                <ul className="p-carousel-indicators">
+                                    {currFolder.items.map((_, index) => (
+                                        <li
+                                            key={index}
+                                            className={`p-carousel-indicator ${activeIndex === index ? 'p-highlight' : ''}`}
+                                            onClick={() => setActiveIndex(index)}
+                                        />
+                                    ))}
+                                </ul>
+                            </div>
+                            <Carousel
+                                className='pt-3'
+                                value={currFolder.items}
+                                numVisible={1}
+                                numScroll={1}
+                                orientation="horizontal"
+                                onPageChange={(e) => setActiveIndex(e.page)}
+                                page={activeIndex}
+                                itemTemplate={itemTemplate}
+                                showIndicators={false}
+                                showNavigators={false}
+                            //style={{maxWidth: '400px', marginTop: '2em'}}
+                            />
+                        </div>
+
+
+                        : <div className='text-xl mt-5'>אין עדיין תמונות</div>}
 
                 </div>
             )}
@@ -363,7 +407,7 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
                         }} />
                     </div>
                 </div>
-                {newFileName && <div className="p-field">
+                {currFolder?.items && currFolder.items.length > 0 && <div className="p-field">
                     <div className="text-xl">שם התמונה</div>
                     <InputText value={newFileName} onChange={(e) => setNewFileName(e.target.value)} />
                     <div className='flex flex-row mt-3'>

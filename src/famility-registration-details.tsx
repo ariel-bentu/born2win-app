@@ -4,7 +4,7 @@ import "./registration.css";
 
 
 import { getFamilyDetails, updateFamilityDemand } from "./api";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
 import { InProgress, PhoneNumber } from "./common-ui";
@@ -83,7 +83,12 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
             ", " + fd.city;
     }
 
-    const dateTemplate = (event: CalendarDateTemplateEvent) => {
+    const dateTemplate = useCallback((event: CalendarDateTemplateEvent) => {
+        const inVisibleMonth = event.month === viewVisibleMonth.month && event.year === viewVisibleMonth.year;
+        if (!inVisibleMonth) {
+            return <span style={{ visibility: 'hidden' }}>{event.day}</span>;
+        }
+
         if (isDateAvailable(event)) {
             return (
                 <span className={"available-day " + (isSameDate(selectedDate, event) ? "selected-day" : "")}>
@@ -92,7 +97,7 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
             );
         }
         return event.day;
-    };
+    }, [viewVisibleMonth])
     const minDate = dayjs();
     const alergies = familyDetails?.alergies;
 
@@ -106,7 +111,7 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
             <Button unstyled icon="pi pi-times" onClick={onClose} className="icon-btn-l" style={{ position: "absolute", right: 0, top: 0 }} />
             {!detailsOnly && <>
                 <div className="flex flex-column justify-content-center align-items-center " >
-                    <div className="tm-5 pb-1 underline text-lg" style={{ maxWidth: "80%" }}>{family.familyLastName}{family.active?"":" - לא פעילה"}</div>
+                    <div className="tm-5 pb-1 underline text-lg" style={{ maxWidth: "80%" }}>{family.familyLastName}{family.active ? "" : " - לא פעילה"}</div>
                     <div className="flex flex-row w-full justify-content-between rm-2">
                         <div><span className="m-2">עיר:</span><span>{family.city}</span></div>
                         <div className="flex flex-row align-items-center">

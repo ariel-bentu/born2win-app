@@ -35,6 +35,7 @@ BORM2WIN_AT_WEBHOOK_USERS_MAC=<webhook secret>
   }
 }
 ```
+  - Setup CORS rules. `gsutil cors set cors.json gs://born2win-prod.appspot.com` - you need to install [gcloud](https://cloud.google.com/sdk/docs/install)
 
 # Development Instructions
 ## Run locally 

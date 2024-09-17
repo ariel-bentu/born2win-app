@@ -227,6 +227,11 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
 
         await doc.ref.update(update);
 
+        if (doc.data()?.isAdmin) {
+            // sets the isAdmin claim
+            await updateAdminClaim(uid, true);
+        }
+
         // Return volunteerID
         return doc.id;
     } else if (uulp.fingerprint && uulp.isIOS) {
@@ -255,6 +260,10 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
 
         await doc.ref.update(update);
 
+        if (doc.data()?.isAdmin) {
+            // sets the isAdmin claim
+            await updateAdminClaim(uid, true);
+        }
         // Return volunteerID for Phase 2
         return doc.id;
     } else if (uulp.phone) {
@@ -289,6 +298,11 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
                     loginInfo: FieldValue.arrayUnion({ uid, createdAt: now.format(DATE_TIME), isIOS: uulp.isIOS }),
                 };
                 await doc.ref.update(update);
+
+                if (doc.data()?.isAdmin) {
+                    // sets the isAdmin claim
+                    await updateAdminClaim(uid, true);
+                }
 
                 // All set
                 return doc.id;
@@ -559,7 +573,7 @@ exports.OnAdminChange = onDocumentWritten(`${Collections.Admins}/{docId}`, async
 
         const doc = await db.collection(Collections.Users).doc(event.params.docId).get();
         if (doc.exists && doc.data()) {
-            const waitFor = doc.data()?.uid?.map((uid: string) => admin.auth().setCustomUserClaims(uid, { isAdmin: updateUser.isAdmin }));
+            const waitFor = doc.data()?.uid?.map((uid: string) => updateAdminClaim(uid, updateUser.isAdmin));
 
             waitFor.push(doc.ref.update(updateUser));
             return Promise.all(waitFor);
@@ -567,6 +581,11 @@ exports.OnAdminChange = onDocumentWritten(`${Collections.Admins}/{docId}`, async
     }
     return;
 });
+
+function updateAdminClaim(uid: string, isAdmin: boolean) {
+    admin.auth().setCustomUserClaims(uid, { isAdmin: isAdmin });
+}
+
 
 exports.LoadExistingNotifications = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);

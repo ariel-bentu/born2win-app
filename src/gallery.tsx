@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { getStorage, ref, listAll, getDownloadURL, deleteObject, uploadBytes } from 'firebase/storage';
+import { getStorage, ref, listAll, getDownloadURL, deleteObject, uploadBytes, getMetadata, updateMetadata } from 'firebase/storage';
 import { Button } from 'primereact/button';
 import { Dialog } from 'primereact/dialog';
 import { FileUpload } from 'primereact/fileupload';
@@ -20,6 +20,7 @@ interface GalleryProps {
 
 interface ImageItem {
     name: string;
+    displayName: string;
     url: string;
 }
 
@@ -45,8 +46,8 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
     const itemTemplate = (item: ImageItem) => {
         if (!item) return null;
         return <div>
-            <div className='absolute w-12 text-center  text-black font-bold' style={{ backgroundColor: "rgba(255,255,255,0.3)" }}>{getFileNameWithoutExtension(item.name)}</div>
-            <img src={item.url} alt={getFileNameWithoutExtension(item.name)} style={{ width: '100%', display: 'block' }} />
+            <div className='absolute w-12 text-center  text-black text-2xl font-bold p-3' style={{ backgroundColor: "rgba(255,255,255,0.3)" }}>{item.displayName}</div>
+            <img src={item.url} alt={item.displayName} style={{ width: '100%', display: 'block' }} />
         </div>;
     };
 
@@ -81,14 +82,12 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
         if (folderIndex < 0) return;
         const selectedFolder = _folders[folderIndex];
 
-        // If folder is already loaded, just set it as current
         if (selectedFolder.loaded) {
             setCurrentFolder(selectedFolder.name);
             setActiveIndex(0);
             return;
         }
-
-        // If folder is not loaded, load its content
+        console.log("Reload folder", folderName)
         const folderRef = ref(storage, `${storagePath}/${folderName}`);
         setBusy(true);
         const results = await listAll(folderRef);
@@ -96,23 +95,28 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
 
         for (let j = 0; j < results.items.length; j++) {
             if (results.items[j].name !== "placeholder.txt") {
-                const url = await getDownloadURL(results.items[j]);
-                loadedItems.push({ name: results.items[j].name, url });
+
+                const fileRef = results.items[j];
+                const url = await getDownloadURL(fileRef);
+                const metadata = await getMetadata(fileRef); // Get metadata
+
+                // Use displayName from metadata, fallback to the original name
+                const displayName = metadata.customMetadata?.displayName || getFileNameWithoutExtension(fileRef.name);
+                loadedItems.push({ name:fileRef.name, displayName, url });
             }
         }
 
-        // Update the folder with loaded items
         const updatedFolders = [..._folders];
         updatedFolders[folderIndex] = {
             ...selectedFolder,
             items: loadedItems,
-            loaded: true // Mark as loaded
+            loaded: true,
         };
         setFolders(updatedFolders);
         setCurrentFolder(selectedFolder.name);
         setActiveIndex(0);
         setBusy(false);
-    }
+    };
 
     const handleDeleteImage = useCallback((index: number) => {
         if (!currentFolder) return;
@@ -210,45 +214,48 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
         if (!folderObj || !folderObj.items[activeIndex]) return;
 
         const imageToRename = folderObj.items[activeIndex];
-        const oldImageRef = ref(storage, `${storagePath}/${currentFolder}/${imageToRename.name}`);
-        const newImageRef = ref(storage, `${storagePath}/${currentFolder}/${newFileName}.jpeg`);
+        const imageRef = ref(storage, `${storagePath}/${currentFolder}/${imageToRename.name}`);
 
-        const fileURL = await getDownloadURL(oldImageRef);
-        const fileBlob = await fetch(fileURL).then(r => r.blob());
+        try {
+            // Update only the displayName metadata
+            const newMetadata = {
+                customMetadata: {
+                    displayName: newFileName, // Set new display name
+                }
+            };
 
-        // Upload the file with the new name
-        await uploadBytes(newImageRef, fileBlob);
+            // Use updateMetadata to update the metadata of the file
+            await updateMetadata(imageRef, newMetadata);
 
-        // Delete the old image
-        await deleteObject(oldImageRef);
+            appServices.showMessage('success', 'שם התמונה שונה בהצלחה', '');
 
-        appServices.showMessage('success', 'תמונה שונתה בהצלחה', '');
-        setReload(prev => prev + 1);
+            folderObj.items[activeIndex].displayName = newFileName;
+            setFolders([...folders]);
+        } catch (error) {
+            console.error('Error updating metadata:', error);
+            appServices.showMessage('error', 'שגיאה בעדכון שם התמונה', '');
+        }
     }, [folders, currentFolder, activeIndex, newFileName]);
 
 
     const handleUpload = useCallback(async (event: any) => {
-        if (!newFileName) return;
-        const illegalCharacters = /[\\/:*?"<>|]/g;  // Add any other illegal characters if necessary
-
-        // Validate the new file name
-        if (illegalCharacters.test(newFileName)) {
-            appServices.showMessage("warn", 'שגיאה', 'שם הקובץ מכיל תווים שאינם חוקיים. נא להשתמש בתווים תקינים.');
-            return;
-        }
-
-        if (!newFileName || newFileName.trim() === "") {
-            appServices.showMessage("warn", 'שגיאה', 'שם הקובץ לא יכול להיות ריק.');
-            return;
-        }
-
         const file = event.files[0];
-        const fileRef = ref(storage, `${storagePath}/${currentFolder || ''}/${newFileName}.jpeg`);
-        await uploadBytes(fileRef, file);
-        appServices.showMessage('success', ',תמונה עלתה בהצלחה', '')
+        const originalFileName = file.name; // Use the original file name
+        const fileRef = ref(storage, `${storagePath}/${currentFolder || ''}/${originalFileName}`);
+
+        // Create metadata object with the custom name
+        const metadata = {
+            customMetadata: {
+                displayName: newFileName || originalFileName, // Store the entered name as metadata
+            }
+        };
+
+        // Upload the file along with its metadata
+        await uploadBytes(fileRef, file, metadata);
+        appServices.showMessage('success', ',תמונה עלתה בהצלחה', '');
 
         setUploadDialogVisible(false);
-        setReload(prev => prev + 1)
+        setReload(prev => prev + 1);
     }, [currentFolder, newFileName]);
 
     const handleCreateFolder = useCallback(async () => {
@@ -264,7 +271,6 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
         setNewFolderName('');
     }, [newFolderName]);
 
-    console.log("gallery folders", folders)
 
     const currFolder = folders.find(f => f.name == currentFolder);
 

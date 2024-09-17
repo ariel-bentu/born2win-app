@@ -319,7 +319,7 @@ async function updateAirTableAppinstalled() {
 
                 const updatedFields = {
                     fields: {
-                        "תאריך התקנת אפליקציה מותקנת": dayjs(date).format("YYYY-MM-DD"),
+                        "תאריך התקנת אפליקציה": dayjs(date).format("YYYY-MM-DD"),
                     },
                 };
                 
@@ -332,7 +332,7 @@ async function updateAirTableAppinstalled() {
     }    
 }
 
-updateAirTableAppinstalled()
+//updateAirTableAppinstalled()
 
 
 //alertUpcomingCooking()

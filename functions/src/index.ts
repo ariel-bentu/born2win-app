@@ -232,6 +232,10 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
             await updateAdminClaim(uid, true);
         }
 
+        if (!uulp.isIOS) {
+            await updateVolunteerHasInstalled(doc.id, now.format(DATE_AT));
+        }
+
         // Return volunteerID
         return doc.id;
     } else if (uulp.fingerprint && uulp.isIOS) {
@@ -264,6 +268,9 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
             // sets the isAdmin claim
             await updateAdminClaim(uid, true);
         }
+
+        await updateVolunteerHasInstalled(doc.id, now.format(DATE_AT));
+
         // Return volunteerID for Phase 2
         return doc.id;
     } else if (uulp.phone) {
@@ -304,6 +311,8 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
                     await updateAdminClaim(uid, true);
                 }
 
+                await updateVolunteerHasInstalled(doc.id, now.format(DATE_AT));
+
                 // All set
                 return doc.id;
             } else {
@@ -315,6 +324,28 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
         throw new HttpsError("invalid-argument", "Missing volunteerID or fingerprint");
     }
 });
+
+function updateVolunteerHasInstalled(volunteerId: string, date: string) {
+    const apiKey = born2winApiKey.value();
+    const airTableMainBase = mainBase.value();
+
+    const url = `https://api.airtable.com/v0/${airTableMainBase}/מתנדבים/${volunteerId}`;
+    const httpOptions = {
+        headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        },
+    };
+    const updatedFields = {
+        fields: {
+            "תאריך התקנת אפליקציה": dayjs(date).format("YYYY-MM-DD"),
+        },
+    };
+
+    return axios.patch(url, updatedFields, httpOptions).catch(err => {
+        logger.error("Error saving installation info in AirTable", err);
+    });
+}
 
 function validateOTPOrFingerprint(token: string | undefined, savedToken: string | string, createdAt: string, validForDays: number): boolean {
     logger.info("validate otp. token:", token, "savedToken:", savedToken, "ca", createdAt, "days", validForDays);

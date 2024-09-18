@@ -43,28 +43,14 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
     const [uploadDialogVisible, setUploadDialogVisible] = useState<boolean>(false);
     const [fileFolderEditVisible, setFileFolderEditVisible] = useState<boolean>(false);
 
-    const itemTemplate = (item: ImageItem) => {
+    const itemTemplate = useCallback((item: ImageItem) => {
         console.log("render item", item.name)
         if (!item) return null;
         return <div>
             <div className='absolute w-12 text-center  text-black text-2xl font-bold p-3' style={{ backgroundColor: "rgba(255,255,255,0.3)" }}>{item.displayName}</div>
             <img src={item.url} alt={item.displayName} style={{ width: '100%', display: 'block' }} />
         </div>;
-    };
-
-    const thumbnailTemplate = useCallback((item: ImageItem) => {
-        if (!item) return null;
-        return <div onTouchEnd={() => {
-            console.log("Thumbnail clicked", item.name)
-            const currFolder = folders.find(f => f.name === currentFolder);
-            const currIndex = currFolder?.items.findIndex(i => i.name === item.name);
-            if (currIndex !== undefined && currIndex >= 0) {
-                setActiveIndex(currIndex)
-            }
-
-        }
-        }><img src={item.url} alt={item.name} style={{ width: 70, display: 'block' }} /></div>;
-    }, [folders, currentFolder]);
+    },[]);
 
 
     useEffect(() => {
@@ -104,21 +90,18 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
         const folderRef = ref(storage, `${storagePath}/${folderName}`);
         setBusy(true);
         const results = await listAll(folderRef);
-        const loadedItems: ImageItem[] = [];
 
-        for (let j = 0; j < results.items.length; j++) {
-            if (results.items[j].name !== "placeholder.txt") {
-
-                const fileRef = results.items[j];
-                const url = await getDownloadURL(fileRef);
-                const metadata = await getMetadata(fileRef); // Get metadata
-
-                // Use displayName from metadata, fallback to the original name
-                const displayName = metadata.customMetadata?.displayName || getFileNameWithoutExtension(fileRef.name);
-                loadedItems.push({ name: fileRef.name, displayName, url });
-            }
-        }
-
+        const items = results.items.filter(item => item.name !== "placeholder.txt");
+        const loadedItems = await Promise.all(
+            items.map(async (fileRef) => {
+                const [url, metadata] = await Promise.all([
+                    getDownloadURL(fileRef),
+                    getMetadata(fileRef)
+                ]);
+                const displayName = metadata.customMetadata?.displayName !== undefined ? metadata.customMetadata.displayName : getFileNameWithoutExtension(fileRef.name);
+                return { name: fileRef.name, displayName, url };
+            })
+        );
         const updatedFolders = [..._folders];
         updatedFolders[folderIndex] = {
             ...selectedFolder,
@@ -146,7 +129,7 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
                 setReload(prev => prev + 1)
             }
         });
-    }, [folders, currentFolder])
+    }, [folders, currentFolder, appServices, storagePath])
 
     const deleteFolder = async (folderPath: string) => {
         const folderRef = ref(storage, folderPath);
@@ -195,18 +178,19 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
 
                     // List all files in the folder
                     const results = await listAll(oldFolderRef);
-
-                    // Copy each file to the new folder
-                    for (let i = 0; i < results.items.length; i++) {
-                        const file = results.items[i];
-                        const fileRef = ref(storage, `${storagePath}/${newFolderName}/${file.name}`);
-                        const fileURL = await getDownloadURL(file);
-                        const fileBlob = await fetch(fileURL).then(r => r.blob())
-                        // Upload to new folder
-                        await uploadBytes(fileRef, fileBlob);
-                    }
-
-                    // Once copied, delete the old folder
+                    const copyPromises = results.items.map(async (file) => {
+                        try {
+                            const fileRef = ref(storage, `${storagePath}/${newFolderName}/${file.name}`);
+                            const url = await getDownloadURL(file);
+                            const response = await fetch(url);
+                            const blob = await response.blob();
+                            await uploadBytes(fileRef, blob);
+                        } catch (error) {
+                            console.error(`Failed to copy file ${file.name}:`, error);
+                        }
+                    });
+                    await Promise.all(copyPromises);
+                    // Delete the old folder after copying
                     await deleteFolder(`${storagePath}/${currentFolder}`);
 
                     setBusy(false);
@@ -302,7 +286,7 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
                     <Button unstyled icon="pi pi-file-edit" onClick={() => {
                         setNewFolderName(currFolder?.name || "");
                         if (currFolder && currFolder.items.length) {
-                            setNewFileName(getFileNameWithoutExtension(currFolder?.items[activeIndex].displayName));
+                            setNewFileName(currFolder?.items[activeIndex].displayName);
                         } else {
                             setNewFileName(undefined);
                         }

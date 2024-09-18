@@ -636,13 +636,13 @@ function App() {
                                 getCachedOpenDemands(true);
                             }} />}
                     </TabPanel>
-                    <TabPanel headerStyle={{ fontSize: 20 }} header="פרטי התנדבות">
+                    <TabPanel headerStyle={{ fontSize: 20 }} header="התנדבויות">
                         {activeIndex === 2 && <ExistingRegistrationsComponent
                             userInfo={userInfo}
                             appServices={appServices} navigationRequest={navigationRequest} actualUserId={actualUserId} />}
                     </TabPanel>
                     {isAdmin &&
-                        <TabPanel headerStyle={{ fontSize: 20 }} header="ניהול שיבוצים">
+                        <TabPanel headerStyle={{ fontSize: 20 }} header="ניהול">
 
                             {isAdmin && <Stats appServices={appServices} userInfo={userInfo} />}
                         </TabPanel>

@@ -5,12 +5,8 @@
   }
   
   .carousel-indicators-container {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 10px;
-    position: absolute;
-    top: 0;
     width: 100%;
+    margin-bottom: 10px;
   }
   
   .p-carousel-indicators {

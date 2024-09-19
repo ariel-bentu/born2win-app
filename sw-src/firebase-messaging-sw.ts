@@ -94,7 +94,7 @@ self.addEventListener('notificationclick', function (event: any) {
             // Check if there is already a window/tab open with the target URL
             for (let i = 0; i < clientList.length; i++) {
                 let client = clientList[i];
-                if (client.url.startsWith(event.notification.data.click_url) && client.focus) {
+                if (client.focus) {
                     client.focus();
                     client.postMessage(event.notification.data);
                     return;
@@ -102,7 +102,7 @@ self.addEventListener('notificationclick', function (event: any) {
             }
             // If not, then open a new window/tab with the target URL
             if (clients.openWindow) {
-                clients.openWindow(event.notification.data.click_url).then((windowClient: any) => {
+                clients.openWindow("/").then((windowClient: any) => {
                     if (windowClient) {
                         windowClient.postMessage(event.notification.data);
                     }

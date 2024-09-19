@@ -653,7 +653,7 @@ function App() {
                         </TabPanel>}
                     <TabPanel headerStyle={{ fontSize: 20 }} header="גלריה">
                         {activeIndex === 5  &&
-                            <Gallery storagePath={"/gallery"} userInfo={userInfo} appServices={appServices} />}
+                            <Gallery storagePath={"/gallery"} userInfo={userInfo} appServices={appServices} topPosition={tabContentsTop}/>}
                     </TabPanel>
                 </TabView>}
         </div >

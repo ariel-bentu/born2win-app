@@ -32,7 +32,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: calc(100% - 18px);
+    padding: 0;
+    /* width: calc(100% - 18px); */
 }
 
 .family-list {
@@ -106,4 +107,50 @@
     color: #1992a2;
     font-weight: bolder;
     font-size: 20px;
+}
+
+.p-datepicker-prev,
+.p-datepicker-next {
+    display: none;
+}
+
+/* Hide month and year dropdowns */
+.p-datepicker-month,
+.p-datepicker-year {
+    display: none;
+}
+
+.p-datepicker-header {
+    display: none;
+}
+
+
+.select-month-badge {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    left: -10px;
+    top: -10px;
+    height: 100%;
+    border-radius: 50%;
+    width: 25px;
+    height: 25px;
+    background-color: var(--born2win-button-color);
+    color: var(--born2win-button-text-color);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.p-multiselect {
+    flex-direction: row-reverse;
+}
+
+.p-multiselect-checkbox {
+    margin-left: 7px;
+}
+
+.p-multiselect-header, .p-multiselect-items-wrapper {
+    direction: rtl;
+    
 }

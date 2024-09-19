@@ -51,6 +51,7 @@ dayjs.locale("he");
 const JERUSALEM = "Asia/Jerusalem";
 const DATE_TIME = "YYYY-MM-DD HH:mm";
 const DATE_AT = "YYYY-MM-DD";
+const DATE_BIRTHDAY = "DD-MM";
 const db = getFirestore();
 
 const appHost = "app.born2win.org.il";
@@ -724,24 +725,11 @@ async function getWebTokens(to: string | string[]): Promise<DeviceInfo[]> {
     } else if (Array.isArray(to)) {
         // Case 3: Array of doc-ids
 
-        if (to.length < 50) {
-            // Chunk doc-ids and perform a batched query
-            const chunks = chunkArray(to, 10); // Assuming you want to query in chunks of 10
-            for (const chunk of chunks) {
-                const chunkedUsersSnapshot = await usersRef.where(FieldPath.documentId(), "in", chunk).get();
-                chunkedUsersSnapshot.forEach(user => {
-                    user.data().notificationTokens?.forEach((nt: TokenInfo) => {
-                        webPushDevices.push({
-                            ownerId: user.id,
-                            tokenInfo: nt,
-                        });
-                    });
-                });
-            }
-        } else {
-            // Query all active users if array length >= 50
-            const activeUsersSnapshot = await usersRef.get();
-            activeUsersSnapshot.forEach(user => {
+        // Chunk doc-ids and perform a batched query
+        const chunks = chunkArray(to, 10); // Assuming you want to query in chunks of 10
+        for (const chunk of chunks) {
+            const chunkedUsersSnapshot = await usersRef.where(FieldPath.documentId(), "in", chunk).get();
+            chunkedUsersSnapshot.forEach(user => {
                 user.data().notificationTokens?.forEach((nt: TokenInfo) => {
                     webPushDevices.push({
                         ownerId: user.id,
@@ -1261,7 +1249,12 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
         }
     }
 
-    return lock.release();
+    await lock.release().catch(err => {
+        logger.error("Error releasing lock", lock.lockId, err);
+        return;
+    });
+    logger.info("Lock released for ", lock.lockId);
+    return;
 });
 
 
@@ -1458,6 +1451,7 @@ const schedules = [
     { desc: "Sync Born2Win users daily", min: 0, hour: [17], weekDay: "*", callback: syncBorn2WinUsers },
     { desc: "Alert 5 days ahead open demand", min: 40, hour: [13], weekDay: "*", callback: alertOpenDemands },
     { desc: "Alert 72 hours before cooking", min: 0, hour: [16], weekDay: "*", callback: alertUpcomingCooking },
+    { desc: "Birthdays greeting", min: 0, hour: [10], weekDay: "*", callback: greetingsToBirthdays },
     // todo - archive notifications
 ];
 
@@ -1494,7 +1488,20 @@ exports.doSchedule = onSchedule({
 
 async function remindVolunteersToRegister() {
     await addNotificationToQueue("התחלנו שיבוצים!",
-        "הכנסו לבחור למי תתנו חיבוק החודש. ניתן להרשם באפליקציה", NotificationChannels.Registrations, [], "all");
+        "הכנסו לאפליקציה לבחור למי תתנו חיבוק החודש. ניתן להרשם בלשונית השיבוצים", NotificationChannels.Registrations, [], "all");
+}
+
+async function greetingsToBirthdays() {
+    const today = dayjs().format(DATE_BIRTHDAY);
+    const users = await db.collection(Collections.Users).where("birthDate", "==", today).get();
+
+    for (let i = 0; i < users.docs.length; i++) {
+        const user = users.docs[i];
+        if (user.data().notificationOn === true) {
+            await addNotificationToQueue(`יום הולדת שמח ${user.data().firstName}`, "", NotificationChannels.Greetings,
+                [], [user.id], { fullImage: user.data().gender === "אישה" ? "birthday-female" : "birthday-male" });
+        }
+    }
 }
 
 async function alertOpenDemands() {
@@ -1527,7 +1534,6 @@ async function alertUpcomingCooking() {
     const districts = await getDestricts();
     const daysBefore = 3;
     for (let i = 0; i < districts.length; i++) {
-        if (districts[i].id !== "recxuE1Cwav0kfA7g") continue; // only in test for now
         const upcomingDemands = await getDemands(districts[i].id, "תפוס", true, dayjs().format(DATE_AT), dayjs().add(daysBefore, "days").format(DATE_AT));
         for (let j = 0; j < upcomingDemands.length; j++) {
             const demand = upcomingDemands[j];
@@ -1608,7 +1614,7 @@ async function syncBorn2WinUsers(sinceDate?: any) {
             },
             params: {
                 filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
-                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "phone_e164", "manychat_id"],
+                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "phone_e164", "manychat_id", "תאריך לידה", "מגדר"],
                 offset: offset,
             },
         });
@@ -1634,6 +1640,8 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                 lastModified: now,
                 phone: user.fields.phone_e164,
                 mahoz: user.fields["מחוז"][0],
+                birthDate: user.fields["תאריך לידה"] ? dayjs(user.fields["תאריך לידה"]).format(DATE_BIRTHDAY) : "",
+                gender: (user.fields["מגדר"] || "לא ידוע"),
                 volId: user.id,
                 manychat_id: user.fields.manychat_id,
             } as UserRecord;
@@ -1644,7 +1652,10 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                     userRecord.active === prevUserRecord.active &&
                     userRecord.firstName === prevUserRecord.firstName &&
                     userRecord.lastName === prevUserRecord.lastName &&
-                    userRecord.phone === prevUserRecord.phone) {
+                    userRecord.phone === prevUserRecord.phone &&
+                    userRecord.birthDate === prevUserRecord.birthDate &&
+                    userRecord.gender === prevUserRecord.gender
+                ) {
                     // No change!
                     continue;
                 }

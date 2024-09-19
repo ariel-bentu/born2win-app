@@ -1,5 +1,6 @@
 import { Button } from 'primereact/button';
-import { confirmPopup } from 'primereact/confirmpopup';
+import birthdayMale from './media/birthday-male.jpeg';
+import birthdayFemale from './media/birthday-female.jpeg';
 
 interface LineButton {
     label: string;
@@ -27,7 +28,26 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
         navigator.clipboard.writeText(link);
     };
 
+
+    const IMAGE_PREFIX = "IMAGE:";
     const renderMessagePart = (part: string, index: number) => {
+        if (part.startsWith(IMAGE_PREFIX)) {
+            const imageName = part.substring(IMAGE_PREFIX.length);
+            let imageSrc;
+            switch (imageName) {
+                case "birthday-male":
+                    imageSrc = birthdayMale;
+                    break;
+                case "birthday-female":
+                    imageSrc = birthdayFemale;
+                    break;
+            }
+            if (imageSrc) {
+                return <img src={imageSrc} style={{width:"95%"}}/>
+            }
+            return <div>תמונה לא מוכרת - {imageName}</div>
+        }
+
         const colonIndex = part.indexOf(':');
 
         if (colonIndex !== -1) {

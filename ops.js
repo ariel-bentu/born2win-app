@@ -67,7 +67,7 @@ async function updateAllUsers() {
             },
             params: {
                 //filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${modifiedSince}')`,
-                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "אמייל", "manychat_id","phone_e164"],
+                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "אמייל", "manychat_id","phone_e164", "תאריך לידה", "מגדר"],
                 offset: offset,
             }
         }).catch(e => console.log(e));
@@ -82,6 +82,8 @@ async function updateAllUsers() {
                 firstName: user.fields["שם פרטי"],
                 lastName: user.fields["שם משפחה"],
                 mahoz: user.fields["מחוז"][0],
+                birthDate: user.fields["תאריך לידה"]  ? dayjs(user.fields["תאריך לידה"]).format("DD-MM") : "",
+                gender: (user.fields["מגדר"] || "לא ידוע"),
                 phone: user.fields.phone_e164,
                 volId: user.id,
             }
@@ -98,9 +100,6 @@ async function updateAllUsers() {
             const docRef = db.collection("users").doc(userId);
             batch.update(docRef, userRecord);
         })
-
-
-
     } while (offset);
 
     // // Add manual users
@@ -332,6 +331,21 @@ async function updateAirTableAppinstalled() {
     }    
 }
 
+
+
+async function greetingsToBirthdays() {
+    const today = "01-06"// dayjs().add(3,"d").format("DD-MM");
+    const users = await db.collection("users").where("birthDate", "==", today).get();
+
+    for (let i = 0; i < users.docs.length; i++) {
+        const user = users.docs[i];
+        if (user.data().notificationOn === true) {
+            console.log("birthday", user.data().firstName,user.data().gender )
+            // await addNotificationToQueue(`יום הולדת שמח ${user.data().firstName}`, "", NotificationChannels.Greetings,
+            //     [], [user.id], { fullImage: user.data().gender === "אישה" ? "birthday-female" : "birthday-male" });
+        }
+    }
+}
 //updateAirTableAppinstalled()
 
 
@@ -343,3 +357,7 @@ async function updateAirTableAppinstalled() {
 // getDemands("rechovsphUJb3r6hS", "תפוס", 45).then(d=>{
 //     console.log(d)
 // })
+
+//addNotificationToQueue("יום הולדת שמח קרן", "", "greetings", [],["kereng"],{fullImage:"birthday-female"});
+//updateAllUsers();
+//greetingsToBirthdays()

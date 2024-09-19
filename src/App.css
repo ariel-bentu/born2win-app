@@ -6,6 +6,7 @@
 }
 
 .App {
+  overflow-x: hidden;
   text-align: center;
   direction: rtl;
   width: 100vw;
@@ -111,14 +112,19 @@
 }
 
 .clickable-span {
-  color: #007bff;         /* Change color to typical link color */
-  text-decoration: underline; /* Add underline like links */
-  cursor: pointer;        /* Change cursor to pointer */
+  color: #007bff;
+  /* Change color to typical link color */
+  text-decoration: underline;
+  /* Add underline like links */
+  cursor: pointer;
+  /* Change cursor to pointer */
 }
 
 .clickable-span:hover {
-  color: #0056b3;         /* Darken the color on hover */
-  text-decoration: none;  /* Optionally remove underline on hover */
+  color: #0056b3;
+  /* Darken the color on hover */
+  text-decoration: none;
+  /* Optionally remove underline on hover */
 }
 
 /* styles.css */
@@ -199,7 +205,13 @@
   background-color: var(--born2win-button-color);
 }
 
-.range-calender > input {
+.range-calender>input {
   font-size: 12px;
 }
 
+
+.button-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

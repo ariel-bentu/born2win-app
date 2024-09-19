@@ -7,7 +7,6 @@ import {
     deleteAllNotifications
 } from './notifications'; // Adjust the import path to your actual notifications file
 import { Button } from 'primereact/button';
-import { Toast } from 'primereact/toast';
 import { NotificationRecord, NotificationStatus } from './db';
 import { confirmPopup } from 'primereact/confirmpopup';
 import { SelectButton } from 'primereact/selectbutton';
@@ -24,6 +23,7 @@ import { getNiceDateTime, isNotEmpty, limitText } from './utils';
 import { Divider } from 'primereact/divider';
 import { AppServices, NotificationChannels, NotificationChannelsName } from './types';
 import { ScrollPanel } from 'primereact/scrollpanel';
+import { ChannelHeader } from './common-ui';
 
 dayjs.extend(isToday);
 dayjs.extend(isYesterday);
@@ -53,7 +53,6 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
     const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
     const [channels, setChannels] = useState<Channel[]>([]);
     const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
-    const toast = useRef<Toast>(null);
     const [filter, setFilter] = useState(Filters.ALL);
     const menu = useRef<Menu>(null);
     const msgRef = useRef<ScrollPanel>(null);
@@ -150,7 +149,6 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
         .filter(notif => filter === Filters.ALL || notif.read == Filters.UNREAD)
     return (
         <div style={{ overflowX: "hidden" }}>
-            <Toast ref={toast} />
             <div className='flex flex-row relative justify-content-center align-items-center'>
                 <SelectButton
                     pt={{ root: { className: "select-button-container" } }}
@@ -162,7 +160,7 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                         </div>
                     )}
                 />
-                <Menu model={contextMenu} popup ref={menu} />
+                <Menu model={contextMenu} popup ref={menu} dir='rtl'/>
                 <Button unstyled icon="pi pi-ellipsis-v" className="three-dot-menu" onClick={(event) => menu.current?.toggle(event)} />
             </div>
 
@@ -183,7 +181,7 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                 ) : (
                     // Full channel view
                     <div className='relative'>
-                        <ChannelHeader name={currentChannel.name} onBack={() => {
+                        <ChannelHeader name={NotificationChannelsName[currentChannel.name].name} icon={NotificationChannelsName[currentChannel.name].icon} onBack={() => {
                             setCurrentChannel(null);
                             console.log("popNavigationStep")
                             appServices.popNavigationStep();
@@ -196,6 +194,7 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                                 channelNotifications?.map(notification => {
                                     // <OneNotification
                                     const buttonStr = notification.data?.buttons;
+                                    const fullImage = notification.data?.fullImage;
                                     let buttons;
                                     if (buttonStr && buttonStr.length) {
                                         try {
@@ -208,7 +207,7 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                                         hideIcon={true}
                                         key={notification.id}
                                         title={notification.title}
-                                        body={notification.body}
+                                        body={fullImage ? "IMAGE:" + fullImage : notification.body}
                                         footer={getNiceDateTime(notification.timestamp)}
                                         unread={notification.read == NotificationStatus.Unread}
                                         onDelete={(event) => {
@@ -249,6 +248,8 @@ interface ChannelProps {
 
 function ChannelComponent({ channel, onClick, index }: ChannelProps) {
     const unreadCount = channel.notifications.reduce((count, notification) => notification.read === NotificationStatus.Unread ? count + 1 : count, 0);
+    const niceName = NotificationChannelsName[channel.name]?.name || "כל השאר";
+    const iconName = NotificationChannelsName[channel.name]?.icon || "pi-clipboard";
 
     return <div className="w-12 flex flex-column relative" onClick={onClick}>
         {/* BADGE */}
@@ -257,7 +258,7 @@ function ChannelComponent({ channel, onClick, index }: ChannelProps) {
         {/* HEADER */}
 
 
-        <ChannelHeader name={channel.name} />
+        <ChannelHeader name={niceName} icon={iconName}/>
         {/* First message */}
         <div className="w-12 flex flex-column align-items-start">
 
@@ -266,24 +267,6 @@ function ChannelComponent({ channel, onClick, index }: ChannelProps) {
             <div className='text-1 mr-2'>{getNiceDateTime(channel.notifications[0].timestamp)}</div>
         </div>
         <Divider />
-    </div>
-}
-
-interface ChannelHeaderProps {
-    name: string;
-    onBack?: () => void;
-}
-function ChannelHeader({ name, onBack }: ChannelHeaderProps) {
-    const niceName = NotificationChannelsName[name]?.name || "כל השאר";
-    const iconName = NotificationChannelsName[name]?.icon || "pi-clipboard";
-    return <div className="w-12 flex flex-col align-items-center">
-        {onBack ? <div className="back-btn" onClick={onBack}>
-            <span className="pi pi-angle-right text-4xl" ></span>
-        </div> : <div style={{ width: 5 }} />}
-        <div className='channel-icon'>
-            <span className={"pi text-4xl " + iconName}></span>
-        </div>
-        <div className='text-2xl mr-2'>{niceName}</div>
     </div>
 }
 

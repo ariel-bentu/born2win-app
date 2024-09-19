@@ -16,6 +16,7 @@ interface GalleryProps {
     userInfo: UserInfo | null;
     storagePath: string;
     appServices: AppServices;
+    topPosition:number;
 }
 
 interface ImageItem {
@@ -30,7 +31,7 @@ interface Folder {
     loaded: boolean;
 }
 
-export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServices }) => {
+export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServices, topPosition }) => {
     const storage = getStorage();
     const [folders, setFolders] = useState<Folder[]>([]);
     const [currentFolder, setCurrentFolder] = useState<string | null>(null);
@@ -272,7 +273,7 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
     const currFolder = folders.find(f => f.name == currentFolder);
 
     console.log("gallery", currentFolder, activeIndex);
-
+    const maxHeight = window.innerHeight - topPosition
     return (
         <div className='flex flex-column relative justify-content-center align-items-center w-12 overflow-x-hidden'>
             {busy && <InProgress />}
@@ -344,7 +345,6 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
                                 </ul>
                             </div>
                             <Carousel
-                                className='pt-3'
                                 value={currFolder.items}
                                 numVisible={1}
                                 numScroll={1}
@@ -354,7 +354,7 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
                                 itemTemplate={itemTemplate}
                                 showIndicators={false}
                                 showNavigators={false}
-                            //style={{maxWidth: '400px', marginTop: '2em'}}
+                            style={{maxWidth: window.innerWidth, maxHeight}}
                             />
                         </div>
 

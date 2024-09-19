@@ -3,7 +3,7 @@ import { Collections } from "../../src/types";
 
 export class Lock {
     public lockId: string;
-    private docRef:DocumentReference<any>;
+    private docRef: DocumentReference<any>;
     private constructor(lockId: string, docRef: DocumentReference<any>) {
         this.lockId = lockId;
         this.docRef = docRef;

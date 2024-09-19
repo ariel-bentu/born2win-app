@@ -7,6 +7,7 @@ import { openPhoneDialer, openWhatsApp } from "./notification-actions";
 import { nicePhone } from "./utils";
 import Slider from 'react-slider';
 import dayjs from "dayjs";
+import { NotificationChannelsName } from "./types";
 
 export function InProgress() {
     return <ProgressBar mode="indeterminate" style={{ height: '6px', width:"100%" }}></ProgressBar>;
@@ -116,3 +117,21 @@ export function WeekSelectorSlider({ selectedWeeks, setSelectedWeeks }: WeekSele
 
 
 
+
+interface ChannelHeaderProps {
+    name: string;
+    onBack?: () => void;
+    icon?: string;
+}
+
+export function ChannelHeader({ name, onBack, icon }: ChannelHeaderProps) {
+    return <div className="w-12 flex flex-col align-items-center">
+        {onBack ? <div className="back-btn" onClick={onBack}>
+            <span className="pi pi-angle-right text-4xl" ></span>
+        </div> : <div style={{ width: 5 }} />}
+        {icon && <div className='channel-icon'>
+            <span className={"pi text-4xl " + icon}></span>
+        </div>}
+        <div className='text-2xl mr-2'>{name}</div>
+    </div>
+}

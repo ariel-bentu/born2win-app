@@ -4,13 +4,15 @@ import "./registration.css";
 
 
 import { getFamilyDetails, updateFamilityDemand } from "./api";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
-import { InProgress, PhoneNumber } from "./common-ui";
+import { ChannelHeader, InProgress, PhoneNumber } from "./common-ui";
 import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails } from "./types";
 import { isNotEmpty } from "./utils";
 import { ProgressSpinner } from "primereact/progressspinner";
+import { SelectButton } from "primereact/selectbutton";
+import { PrimeIcons } from "primereact/api";
 
 interface FamilyDetailsComponentProps {
     demands: FamilyDemand[];
@@ -31,6 +33,8 @@ function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
         d.getFullYear() === event.year;
 }
 
+
+
 export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDemandId, onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts }: FamilyDetailsComponentProps) {
     const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
     const [selectedDate, setSelectedDate] = useState<Nullable<Date>>(null);
@@ -40,13 +44,34 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
     const [saving, setSaving] = useState<boolean>(false);
     const [viewDate, setViewDate] = useState(new Date());
 
+    const months = useMemo(() => {
+        const today = dayjs();
+        const nextMonth = today.add(1, "month");
+
+        const thisMonthCount = demands.filter(d => dayjs(d.date).month() === today.month()).length;
+        const nextMonthCount = demands.filter(d => dayjs(d.date).month() === nextMonth.month()).length;
+
+        return [{
+            name: today.format("MMMM"),
+            month: today.month(),
+            year: today.year(),
+            count: thisMonthCount,
+        },
+        {
+            name: nextMonth.format("MMMM"),
+            month: nextMonth.month(),
+            year: nextMonth.year(),
+            count: nextMonthCount,
+        }];
+    }, [demands])
+
     const [viewVisibleMonth, setViewVisibleMonth] = useState<CalendarMonthChangeEvent>({ year: dayjs().year(), month: dayjs().month() });
     const divRef = useRef<HTMLUListElement>(null);
 
-    const handleMonthChange = (e: CalendarMonthChangeEvent) => {
-        console.log("Month changed", e)
-        setViewVisibleMonth(e);
-    };
+    // const handleMonthChange = (e: CalendarMonthChangeEvent) => {
+    //     console.log("Month changed", e)
+    //     setViewVisibleMonth(e);
+    // };
 
     useEffect(() => {
         if (districtBaseFamilyId) {
@@ -88,7 +113,6 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
         if (!inVisibleMonth) {
             return <span style={{ visibility: 'hidden' }}>{event.day}</span>;
         }
-
         if (isDateAvailable(event)) {
             return (
                 <span className={"available-day " + (isSameDate(selectedDate, event) ? "selected-day" : "")}>
@@ -97,7 +121,7 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
             );
         }
         return event.day;
-    }, [viewVisibleMonth])
+    }, [viewVisibleMonth, selectedDate])
     const minDate = dayjs();
     const alergies = familyDetails?.alergies;
 
@@ -107,51 +131,60 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
     });
 
     return (
-        <div className="flex flex-column relative justify-content-center shadow-2 p-3" style={{ maxWidth: 700 }}>
-            <Button unstyled icon="pi pi-times" onClick={onClose} className="icon-btn-l" style={{ position: "absolute", right: 0, top: 0 }} />
-            {!detailsOnly && <>
-                <div className="flex flex-column justify-content-center align-items-center " >
-                    <div className="tm-5 pb-1 underline text-lg" style={{ maxWidth: "80%" }}>{family.familyLastName}{family.active ? "" : " - לא פעילה"}</div>
-                    <div className="flex flex-row w-full justify-content-between rm-2">
-                        <div><span className="m-2">עיר:</span><span>{family.city}</span></div>
-                        <div className="flex flex-row align-items-center">
-                            {loading && <ProgressSpinner style={{ height: 20, width: 20 }} />}
-                            <span className="clickable-span" onClick={loading ? undefined : handleScrollToDetails}>פרטי משפחה</span>
-                        </div>
+        <div className="flex flex-column relative justify-content-center w-full p-3" style={{ maxWidth: 700 }}>
+            <ChannelHeader name={family.familyLastName + (family.active ? "" : " - לא פעילה")} onBack={onClose} />
+            <div className="flex flex-row w-12 justify-content-end mb-2">
+                {!detailsOnly &&
+                    <div className="flex flex-row align-items-center">
+                        {loading && <ProgressSpinner style={{ height: 20, width: 20 }} />}
+                        <span className="clickable-span" onClick={loading ? undefined : handleScrollToDetails}>פרטי משפחה</span>
                     </div>
+                }
+            </div>
 
-                    <h3>לבחירת תאריך:</h3>
-                    {demands.length === 0 && <div>אין תאריכים זמינים</div>}
-                    <Calendar
-                        onViewDateChange={(e) => {
-                            setViewDate(e.value);
-                            const newViewDate = dayjs(e.value);
-                            handleMonthChange({ month: newViewDate.month(), year: newViewDate.year() });
-                        }}
-                        viewDate={viewDate}
-                        className={!isAvailableDatesVisible ? 'watermarked-no-dates' : ''}
-                        value={selectedDate}
-                        enabledDates={availableDates}
-                        onChange={(e) => {
-                            console.log("date selected", e.value)
-                            setSelectedDate(e.value)
-                        }}
-                        inline
-
-                        // showButtonBar
-                        dateTemplate={dateTemplate}
-                        locale="he"
-                        //firstDayOfWeek={"Sunday"}
-                        monthNavigator
-                        minDate={minDate.toDate()}
-                    //yearNavigator 
-                    //yearRange="2020:2030" 
+            {!detailsOnly && <>
+                <div className='flex flex-row relative justify-content-center align-items-center'>
+                    <SelectButton
+                        pt={{ root: { className: "select-button-container mb-2" } }}
+                        unstyled
+                        value={viewDate} onChange={(e) => {
+                            setViewVisibleMonth(e.value)
+                            const newDate = dayjs(e.value.year + "-" + (e.value.month + 1) + "-01")
+                            console.log("selected ", newDate.format("YYYY-MM-DD"));
+                            setViewDate(newDate.toDate());
+                        }} optionLabel="name" options={months}
+                        itemTemplate={(option) => (
+                            <div className={`select-button-item relative ${viewVisibleMonth.month === option.month ? 'p-highlight' : ''}`}>
+                                {option.name}
+                                <div className='select-month-badge'>{option.count}</div>
+                            </div>
+                        )}
                     />
-                    {saving && <InProgress />}
+
+                </div>
+                <Calendar
+                    viewDate={viewDate}
+                    className={!isAvailableDatesVisible ? 'watermarked-no-dates' : ''}
+                    value={selectedDate}
+                    enabledDates={availableDates}
+                    onChange={(e) => {
+                        console.log("date selected", e.value)
+                        setSelectedDate(e.value)
+                    }}
+                    inline
+
+                    dateTemplate={dateTemplate}
+                    locale="he"
+                    minDate={minDate.toDate()}
+                />
+                {saving && <InProgress />}
+                <div className="button-container mt-3 ">
+                    {selectedDate && <i className={`arrow-animation ${PrimeIcons.ANGLE_LEFT}`}></i>}
+
                     <Button
                         disabled={!selectedDate || !familyDetails || saving}
 
-                        label="שבצו אותי"
+                        label={"שבצו אותי" + (selectedDate ? (" ב- " + dayjs(selectedDate).format("DD-MMM") + "׳") : "")}
                         onClick={() => {
                             const availabilityRecord = demands.find(a => dayjs(a.date).diff(selectedDate, "days") === 0);
                             // to avoid double click
@@ -165,14 +198,17 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
                                 }).catch((err) => appServices.showMessage("error", "תקלה ברישום (1) - ", err.message))
                                     .finally(() => setSaving(false));
                             }
-                        }} className="mt-3 w-full" />
+                        }} className="w-full" />
                 </div>
+
             </>}
             {error && <div>תקלה בקריאת פרטי משפחה</div>}
             {loading && <div className="mt-5"><InProgress /></div>}
             {familyDetails &&
-                <ul ref={divRef} className="pl-4 list-disc text-right w-full">
-                    <div className="tm-5 pb-1 underline text-lg">שם: {familyDetails.familyLastName}</div>
+                <ul ref={divRef} className="pl-4 list-disc text-right">
+                    {/* <div className="tm-5 pb-1 underline text-lg">שם: {familyDetails.familyLastName}</div> */}
+                    <div className="tm-5 pb-1 underline text-lg">פרטים</div>
+                    <li><strong>עיר:</strong>{family.city}</li>
                     <li>המשפחה בת <strong> {familyDetails.adultsCount}</strong> נפשות</li>
                     <li><strong>הרכב בני המשפחה:</strong> {familyDetails.familyStructure}</li>
                     <li><strong>גילאי בני המשפחה:</strong> {familyDetails.familyMembersAge}</li>

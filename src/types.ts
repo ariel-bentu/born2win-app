@@ -124,6 +124,8 @@ export interface UserRecord {
     lastModified: string;
     otp?: string;
     otpCreatedAt?: string;
+    birthDate: string;
+    gender:string;
 }
 
 

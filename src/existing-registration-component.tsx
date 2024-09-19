@@ -11,11 +11,11 @@ import { NICE_DATE, sortByDateDesc } from './utils';
 import { FamilyDetailsComponent } from './famility-registration-details';
 
 const Filters = {
-    ALL: 1,
-    FUTURE: 2,
+    ALL: 2,
+    FUTURE: 1,
     array: [
-        { name: 'הכל', value: 1 },
-        { name: 'עתידי', value: 2 },
+        { name: 'עתידי', value: 1 },
+        { name: 'הכל', value: 2 },
     ]
 }
 interface ExistingRegistrationsComponentProps {

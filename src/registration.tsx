@@ -59,7 +59,7 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
             // calculate the cities' availability
             // const cities = getUniqueCities(demands.demands).map(city => ({ ...city, available: true }));
             // console.log("cities", demands.allDistrictCities)
-            const cities = demands.allDistrictCities.map(city => ({ ...city, available: (demands.demands.some(d => compareCities(d.city ,city.name))) } as CityAvailability));
+            const cities = demands.allDistrictCities.map(city => ({ ...city, available: (demands.demands.some(d => compareCities(d.city, city.name))) } as CityAvailability));
             setCities(cities);
             if (cities.length == 1) {
                 console.log("cities", cities)
@@ -91,14 +91,14 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
 
     const selectedFamilyDemand = selectedFamily ? familyDemands.filter(fd => fd.districtBaseFamilyId === selectedFamily.districtBaseFamilyId) : undefined;
     const filteredFamilies = families.filter(family => selectedCities.some(sc => compareCities(sc.name, family.city)));
-
+    console.log("topPosition",topPosition)
     return (
         <div className="registration-component">
             <div className="img-header">
                 {standalone && <img src={headerImg} />}
             </div>
-            {standalone && !selectedFamily && <img src={bunnerImg} alt="Registration Banner" style={{ maxWidth: "100%" }} />}
-            {standalone && !selectedFamily && <div>
+            {standalone && <img src={bunnerImg} alt="Registration Banner" style={{ maxWidth: "100%" }} />}
+            {standalone && <div>
                 <div className='standalone-title bm-4'>נולדת לנצח - מחוז {userInfo && userInfo.userDistrict.name}</div>
                 <div className='m-2 standalone-text-desc'>
                     <div className='m-2'>{userInfo && (userInfo.firstName + " " + userInfo.lastName)}</div>
@@ -109,13 +109,17 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
 
             </div>}
             <div className={standalone ? 'standalone-dynamic-host' : "w-full"}>
-                <ScrollPanel style={{ width: "100%", height: window.innerHeight - topPosition }}
+                <ScrollPanel style={{ width: "100%", height: standalone?"100%":window.innerHeight - topPosition }}
                     pt={{
                         wrapper: { className: "registration-scroller-wrapper", style: { paddingTop: standalone ? 40 : 0 } },
                         content: { className: "registration-scroller-content " + (standalone ? "standalone-card" : "") }  // Pass class to the content
                     }}
 
                 >
+                    {!standalone && !selectedFamily && <img src={bunnerImg} alt="Registration Banner" style={{ maxWidth: "70%" }} />}
+
+
+
                     {selectedFamily ?
                         <FamilyDetailsComponent districtBaseFamilyId={selectedFamily.districtBaseFamilyId} family={selectedFamily} onClose={() => {
                             setSelectedFamily(null);
@@ -125,16 +129,15 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
                             reloadOpenDemands={reloadOpenDemands} includeContacts={false} /> :
                         <>
                             {standalone && <span className='standalone-text-title'>אלו הערים שבהן ניתן לחבק משפחות החודש</span>}
-                            {!standalone && !selectedFamily && <img src={bunnerImg} alt="Registration Banner" style={{ maxWidth: "70%" }} />}
                             <MultiSelect
                                 value={selectedCities}
-                                options={cities.map(city => ({ label: city.name + (city.available ? "" : " (אין התנדבות זמינה)"), value: city }))}
+                                options={cities.map(city => ({ label: city.name + (city.available ? "" : " (כל התאריכים תפוסים)"), value: city }))}
                                 onChange={(e) => setSelectedCities(e.value)}
                                 placeholder="סינון לפי עיר"
                                 className="w-11 m-2"// md:w-20rem"
                                 display="chip"
                             />
-                            {<span className='standalone-text-title'>רשימת משפחות</span>}
+                            {selectedCities.length > 0 && <span className='standalone-text-title'>רשימת משפחות</span>}
                             {selectedCities.length == 0 && <span className='standalone-text-desc  w-11 mt-1 text-right'>יש לבחור עיר כדי לראות משפחות</span>}
                             {
                                 filteredFamilies.map((family, i) => (<OneLine

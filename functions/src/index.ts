@@ -377,6 +377,7 @@ exports.UpdateNotification = onCall({ cors: true }, async (request) => {
     if (doc) {
         const unp = request.data as NotificationUpdatePayload;
         let dirty = false;
+        let sendWelcome = false;
 
         const update: any = {};
         if (unp.notificationOn !== undefined) {
@@ -388,6 +389,7 @@ exports.UpdateNotification = onCall({ cors: true }, async (request) => {
             if (doc.data().notificationTokens === undefined || doc.data().notificationTokens.length === 0) {
                 update.notificationTokens = [{ ...unp.tokenInfo, uid }];
                 dirty = true;
+                sendWelcome = true;
             } else {
                 let currNotificationTokens = doc.data().notificationTokens;
                 if (currNotificationTokens.find((nt: TokenInfo) => nt.uid === uid && nt.token === unp.tokenInfo.token)) {
@@ -401,7 +403,25 @@ exports.UpdateNotification = onCall({ cors: true }, async (request) => {
             }
         }
         if (dirty) {
-            return doc.ref.update(update);
+            return doc.ref.update(update).then(() => {
+                if (sendWelcome) {
+                    const gender = doc.data().gender;
+                    const greeting = gender === "אישה" ?
+                        "ברוכה הבאה" : (gender === "גבר" ? "ברוך הבא" : "ברוכים הבאים");
+
+
+                    return addNotificationToQueue(`${greeting} ${doc.data().firstName} 💜`, `שמחים שהצטרפת לאפליקצית נולדת לנצח. מומלץ לעשות סיור בכל הלשוניות -
+
+הודעות: לכאן תגענה הודעות מהמערכת אליך
+שיבוצים: משמש לרישום להתנדבות
+התנדבויות: לראות את כל ההתנדבויות שנרשמת אליהן, ופרטי המשפחה
+גלריה: תמונות של ארוחות לקבלת רעיונות
+
+התנדבות נעימה
+                    `, NotificationChannels.Greetings, [], [doc.id]);
+                }
+                return;
+            });
         }
     }
     return;
@@ -1498,10 +1518,17 @@ async function greetingsToBirthdays() {
     for (let i = 0; i < users.docs.length; i++) {
         const user = users.docs[i];
         if (user.data().notificationOn === true) {
-            await addNotificationToQueue(`יום הולדת שמח ${user.data().firstName}`, "", NotificationChannels.Greetings,
+            await addNotificationToQueue(`יום הולדת שמח ${user.data().firstName} 💜`, "", NotificationChannels.Greetings,
                 [], [user.id], { fullImage: user.data().gender === "אישה" ? "birthday-female" : "birthday-male" });
         }
     }
+
+    const districts = await getDestricts();
+
+    // Notify Managers
+    const usersList = users.docs.map(user => `- ${user.data().firstName} ${user.data().lastName} (${districts.find(d => d.id === user.data().mahoz)?.name || ""})`).join("\n");
+    return addNotificationToQueue("ימי הולדת היום 💜", `הנה רשימת המתנדבים שהיום יום הולדתם:\n${usersList}`, NotificationChannels.Alerts,
+        [], "admins");
 }
 
 async function alertOpenDemands() {
@@ -1515,7 +1542,7 @@ async function alertOpenDemands() {
         let msgBody = "מחוז: " + districts[i].name + "\n";
         if (openDemands.length > 0) {
             let found = false;
-            openDemands.forEach(od => {
+            openDemands.filter(od => !od.familyLastName.includes("בדיקה")).forEach(od => {
                 const daysLeft = Math.abs(dayjs().diff(od.date, "days"));
                 if (daysLeft > 0) {
                     found = true;

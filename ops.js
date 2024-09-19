@@ -140,7 +140,7 @@ async function getDestricts() {
         const districtResponse = await axios.get(`https://api.airtable.com/v0/${baseId}/מחוז`, {
             headers,
         });
-        districts = districtResponse.data.records.map((r) => ({ id: r.id, base_id: r.fields.base_id }));
+        districts = districtResponse.data.records.map((r) => ({ id: r.id, base_id: r.fields.base_id, name: r.fields["מחוז"] }));
     }
     return districts || [];
 }
@@ -331,8 +331,6 @@ async function updateAirTableAppinstalled() {
     }    
 }
 
-
-
 async function greetingsToBirthdays() {
     const today = "01-06"// dayjs().add(3,"d").format("DD-MM");
     const users = await db.collection("users").where("birthDate", "==", today).get();
@@ -345,6 +343,12 @@ async function greetingsToBirthdays() {
             //     [], [user.id], { fullImage: user.data().gender === "אישה" ? "birthday-female" : "birthday-male" });
         }
     }
+    const districts = await getDestricts();
+
+    // Notify Managers
+    const usersList = users.docs.map(user => `- ${user.data().firstName} ${user.data().lastName} (${districts.find(d => d.id === user.data().mahoz)?.name || ""})`).join("\n");
+    return addNotificationToQueue(`ימי הולדת היום 💜`, `הנה רשימת המתנדבים שהיום יום הולדתם\n${usersList}`, "alerts",
+        [], ["kereng"]);
 }
 //updateAirTableAppinstalled()
 
@@ -359,5 +363,9 @@ async function greetingsToBirthdays() {
 // })
 
 //addNotificationToQueue("יום הולדת שמח קרן", "", "greetings", [],["kereng"],{fullImage:"birthday-female"});
+
+
+
+
 //updateAllUsers();
 //greetingsToBirthdays()

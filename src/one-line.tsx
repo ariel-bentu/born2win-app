@@ -55,7 +55,7 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
             const isLink = value.startsWith('http://') || value.startsWith('https://');
             const label = part.slice(0, colonIndex + (isLink ? 0 : 1));
             return (
-                <div className="flex align-items-center" key={index}>
+                <div className="flex align-items-start  " key={index}>
                     {isLink ? <>
                         <a href={value} target="_blank" rel="noopener noreferrer" className='ml-2'>
                             {label}
@@ -63,10 +63,13 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
                         <Button icon="pi pi-copy" label="העתק" className="p-button-text p-button-rounded" onClick={() => handleCopyLink(value)} style={{ marginLeft: '0.5rem' }} />
                     </> :
                         <>
-                            <strong className="pl-1">{label}</strong> <div>{value}</div>
+                            <strong className="pl-1">{label}</strong> <div className='text-right'>{value}</div>
                         </>}
                 </div>
             );
+        }
+        if (part === "") {
+            return <br />;
         }
 
         return <div key={index}>{part}</div>;

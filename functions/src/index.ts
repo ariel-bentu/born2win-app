@@ -1513,10 +1513,10 @@ async function remindVolunteersToRegister() {
 
 async function greetingsToBirthdays() {
     const today = dayjs().format(DATE_BIRTHDAY);
-    const users = await db.collection(Collections.Users).where("birthDate", "==", today).get();
-
-    for (let i = 0; i < users.docs.length; i++) {
-        const user = users.docs[i];
+    const allUsers = await db.collection(Collections.Users).where("birthDate", "==", today).get();
+    const users = allUsers.docs.filter(u=>u.data().active === true);
+    for (let i = 0; i < users.length; i++) {
+        const user = users[i];
         if (user.data().notificationOn === true) {
             await addNotificationToQueue(`יום הולדת שמח ${user.data().firstName} 💜`, "", NotificationChannels.Greetings,
                 [], [user.id], { fullImage: user.data().gender === "אישה" ? "birthday-female" : "birthday-male" });
@@ -1526,7 +1526,7 @@ async function greetingsToBirthdays() {
     const districts = await getDestricts();
 
     // Notify Managers
-    const usersList = users.docs.map(user => `- ${user.data().firstName} ${user.data().lastName} (${districts.find(d => d.id === user.data().mahoz)?.name || ""})`).join("\n");
+    const usersList = users.map(user => `- ${user.data().firstName} ${user.data().lastName} (${districts.find(d => d.id === user.data().mahoz)?.name || ""}) tel:+${user.data().phone}`).join("\n");
     return addNotificationToQueue("ימי הולדת היום 💜", `הנה רשימת המתנדבים שהיום יום הולדתם:\n${usersList}`, NotificationChannels.Alerts,
         [], "admins");
 }

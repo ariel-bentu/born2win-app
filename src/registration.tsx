@@ -91,7 +91,7 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
 
     const selectedFamilyDemand = selectedFamily ? familyDemands.filter(fd => fd.districtBaseFamilyId === selectedFamily.districtBaseFamilyId) : undefined;
     const filteredFamilies = families.filter(family => selectedCities.some(sc => compareCities(sc.name, family.city)));
-    console.log("topPosition",topPosition)
+    console.log("topPosition", topPosition)
     return (
         <div className="registration-component">
             <div className="img-header">
@@ -109,10 +109,10 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
 
             </div>}
             <div className={standalone ? 'standalone-dynamic-host' : "w-full"}>
-                <ScrollPanel style={{ width: "100%", height: standalone?"100%":window.innerHeight - topPosition }}
+                <ScrollPanel style={{ width: "100%", height: standalone ? "100%" : window.innerHeight - topPosition }}
                     pt={{
                         wrapper: { className: "registration-scroller-wrapper", style: { paddingTop: standalone ? 40 : 0 } },
-                        content: { className: "registration-scroller-content " + (standalone ? "standalone-card" : "") }  // Pass class to the content
+                        content: { className: "registration-scroller-content " + (standalone ? "standalone-card" : ""), style: { width: Math.max(window.innerWidth - 50, 350) } }  // Pass class to the content
                     }}
 
                 >

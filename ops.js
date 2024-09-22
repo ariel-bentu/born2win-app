@@ -346,9 +346,9 @@ async function greetingsToBirthdays() {
     const districts = await getDestricts();
 
     // Notify Managers
-    const usersList = users.docs.map(user => `- ${user.data().firstName} ${user.data().lastName} (${districts.find(d => d.id === user.data().mahoz)?.name || ""})`).join("\n");
+    const usersList = users.docs.map(user => `- ${user.data().firstName} ${user.data().lastName} (${districts.find(d => d.id === user.data().mahoz)?.name || ""})  tel:+${user.data().phone}`).join("\n");
     return addNotificationToQueue(`ימי הולדת היום 💜`, `הנה רשימת המתנדבים שהיום יום הולדתם\n${usersList}`, "alerts",
-        [], ["kereng"]);
+        [], ["arielb"]);
 }
 //updateAirTableAppinstalled()
 

@@ -45,9 +45,10 @@ export function NewAppVersion({ onClick }: RegisterToNotificationProps) {
     );
 }
 
-export function PhoneNumber({ phone }: { phone: string }) {
+export function PhoneNumber({ phone , hideText}: { phone: string, hideText?:boolean }) {
     return <div className="flex flex-row align-items-center">
-        <strong className="ml-2">טלפון:</strong>{nicePhone(phone)}
+        {!hideText && <strong className="ml-2">טלפון:</strong>}
+        {!hideText ?nicePhone(phone):""}
         <Button
             icon="pi pi-whatsapp"
             className="p-button-rounded p-button-info m-2"

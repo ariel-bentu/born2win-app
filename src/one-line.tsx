@@ -1,6 +1,7 @@
 import { Button } from 'primereact/button';
 import birthdayMale from './media/birthday-male.jpeg';
 import birthdayFemale from './media/birthday-female.jpeg';
+import { PhoneNumber } from './common-ui';
 
 interface LineButton {
     label: string;
@@ -43,19 +44,34 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
                     break;
             }
             if (imageSrc) {
-                return <img src={imageSrc} style={{width:"95%"}}/>
+                return <img src={imageSrc} style={{ width: "95%" }} />
             }
             return <div>תמונה לא מוכרת - {imageName}</div>
         }
 
-        const colonIndex = part.indexOf(':');
+        let phone = undefined;
+        const phoneIndex = part.indexOf('tel:');
+        if (phoneIndex >= 0) {
+            const startIndex = phoneIndex + 4; // Move past 'tel:'
+            const endIndex = part.substring(startIndex).search(/\s/);
 
+            phone = endIndex === -1 ? part.substring(startIndex) : part.substring(startIndex, startIndex + endIndex);
+
+            if (endIndex === -1) {
+                part = part.substring(0, phoneIndex).trim();
+            } else {
+                part = part.substring(0, phoneIndex) + part.substring(startIndex + endIndex).trim();
+            }
+        }
+        const colonIndex = part.indexOf(':');
+        const bullet = part.startsWith("- ");
+        if (phone) console.log(" extracted phone", phone)
         if (colonIndex !== -1) {
             const value = part.slice(colonIndex + 1).trim();
             const isLink = value.startsWith('http://') || value.startsWith('https://');
             const label = part.slice(0, colonIndex + (isLink ? 0 : 1));
             return (
-                <div className="flex align-items-start  " key={index}>
+                <div className="flex align-items-start justify-content-center" key={index}>
                     {isLink ? <>
                         <a href={value} target="_blank" rel="noopener noreferrer" className='ml-2'>
                             {label}
@@ -72,7 +88,7 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
             return <br />;
         }
 
-        return <div key={index}>{part}</div>;
+        return <div className={bullet ? "flex align-items-center" : ""} key={index}><div className="flex">{part}</div >{phone && <PhoneNumber phone={phone} hideText={true}/> }</div>;
     };
 
     return (

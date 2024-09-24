@@ -176,11 +176,13 @@ function getUserByID(id: string): Promise<DocumentSnapshot | null> {
  */
 exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
     if (!request.auth) {
+        logger.error("Request had invalid credentials.");
         throw new HttpsError("unauthenticated", "Request had invalid credentials.");
     }
 
     const uid = request.auth.uid;
     if (!uid) {
+        logger.error("Request is missing uid.");
         throw new HttpsError("unauthenticated", "Request is missing uid.");
     }
 
@@ -190,10 +192,11 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
     let doc;
 
     if (uulp.volunteerId) {
-        // Androing or iOS phase 1
+        // Android or iOS phase 1
         // -----------------------
         doc = await getUserByID(uulp.volunteerId);
         if (!doc) {
+            logger.error("Volunteer ID not found", uulp);
             throw new HttpsError("not-found", "Volunteer ID not found");
         }
 
@@ -204,10 +207,12 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
             validateOTPOrFingerprint(uulp.otp, doc.data()?.otp, doc.data()?.otpCreatedAt, 30);
 
         if (!otpValid) {
+            logger.error("Invalid or expired OTP", uulp);
             throw new HttpsError("invalid-argument", "Invalid or expired OTP");
         }
 
         if (uulp.isIOS && !uulp.fingerprint) {
+            logger.error("Missing fingerpring", uulp);
             throw new HttpsError("invalid-argument", "Missing fingerpring");
         }
         const update: any = uulp.isIOS ?
@@ -244,12 +249,14 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
         doc = await findUserByFingerprint(uulp.fingerprint);
 
         if (!doc) {
+            logger.error("Fingerprint not found", uulp);
             throw new HttpsError("not-found", "Fingerprint not found");
         }
         const devOtp = doc.data()?.devOtp;
 
         const fpValid = validateOTPOrFingerprint(uulp.fingerprint, doc.data()?.fingerprint, doc.data()?.otpCreatedAt, 1);
         if (!fpValid) {
+            logger.error("Invalid or expired Fingerpring", uulp, doc.data()?.fingerprint, doc.data()?.otpCreatedAt);
             throw new HttpsError("invalid-argument", "Invalid or expired Fingerpring");
         }
         // Update UID based on fingerprint (iOS Phase 2)
@@ -278,6 +285,7 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
         // Phone flow
         doc = await findUserByPhone(uulp.phone);
         if (!doc) {
+            logger.error("User with given phone is not known", uulp);
             throw new HttpsError("not-found", "User with given phone is not known");
         }
 
@@ -317,11 +325,13 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
                 // All set
                 return doc.id;
             } else {
+                logger.error("Invalid or expired OTP - 2", uulp, doc.data().otp, doc.data().otpCreatedAt);
                 throw new HttpsError("invalid-argument", "Invalid or expired OTP");
             }
         }
         return ""; // not yet sending volunteer Id
     } else {
+        logger.error("Missing volunteerID or fingerprint", uulp);
         throw new HttpsError("invalid-argument", "Missing volunteerID or fingerprint");
     }
 });
@@ -1603,7 +1613,7 @@ async function refreshWebhookToken() {
             addNotificationToQueue("Refresh Webhook Failed", "AitTable Webhook refrsh Failed with status: " + res.status,
                 NotificationChannels.Alerts, [], "admins");
         } else {
-            logger.error("Refresh Webhook Succeeded");
+            logger.info("Refresh Webhook Succeeded");
         }
     }).catch((err) => {
         logger.error("Refresh Webhook failed", err);

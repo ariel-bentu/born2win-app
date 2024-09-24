@@ -135,9 +135,16 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
             <ChannelHeader name={family.familyLastName + (family.active ? "" : " - לא פעילה")} onBack={onClose} />
             <div className="flex flex-row w-12 justify-content-end mb-2">
                 {!detailsOnly &&
-                    <div className="flex flex-row align-items-center">
+                    <div className="flex flex-column justify-content-start align-items-start w-12 pr-3">
                         {loading && <ProgressSpinner style={{ height: 20, width: 20 }} />}
-                        <span className="clickable-span" onClick={loading ? undefined : handleScrollToDetails}>פרטי משפחה</span>
+                        {familyDetails && <>
+                        <li><strong>עיר:</strong>{family.city}</li>
+                        <li>המשפחה בת <strong> {familyDetails.adultsCount}</strong> נפשות</li>
+                        <li><strong>הרכב בני המשפחה:</strong> {familyDetails.familyStructure}</li>
+                        <li><strong>גילאי בני המשפחה:</strong> {familyDetails.familyMembersAge}</li>
+                        <li><strong>גיל החולה:</strong> {familyDetails.patientAge}</li>
+                        </>}
+                        <span className="clickable-span" onClick={loading ? undefined : handleScrollToDetails}>לפרטי משפחה נוספים...</span>
                     </div>
                 }
             </div>

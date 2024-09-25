@@ -78,9 +78,9 @@ export default function OneLine({ title, body, unread, footer, onDelete, onRead,
                         </a>
                         <Button icon="pi pi-copy" label="העתק" className="p-button-text p-button-rounded" onClick={() => handleCopyLink(value)} style={{ marginLeft: '0.5rem' }} />
                     </> :
-                        <>
+                        <div className='flex w-full justify-content-start'>
                             <strong className="pl-1">{label}</strong> <div className='text-right'>{value}</div>
-                        </>}
+                        </div>}
                 </div>
             );
         }

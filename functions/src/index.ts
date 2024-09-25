@@ -1151,7 +1151,7 @@ exports.GetUserRegistrations = onCall({ cors: true }, async (request): Promise<F
     const doc = await authenticate(request);
     const district = doc.data().mahoz;
     const volunteerId = doc.id;
-    return getDemands(district, "תפוס", true, undefined, undefined, volunteerId);
+    return getDemands(district, "תפוס", true, dayjs().startOf("month").format(DATE_AT), undefined, volunteerId);
 });
 
 

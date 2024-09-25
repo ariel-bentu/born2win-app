@@ -7,7 +7,7 @@ import { AppServices, FamilyCompact, FamilyDemand, NavigationStep, UserInfo } fr
 import { InProgress } from './common-ui';
 import OneLine from './one-line';
 import RegistrationCancellation from './registration-cancellation';
-import { NICE_DATE, sortByDateDesc } from './utils';
+import { getReferenceDays, NICE_DATE, sortByDateDesc } from './utils';
 import { FamilyDetailsComponent } from './famility-registration-details';
 
 const Filters = {
@@ -80,6 +80,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
             familyLastName: currentRegistration.familyLastName,
             district: currentRegistration.district,
             active: currentRegistration.isFamilyActive,
+
         } as FamilyCompact;
         return <FamilyDetailsComponent detailsOnly={true} familyDemandId={currentRegistration.id}
             districtBaseFamilyId={currentRegistration.districtBaseFamilyId} family={currentFamily} onClose={() => {
@@ -130,7 +131,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                                 key={reg.id}
                                 hideIcon={true}
                                 title={reg.familyLastName}
-                                body={`עיר: ${reg.city}`}
+                                body={`עיר: ${reg.city}\nמתי: ${getReferenceDays(reg.date)}`}
                                 footer={dayjs(reg.date).format(NICE_DATE)}
                                 unread={isInFuture(reg.date)}
                                 onRead={() => {

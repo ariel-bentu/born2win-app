@@ -46,6 +46,18 @@ export function getNiceDateTime(d: number | string) {
     return theDate.format("[יום ]dddd, D [ב]MMMM HH:mm");
 }
 
+export function getReferenceDays(date:string) {
+    const d = dayjs(date);
+    const today = dayjs();
+    if (d.isAfter(today)) {
+        return `עוד ${d.diff(today, "days")} ימים`;
+    } else if (d.diff(today, "days") === 0) {
+        return "היום";
+    } else {
+        return `לפני ${d.diff(today, "days")} ימים`;
+    }
+}
+
 export const sortByDate = (a: string, b: string) => dayjs(a).isBefore(b) ? -1 : 1;
 export const sortByDateDesc = (a: string, b: string) => dayjs(a).isBefore(b) ? 1 : -1;
 

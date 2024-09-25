@@ -24,12 +24,13 @@ import {
     VolunteerInfo,
     VolunteerInfoPayload,
     GetDemandsPayload,
+    Errors,
 } from "../../src/types";
 import axios from "axios";
 import express = require("express");
 import crypto = require("crypto");
 import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
-import { IL_DATE, replaceAll } from "../../src/utils";
+import { IL_DATE, replaceAll, simplifyFamilyName } from "../../src/utils";
 import localeData = require("dayjs/plugin/localeData");
 import { Lock } from "./lock";
 
@@ -472,6 +473,8 @@ async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
         userDistrict: { id: data.mahoz, name: userDistrict?.name || "" },
         isAdmin: (data.isAdmin == true),
         districts: adminDistricts,
+        needToSignConfidentiality: data.needToSignConfidentiality,
+        active: data.active,
     } as UserInfo;
 }
 
@@ -881,6 +884,13 @@ async function authenticate(request: CallableRequest<any>): Promise<QueryDocumen
         if (!impersonateDoc) {
             throw new HttpsError("not-found", "impersonated user not found");
         }
+
+        if (impersonateDoc.data()?.loginInfo && impersonateDoc.data()?.loginInfo.length > 0) {
+            // user is already onboarded to app - reject old access
+            logger.warn(Errors.UserAlreadyOnboardedToApp, oldAccessUserID);
+            throw new HttpsError("permission-denied", Errors.UserAlreadyOnboardedToApp);
+        }
+
         return impersonateDoc as QueryDocumentSnapshot;
     }
 
@@ -889,7 +899,7 @@ async function authenticate(request: CallableRequest<any>): Promise<QueryDocumen
         throw new HttpsError("unauthenticated", "unauthorized user");
     }
     if (!doc.data().active) {
-        throw new HttpsError("unauthenticated", "Inactive user");
+        throw new HttpsError("unauthenticated", Errors.InactiveUser);
     }
 
     if (request.data && impersonateUser) {
@@ -1524,7 +1534,7 @@ async function remindVolunteersToRegister() {
 async function greetingsToBirthdays() {
     const today = dayjs().format(DATE_BIRTHDAY);
     const allUsers = await db.collection(Collections.Users).where("birthDate", "==", today).get();
-    const users = allUsers.docs.filter(u=>u.data().active === true);
+    const users = allUsers.docs.filter(u => u.data().active === true);
     for (let i = 0; i < users.length; i++) {
         const user = users[i];
         if (user.data().notificationOn === true) {
@@ -1547,6 +1557,9 @@ async function alertOpenDemands() {
     const adminsIds = admins.docs.map(doc => doc.id);
     const waitFor = [];
 
+    let adminMsg = "";
+    let notifyAdmins = false;
+
     for (let i = 0; i < districts.length; i++) {
         const openDemands = await getDemands(districts[i].id, "זמין", false, dayjs().format(DATE_AT), dayjs().add(5, "days").format(DATE_AT));
         let msgBody = "מחוז: " + districts[i].name + "\n";
@@ -1556,14 +1569,22 @@ async function alertOpenDemands() {
                 const daysLeft = Math.abs(dayjs().diff(od.date, "days"));
                 if (daysLeft > 0) {
                     found = true;
-                    msgBody += `- ${od.familyLastName} (עוד ${daysLeft} ימים)` + "\n";
+                    const simplifedName = simplifyFamilyName(od.familyLastName);
+                    msgBody += `- ${simplifedName} - ${od.city} (עוד ${daysLeft} ימים)` + "\n";
                 }
             });
             if (found) {
-                waitFor.push(addNotificationToQueue("שיבוצים חסרים - 5 ימים קרובים", msgBody, NotificationChannels.Alerts, [districts[i].id], adminsIds));
+                adminMsg += msgBody;
+                notifyAdmins = true;
+                waitFor.push(addNotificationToQueue("שיבוצים חסרים - 5 ימים קרובים", msgBody, NotificationChannels.Alerts, [districts[i].id], []));
             }
         }
     }
+
+    if (notifyAdmins) {
+        waitFor.push(addNotificationToQueue("הודעת מנהל: חוסרים 5 ימים קרובים", adminMsg, NotificationChannels.Alerts, [], adminsIds));
+    }
+
     Promise.all(waitFor);
 }
 
@@ -1651,7 +1672,7 @@ async function syncBorn2WinUsers(sinceDate?: any) {
             },
             params: {
                 filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
-                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "phone_e164", "manychat_id", "תאריך לידה", "מגדר"],
+                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "phone_e164", "manychat_id", "תאריך לידה", "מגדר", "חתם על שמירת סודיות", "תעודת זהות"],
                 offset: offset,
             },
         });
@@ -1669,6 +1690,7 @@ async function syncBorn2WinUsers(sinceDate?: any) {
             seenUsers[userId] = true;
             const docRef = db.collection(Collections.Users).doc(userId);
             const userDoc = await docRef.get();
+            const isNeedToSignConfidentiality = (user.fields["חתם על שמירת סודיות"] !== "חתם");
 
             const userRecord = {
                 active: user.fields["פעיל"] == "פעיל",
@@ -1679,6 +1701,9 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                 mahoz: user.fields["מחוז"][0],
                 birthDate: user.fields["תאריך לידה"] ? dayjs(user.fields["תאריך לידה"]).format(DATE_BIRTHDAY) : "",
                 gender: (user.fields["מגדר"] || "לא ידוע"),
+                needToSignConfidentiality: (isNeedToSignConfidentiality ?
+                    generateSignConfidentialityURL(user.fields["שם פרטי"], user.fields["תעודת זהות"], userId) :
+                    FieldValue.delete()),
                 volId: user.id,
                 manychat_id: user.fields.manychat_id,
             } as UserRecord;
@@ -1691,7 +1716,9 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                     userRecord.lastName === prevUserRecord.lastName &&
                     userRecord.phone === prevUserRecord.phone &&
                     userRecord.birthDate === prevUserRecord.birthDate &&
-                    userRecord.gender === prevUserRecord.gender
+                    userRecord.gender === prevUserRecord.gender &&
+                    (isNeedToSignConfidentiality && prevUserRecord.needToSignConfidentiality ||
+                        (!isNeedToSignConfidentiality && !prevUserRecord.needToSignConfidentiality))
                 ) {
                     // No change!
                     continue;
@@ -1736,6 +1763,16 @@ async function syncBorn2WinUsers(sinceDate?: any) {
         //         }
         return;
     });
+}
+
+function generateSignConfidentialityURL(firstName: string, identificationId: string, volunteerId: string) {
+    const entry = {
+        identitycard: identificationId,
+        name: firstName,
+        recordid: volunteerId,
+    };
+
+    return `https://born2win.org.il/confidentiality-and-privacy/?entry=${encodeURI(JSON.stringify(entry))}`;
 }
 
 function getRegistrationLink(userId: string, otp: string): string {

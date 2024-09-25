@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo, ReactNode } from 'react';
 import { TabView, TabPanel } from 'primereact/tabview';
 import { Badge } from 'primereact/badge';
 import { Toast } from 'primereact/toast';
@@ -9,7 +9,7 @@ import 'primeflex/primeflex.css';
 import './App.css';
 import * as api from './api';
 import { NextOrObserver, User } from 'firebase/auth';
-import { AppServices, Cached, NavigationState, NavigationStep, OpenFamilyDemands, UserInfo } from './types';
+import { AppServices, Cached, Errors, NavigationState, NavigationStep, OpenFamilyDemands, UserInfo } from './types';
 import { ClientJS } from 'clientjs';
 import NotificationsComponent from './notifications-component';
 import { countUnreadNotifications } from './notifications';
@@ -25,9 +25,10 @@ import dayjs from 'dayjs';
 import { SendMessage } from './send-message';
 import { confirmPopup, ConfirmPopup } from 'primereact/confirmpopup';
 import { isNotEmpty } from './utils';
-import { DisposeNavigationRequester, initializeNavigationRequester } from './notification-actions';
+import { DisposeNavigationRequester, initializeNavigationRequester, openAppUrl } from './notification-actions';
 import PhoneRegistration from './phone-registration';
 import { Gallery } from './gallery';
+import { Button } from 'primereact/button';
 
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
@@ -103,6 +104,8 @@ function App() {
     const [phoneFlow, setPhoneFlow] = useState<boolean>(false);
     const [latestVersion, setLatestVersion] = useState<string | undefined>();
     const [newVersionExists, setNewVersionExists] = useState<boolean>(false);
+    const [blockUserWithMessage, setBlockUserWithMessage] = useState<ReactNode | undefined>();
+
 
     const onAuth: NextOrObserver<User> = (user: User | null) => {
         console.log("OnAuth - Login callback called", user);
@@ -390,6 +393,13 @@ function App() {
                 // Force a token refresh
                 user.getIdToken(true);
             }
+
+            if (userInfo && userInfo.needToSignConfidentiality && userInfo.needToSignConfidentiality.length > 0) {
+                setBlockUserWithMessage(<div>
+                    <h3>מתנדב.ת יקר.ה, נדרשת חתימה על הסכם סודיות עם העמותה</h3>
+                    <Button label="מעבר לחתימה על הסכם סודיות" onClick={()=>openAppUrl(userInfo.needToSignConfidentiality || "")}/>
+                </div>);
+            }
         }
     }, [user, userInfo, isTokenAdmin])
 
@@ -399,6 +409,13 @@ function App() {
             api.getUserInfo().then((uInfo) => {
                 console.log("UserInfo set to", uInfo.firstName);
                 setUserInfo(uInfo);
+            }).catch(err => {
+                if (err.message === Errors.UserAlreadyOnboardedToApp) {
+                    // cannot use old URL any more
+                    setBlockUserWithMessage(<div>גישה מלינק זה נחסמה - יש לפתוח את האפליקציה</div>);
+                } else if (err.message === Errors.InactiveUser) {
+                    setBlockUserWithMessage(<div>משתמש אינו פעיל - יש לפנות לעמותה</div>);
+                }
             });
         }
     }, [user, volunteerId]);
@@ -547,7 +564,14 @@ function App() {
     const showRegToMessages = appReady && userInfo && !userInfo?.notificationToken;
     const tabContentsTop = 161 + (showRegToMessages || newVersionExists ? 120 : 0);
 
+    if (blockUserWithMessage) {
+        return <div className="App text-2xl">
+            {blockUserWithMessage}
+        </div>
+    }
+
     if (oldUrlParamID) {
+
         // OLD URL SUPPORT - to remove after app launch
         return <div className="App">
             <ConfirmPopup />
@@ -652,8 +676,8 @@ function App() {
                             {isAdmin && <SendMessage userInfo={userInfo} appServices={appServices} />}
                         </TabPanel>}
                     <TabPanel headerStyle={{ fontSize: 20 }} header="גלריה">
-                        {activeIndex === 5  &&
-                            <Gallery storagePath={"/gallery"} userInfo={userInfo} appServices={appServices} topPosition={tabContentsTop}/>}
+                        {activeIndex === 5 &&
+                            <Gallery storagePath={"/gallery"} userInfo={userInfo} appServices={appServices} topPosition={tabContentsTop} />}
                     </TabPanel>
                 </TabView>}
         </div >

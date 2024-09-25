@@ -7,7 +7,7 @@ import { getDemands, getVolunteerInfo, handleSearchUsers, updateFamilityDemand }
 
 import { InProgress, PhoneNumber, WeekSelectorSlider } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
-import { sortByDate } from './utils';
+import { simplifyFamilyName, sortByDate } from './utils';
 import { Button } from 'primereact/button';
 import "./charts.css"
 import { FamilyDetailsComponent } from './famility-registration-details';
@@ -61,14 +61,6 @@ interface GroupedData {
     };
 }
 
-function simplifyFamilyName(name: string): string {
-    if (!name) return "";
-    const match = name.match(/משפחת\s(.+?)\s-/);
-    if (match) {
-        return match[1]; // Extracted family name
-    }
-    return name;
-}
 
 const filterOnlyOpen = (f: FamilyDemand) => f.status === "זמין" && f.isFamilyActive === true;
 const filterOnlyFulfilled = (f: FamilyDemand) => f.status === "תפוס";

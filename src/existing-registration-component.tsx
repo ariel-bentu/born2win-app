@@ -79,6 +79,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
             districtBaseFamilyId: currentRegistration.districtBaseFamilyId,
             familyLastName: currentRegistration.familyLastName,
             district: currentRegistration.district,
+            active: currentRegistration.isFamilyActive,
         } as FamilyCompact;
         return <FamilyDetailsComponent detailsOnly={true} familyDemandId={currentRegistration.id}
             districtBaseFamilyId={currentRegistration.districtBaseFamilyId} family={currentFamily} onClose={() => {

@@ -76,3 +76,12 @@ export function nicePhone(phone: string): string {
     }
     return phone;
 }
+
+export function simplifyFamilyName(name: string): string {
+    if (!name) return "";
+    const match = name.match(/משפחת\s(.+?)\s-/);
+    if (match) {
+        return match[1]; // Extracted family name
+    }
+    return name;
+}

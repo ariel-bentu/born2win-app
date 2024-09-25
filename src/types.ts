@@ -101,7 +101,9 @@ export interface UserInfo {
     phone: string,
     userDistrict: { id: string, name: string },
     isAdmin: boolean,
+    needToSignConfidentiality?: string;
     districts?: { id: string, name: string }[],
+    active: boolean;
 }
 
 export interface LoginInfo {
@@ -126,6 +128,7 @@ export interface UserRecord {
     otpCreatedAt?: string;
     birthDate: string;
     gender:string;
+    needToSignConfidentiality?:string;
 }
 
 
@@ -260,3 +263,8 @@ export interface FamilyDetails {
     phone: string;
 }
 
+
+export const Errors = {
+    UserAlreadyOnboardedToApp: "User is already onboarded to the app",
+    InactiveUser: "Inactive user",
+}

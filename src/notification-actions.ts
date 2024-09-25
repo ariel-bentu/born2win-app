@@ -26,7 +26,7 @@ export function openPhoneDialer(phone: string) {
     openAppUrl(`tel:${phone}`);
 }
 
-function openAppUrl(url: string) {
+export function openAppUrl(url: string) {
     const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
     setTimeout(() => {
         if (newWindow) {

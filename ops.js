@@ -67,7 +67,7 @@ async function updateAllUsers() {
             },
             params: {
                 //filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${modifiedSince}')`,
-                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "אמייל", "manychat_id","phone_e164", "תאריך לידה", "מגדר"],
+                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "אמייל", "manychat_id","phone_e164", "תאריך לידה", "מגדר", "חתם על שמירת סודיות", "תעודת זהות"],
                 offset: offset,
             }
         }).catch(e => console.log(e));
@@ -86,6 +86,9 @@ async function updateAllUsers() {
                 gender: (user.fields["מגדר"] || "לא ידוע"),
                 phone: user.fields.phone_e164,
                 volId: user.id,
+                needToSignConfidentiality: (user.fields["חתם על שמירת סודיות"] !== "חתם" ?
+                    generateSignConfidentialityURL(user.fields["שם פרטי"], user.fields["תעודת זהות"], userId) :
+                    FieldValue.delete()),
             }
 
             if (user.fields.manychat_id) {
@@ -369,3 +372,15 @@ async function greetingsToBirthdays() {
 
 //updateAllUsers();
 //greetingsToBirthdays()
+
+
+function generateSignConfidentialityURL(firstName, identificationId, volunteerId) {
+    const entry = {
+        identitycard: identificationId,
+        name: firstName,
+        recordid: volunteerId,
+    };
+
+    return `https://born2win.org.il/confidentiality-and-privacy/?entry=${encodeURI(JSON.stringify(entry))}`;
+}
+

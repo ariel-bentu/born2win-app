@@ -128,7 +128,7 @@ export interface UserRecord {
     otpCreatedAt?: string;
     birthDate: string;
     gender:string;
-    needToSignConfidentiality?:string;
+    needToSignConfidentiality?:string | any;
 }
 
 

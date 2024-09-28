@@ -1232,7 +1232,7 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
             ],
         };
 
-        await axios.post(urlMainBase, newRegistrationRec, httpOptions).then(async (response) => {
+        await axios.post(urlMainBase, newRegistrationRec, httpOptions).then(async () => {
             // send notification to admins - disabled for now
             //             const admins = await db.collection(Collections.Admins).get();
             //             const adminsIds = admins.docs.map(doc => doc.id);
@@ -1243,7 +1243,7 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
             // עיר: ${updatedRecord.fields["עיר"]}
             // `, NotificationChannels.Registrations, [], adminsIds);
 
-            logger.info("New registration added", response.data);
+            logger.info("New registration added", volunteerId, fdup.mainBaseFamilyId, demandDate);
         });
     } else {
         // Need to find the record:
@@ -1447,14 +1447,13 @@ const app = express();
 app.use(express.json());
 
 function verifyAirtableWebhook(req: any, secret: string) {
+    const providedHmac = req.headers["x-airtable-content-mac"];
+    logger.info("verifyAirtableWebhook", req.body, providedHmac);
     const macSecretDecoded = Buffer.from(secret, "base64");
     const body = Buffer.from(JSON.stringify(req.body), "utf8");
     const hmac = crypto.createHmac("sha256", macSecretDecoded);
     hmac.update(body.toString(), "ascii");
     const expectedContentHmac = "hmac-sha256=" + hmac.digest("hex");
-
-    const providedHmac = req.headers["x-airtable-content-mac"];
-
     return providedHmac === expectedContentHmac;
 }
 
@@ -1701,9 +1700,6 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                 mahoz: user.fields["מחוז"][0],
                 birthDate: user.fields["תאריך לידה"] ? dayjs(user.fields["תאריך לידה"]).format(DATE_BIRTHDAY) : "",
                 gender: (user.fields["מגדר"] || "לא ידוע"),
-                needToSignConfidentiality: (isNeedToSignConfidentiality ?
-                    generateSignConfidentialityURL(user.fields["שם פרטי"], user.fields["תעודת זהות"], userId) :
-                    FieldValue.delete()),
                 volId: user.id,
                 manychat_id: user.fields.manychat_id,
             } as UserRecord;
@@ -1730,6 +1726,11 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                     userRecord.otp = crypto.randomUUID();
                     userRecord.otpCreatedAt = dayjs().format(DATE_TIME);
                 }
+
+                if (prevUserRecord && prevUserRecord.needToSignConfidentiality && !isNeedToSignConfidentiality) {
+                    userRecord.needToSignConfidentiality = FieldValue.delete();
+                }
+
                 batch.update(userDoc.ref, userRecord as any);
             } else {
                 // create new
@@ -1737,6 +1738,11 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                     userRecord.otp = crypto.randomUUID();
                     userRecord.otpCreatedAt = dayjs().format(DATE_TIME);
                 }
+
+                if (isNeedToSignConfidentiality) {
+                    userRecord.needToSignConfidentiality = generateSignConfidentialityURL(user.fields["שם פרטי"], user.fields["תעודת זהות"], userId);
+                }
+
                 batch.create(docRef, userRecord);
             }
             if (userRecord.otp) {

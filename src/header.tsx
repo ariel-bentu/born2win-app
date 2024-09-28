@@ -142,9 +142,9 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
                     }} />}
 
                     {userInfo?.isAdmin && <div dir="rtl" className="m-2 text-lg font-semibold">פעל בשם:</div>}
-                    <Impersonate isImpersonated={actualUserId != userInfo?.id} appServices={appServices} userInfo={userInfo} onChange={(userId, name) => {
+                    <Impersonate isImpersonated={actualUserId != userInfo?.id} appServices={appServices} userInfo={userInfo} onChange={(userId, name, phone) => {
                         if (userId && name) {
-                            impersonate(userId, name);
+                            impersonate(userId, name, phone);
                             setActualUserId(userId);
                         } else if (!userId) {
                             resetImpersonation();

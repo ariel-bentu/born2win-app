@@ -43,6 +43,7 @@ let serviceWorkerRegistration: any;
 export let impersonateUser: {
     id: string;
     name: string;
+    phone?: string;
 } | undefined = undefined;
 
 export function init(onAuth: NextOrObserver<User>) {
@@ -96,8 +97,8 @@ export function logout() {
         });
 }
 
-export function impersonate(id: string, name: string) {
-    impersonateUser = { id, name };
+export function impersonate(id: string, name: string, phone?: string) {
+    impersonateUser = { id, name, phone };
 }
 export function resetImpersonation() {
     impersonateUser = undefined;

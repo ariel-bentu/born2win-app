@@ -82,7 +82,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
             active: currentRegistration.isFamilyActive,
 
         } as FamilyCompact;
-        return <FamilyDetailsComponent detailsOnly={true} familyDemandId={currentRegistration.id}
+        return <FamilyDetailsComponent detailsOnly={true} familyDemandId={currentRegistration.id} date={currentRegistration.date}
             districtBaseFamilyId={currentRegistration.districtBaseFamilyId} family={currentFamily} onClose={() => {
                 setCurrentRegistration(undefined)
                 appServices.popNavigationStep();

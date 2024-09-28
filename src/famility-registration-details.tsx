@@ -3,16 +3,17 @@ import { Calendar, CalendarDateTemplateEvent, CalendarMonthChangeEvent } from "p
 import "./registration.css";
 
 
-import { getFamilyDetails, updateFamilityDemand } from "./api";
+import { getFamilyDetails, impersonateUser, updateFamilityDemand } from "./api";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
 import { ChannelHeader, InProgress, PhoneNumber } from "./common-ui";
 import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails } from "./types";
-import { isNotEmpty } from "./utils";
+import { isNotEmpty, nicePhone } from "./utils";
 import { ProgressSpinner } from "primereact/progressspinner";
 import { SelectButton } from "primereact/selectbutton";
 import { PrimeIcons } from "primereact/api";
+import { openWhatsApp } from "./notification-actions";
 
 interface FamilyDetailsComponentProps {
     demands: FamilyDemand[];
@@ -24,6 +25,7 @@ interface FamilyDetailsComponentProps {
     onClose: () => void;
     reloadOpenDemands: () => void;
     includeContacts: boolean;
+    date?:string //used to include it in the message to impersonated users
 }
 
 function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
@@ -35,7 +37,7 @@ function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
 
 
 
-export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDemandId, onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts }: FamilyDetailsComponentProps) {
+export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDemandId, onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts, date }: FamilyDetailsComponentProps) {
     const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
     const [selectedDate, setSelectedDate] = useState<Nullable<Date>>(null);
     const [error, setError] = useState<any>(undefined);
@@ -101,12 +103,7 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
         }
     };
 
-    const getAddress = (fd: FamilyDetails) => {
-        return fd.street + " " + fd.streatNumber +
-            (fd.appartment ? ", דירה " + fd.appartment : "") +
-            (fd.floor ? ", קומה " + fd.floor : "") +
-            ", " + fd.city;
-    }
+
 
     const dateTemplate = useCallback((event: CalendarDateTemplateEvent) => {
         const inVisibleMonth = event.month === viewVisibleMonth.month && event.year === viewVisibleMonth.year;
@@ -138,11 +135,11 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
                     <div className="flex flex-column justify-content-start align-items-start w-12 pr-3">
                         {loading && <ProgressSpinner style={{ height: 20, width: 20 }} />}
                         {familyDetails && <>
-                        <li><strong>עיר:</strong>{family.city}</li>
-                        <li>המשפחה בת <strong> {familyDetails.adultsCount}</strong> נפשות</li>
-                        <li><strong>הרכב בני המשפחה:</strong> {familyDetails.familyStructure}</li>
-                        <li><strong>גילאי בני המשפחה:</strong> {familyDetails.familyMembersAge}</li>
-                        <li><strong>גיל החולה:</strong> {familyDetails.patientAge}</li>
+                            <li><strong>עיר:</strong>{family.city}</li>
+                            <li>המשפחה בת <strong> {familyDetails.adultsCount}</strong> נפשות</li>
+                            <li><strong>הרכב בני המשפחה:</strong> {familyDetails.familyStructure}</li>
+                            <li><strong>גילאי בני המשפחה:</strong> {familyDetails.familyMembersAge}</li>
+                            <li><strong>גיל החולה:</strong> {familyDetails.patientAge}</li>
                         </>}
                         <span className="clickable-span" onClick={loading ? undefined : handleScrollToDetails}>לפרטי משפחה נוספים...</span>
                     </div>
@@ -239,9 +236,63 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
                         {isNotEmpty(familyDetails.phone) && (<li>
                             <PhoneNumber phone={familyDetails.phone} />
                         </li>)}
+                        {impersonateUser && impersonateUser.phone && (<li className="flex align-items-center">
+                            <strong>שלח פרטים ל{impersonateUser.name}</strong>
+                            <Button
+                                icon="pi pi-whatsapp"
+                                className="p-button-rounded p-button-info m-2"
+                                onClick={() => openWhatsApp(impersonateUser!.phone!, generateDetailsForWhatapp(familyDetails, family.city, date))}
+                                aria-label="WhatsApp"
+                            />
+                        </li>)}
                     </>}
 
                 </ul>}
         </div>
     );
 }
+
+function getAddress(fd: FamilyDetails) {
+    return fd.street + " " + fd.streatNumber +
+        (fd.appartment ? ", דירה " + fd.appartment : "") +
+        (fd.floor ? ", קומה " + fd.floor : "") +
+        ", " + fd.city;
+}
+
+const generateDetailsForWhatapp = (familyDetails: FamilyDetails, city: string, date?:string) => {
+    const alergies = familyDetails?.alergies;
+
+    let msg = `*פרטי בישול*:\n`;
+    msg += `*משפחה*: ${familyDetails.familyLastName}\n`;
+    msg += `*תאריך*: ${date? dayjs(date).format("DD-MMM-YYYY") : ""}\n`;
+    msg += `*עיר*: ${city}\n`;
+    msg += `*המשפחה בת*: ${familyDetails.adultsCount} נפשות\n`;
+    msg += `*הרכב בני המשפחה*: ${familyDetails.familyStructure}\n`;
+    msg += `*גילאי בני המשפחה*: ${familyDetails.familyMembersAge}\n`;
+    msg += `*גיל החולה*: ${familyDetails.patientAge}\n`;
+    msg += `*כשרות*: ${familyDetails.kosherLevel}\n`;
+    msg += `*העדפה לסוג ארוחה*: ${familyDetails.prefferedMeal}\n`;
+    msg += `*העדפות בשר*: ${familyDetails.meatPreferences || ""}\n`;
+    msg += `*העדפות דגים*: ${familyDetails.fishPreferences}\n`;
+    msg += `*לא אוכלים*: ${isNotEmpty(familyDetails.avoidDishes) ? familyDetails.avoidDishes : "אין העדפה"}\n`;
+    msg += `*תוספות*: ${familyDetails.sideDishes}\n`;
+
+    if (isNotEmpty(alergies)) {
+        msg += `*נא לשים לב לאלרגיה!* ${alergies}\n`;
+    } else {
+        msg += `*אלרגיות*: אין\n`;
+    }
+
+    msg += `*שימו לב! ימי הבישול הם*: ${familyDetails.cookingDays?.join(", ") || ""}\n`;
+    msg += `*כתובת*: ${getAddress(familyDetails)}\n`;
+
+    if (isNotEmpty(familyDetails.contactName)) {
+        msg += `*איש קשר*: ${familyDetails.contactName}\n`;
+    }
+
+    if (isNotEmpty(familyDetails.phone)) {
+        msg += `*טלפון*: ${nicePhone(familyDetails.phone)}\n`;
+    }
+
+    return msg;
+};

@@ -9,7 +9,7 @@ import { openWhatsApp } from "./notification-actions";
 
 interface ImpersonateProps {
     userInfo: UserInfo | null;
-    onChange: (userId: string | undefined, name?: string) => void;
+    onChange: (userId: string | undefined, name?: string, phone?:string) => void;
     appServices: AppServices;
     isImpersonated: boolean;
 }
@@ -42,7 +42,8 @@ export default function Impersonate({ userInfo, onChange, appServices, isImperso
         }} />
         {loading && <InProgress />}
         <div className="flex flex-column">
-            <Button disabled={!selectedUser || !selectedUser.id} label={"פעל בשם" + (selectedUser && selectedUser.name ? ": " + selectedUser.name : "")} onClick={() => onChange(selectedUser.id, selectedUser.name)} />
+            <Button disabled={!selectedUser || !selectedUser.id} label={"פעל בשם" + (selectedUser && selectedUser.name ? ": " + selectedUser.name : "")} 
+                onClick={() => onChange(selectedUser.id, selectedUser.name, selectedUser.phone)} />
             <Button disabled={!isImpersonated} label="בטל פעולה בשם" onClick={() => onChange(undefined)} />
             <Button disabled={!selectedUser || !selectedUser.id} label="שלח לינק להתקנה" onClick={async () => {
                 setLoading(true);

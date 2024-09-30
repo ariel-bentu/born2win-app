@@ -1545,9 +1545,12 @@ async function greetingsToBirthdays() {
     const districts = await getDestricts();
 
     // Notify Managers
-    const usersList = users.map(user => `- ${user.data().firstName} ${user.data().lastName} (${districts.find(d => d.id === user.data().mahoz)?.name || ""}) tel:+${user.data().phone}`).join("\n");
-    return addNotificationToQueue("ימי הולדת היום 💜", `הנה רשימת המתנדבים שהיום יום הולדתם:\n${usersList}`, NotificationChannels.Alerts,
-        [], "admins");
+    const usersList = users.map(user => `- ${user.data().firstName} ${user.data().lastName} (${districts.find(d => d.id === user.data().mahoz)?.name || ""}) tel:+${user.data().phone}`);
+    if (usersList.length > 0) {
+        return addNotificationToQueue("ימי הולדת היום 💜", `הנה רשימת המתנדבים שהיום יום הולדתם:\n${usersList.join("\n")}`, NotificationChannels.Alerts,
+            [], "admins");
+    }
+    return;
 }
 
 async function alertOpenDemands() {

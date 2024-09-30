@@ -1485,7 +1485,7 @@ exports.httpApp = onRequest(app);
 */
 
 const schedules = [
-    { desc: "Reminder on Sunday at 10:30", min: 30, hour: [10], weekDay: 0, callback: remindVolunteersToRegister },
+    // { desc: "Reminder on Sunday at 10:30", min: 30, hour: [10], weekDay: 0, callback: remindVolunteersToRegister },
     { desc: "Refresh webhook registration", min: 0, hour: [12], weekDay: "*", callback: refreshWebhookToken },
     { desc: "Sync Born2Win users daily", min: 0, hour: [17], weekDay: "*", callback: syncBorn2WinUsers },
     { desc: "Alert 5 days ahead open demand", min: 40, hour: [13], weekDay: "*", callback: alertOpenDemands },
@@ -1578,7 +1578,8 @@ async function alertOpenDemands() {
             if (found) {
                 adminMsg += msgBody;
                 notifyAdmins = true;
-                waitFor.push(addNotificationToQueue("שיבוצים חסרים - 5 ימים קרובים", msgBody, NotificationChannels.Alerts, [districts[i].id], []));
+                // for now do not send the district's users, only admins
+                // waitFor.push(addNotificationToQueue("שיבוצים חסרים - 5 ימים קרובים", msgBody, NotificationChannels.Alerts, [districts[i].id], []));
             }
         }
     }

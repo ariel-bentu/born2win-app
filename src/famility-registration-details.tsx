@@ -3,7 +3,7 @@ import { Calendar, CalendarDateTemplateEvent, CalendarMonthChangeEvent } from "p
 import "./registration.css";
 
 
-import { getFamilyDetails, impersonateUser, updateFamilityDemand } from "./api";
+import { analyticLog, getFamilyDetails, impersonateUser, updateFamilityDemand } from "./api";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
@@ -26,6 +26,7 @@ interface FamilyDetailsComponentProps {
     reloadOpenDemands: () => void;
     includeContacts: boolean;
     date?:string //used to include it in the message to impersonated users
+    analyticComponent: string;
 }
 
 function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
@@ -37,7 +38,8 @@ function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
 
 
 
-export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDemandId, onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts, date }: FamilyDetailsComponentProps) {
+export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDemandId, 
+    onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts, date, analyticComponent }: FamilyDetailsComponentProps) {
     const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
     const [selectedDate, setSelectedDate] = useState<Nullable<Date>>(null);
     const [error, setError] = useState<any>(undefined);
@@ -99,6 +101,7 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
 
     const handleScrollToDetails = () => {
         if (divRef.current) {
+            analyticLog( analyticComponent, "scroll to details");
             divRef.current.scrollIntoView({ behavior: 'smooth' });
         }
     };
@@ -195,6 +198,7 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
                             setSelectedDate(null);
                             if (availabilityRecord && familyDetails) {
                                 setSaving(true);
+                                analyticLog( analyticComponent, "save new Registration");
                                 updateFamilityDemand(availabilityRecord.id, familyDetails.mainBaseFamilyId, familyDetails.cityId, true).then(() => {
                                     appServices.showMessage("success", "שיבוץ נקלט בהצלחה", "");
                                     reloadOpenDemands();

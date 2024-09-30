@@ -15,6 +15,8 @@ import { AppServices, City, FamilyCompact, FamilyDemand, OpenFamilyDemands, Show
 import OneLine from './one-line';
 import { getUniqueFamilies } from './utils';
 import { ScrollPanel } from 'primereact/scrollpanel';
+import { analyticLog } from './api';
+import { oldUrlParamID } from './App';
 
 function cleanseCityName(cityName: string) {
     return cityName.replace(/["\n\s]/g, '');
@@ -51,7 +53,10 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
     const [selectedFamily, setSelectedFamily] = useState<FamilyCompact | null>(null);
     const [error, setError] = useState<any>(undefined);
 
+    const analyticComponent = oldUrlParamID !== null ? "LinkRegistration" : "Registration";
+
     useEffect(() => {
+        analyticLog(analyticComponent, "open");
         setSelectedCities([])
         openDemands.then().then((demands: OpenFamilyDemands) => {
             setFamilyDemands(demands.demands);
@@ -84,14 +89,16 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
         </>
     );
 
-    if (familyDemands.length == 0) return (
-        <div>לא נותרו משפחות לשיבוץ לתקופה הקרובה - אם מישהו יבטל תקבלו הודעה </div>
-    )
+    if (familyDemands.length == 0) {
+        analyticLog(analyticComponent, "no open dates");
+        return (
+            <div>לא נותרו משפחות לשיבוץ לתקופה הקרובה - אם מישהו יבטל תקבלו הודעה </div>
+        )
+    }
 
 
     const selectedFamilyDemand = selectedFamily ? familyDemands.filter(fd => fd.districtBaseFamilyId === selectedFamily.districtBaseFamilyId) : undefined;
     const filteredFamilies = families.filter(family => selectedCities.some(sc => compareCities(sc.name, family.city)));
-    console.log("topPosition", topPosition)
     return (
         <div className="registration-component">
             <div className="img-header">
@@ -121,10 +128,13 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
 
 
                     {selectedFamily ?
-                        <FamilyDetailsComponent districtBaseFamilyId={selectedFamily.districtBaseFamilyId} family={selectedFamily} onClose={() => {
-                            setSelectedFamily(null);
-                            appServices.popNavigationStep();
-                        }}
+                        <FamilyDetailsComponent
+                            analyticComponent={analyticComponent}
+
+                            districtBaseFamilyId={selectedFamily.districtBaseFamilyId} family={selectedFamily} onClose={() => {
+                                setSelectedFamily(null);
+                                appServices.popNavigationStep();
+                            }}
                             appServices={appServices} demands={selectedFamilyDemand || []}
                             reloadOpenDemands={reloadOpenDemands} includeContacts={false} /> :
                         <>

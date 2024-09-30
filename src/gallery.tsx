@@ -10,6 +10,7 @@ import { InProgress } from './common-ui';
 import { confirmPopup } from 'primereact/confirmpopup';
 import { Carousel } from 'primereact/carousel';
 import './gallery.css';
+import { analyticLog } from './api';
 
 
 interface GalleryProps {
@@ -55,6 +56,7 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
 
 
     useEffect(() => {
+        analyticLog("Gallery", "open");
         const loadFolders = async () => {
             const path = `${storagePath}`;
             const rootRef = ref(storage, path);
@@ -78,6 +80,7 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
     // Function to load the folder's content lazily
     const handleFolderClick = async (_folders: Folder[], folderName: string) => {
         console.log("folder clicked ", folderName)
+        analyticLog("Gallery", "select folder " + folderName);
         const folderIndex = _folders.findIndex(f => f.name === folderName);
         if (folderIndex < 0) return;
         const selectedFolder = _folders[folderIndex];

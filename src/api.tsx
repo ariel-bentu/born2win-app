@@ -22,6 +22,7 @@ import {
 import { readAllNotifications } from "./notifications";
 import { getDB } from "./db";
 import { isNotEmpty } from "./utils";
+import { Analytics, getAnalytics, logEvent } from "firebase/analytics";
 
 
 const firebaseConfig = {
@@ -39,6 +40,7 @@ let app: FirebaseApp;
 let auth: Auth;
 let functions: Functions;
 let serviceWorkerRegistration: any;
+let analytics: Analytics;
 
 export let impersonateUser: {
     id: string;
@@ -65,17 +67,19 @@ export function init(onAuth: NextOrObserver<User>) {
         }
 
         auth = getAuth(app);
+        analytics = getAnalytics(app);
 
         functions = getFunctions(app, 'europe-west1');
     }
     return setPersistence(auth, indexedDBLocalPersistence).then(() => onAuthStateChanged(auth, onAuth));
 }
 
-export function login() {
+export function login(isLink: boolean) {
     return signInAnonymously(auth)
         .then((u) => {
             // Signed in..
             console.log("User is authenticated", u.user.uid);
+            logEvent(analytics, isLink ? 'Login to Link' : 'Login to app');
         })
         .catch((error) => {
             // const errorCode = error.code;
@@ -108,6 +112,9 @@ export function getUserInfo(): Promise<UserInfo> {
     return callFunctionWithImpersonation('GetUserInfo').then(res => res.data as UserInfo);
 }
 
+export function analyticLog(component: string, action: string) {
+    logEvent(analytics, component + ":" + action);
+}
 
 export async function getFCMToken() {
     const messaging = getMessaging(app);

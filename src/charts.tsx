@@ -233,7 +233,9 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
     const sortedCities = Object.keys(groupedData).sort();
 
     if (showFamilyDetails) {
-        return <FamilyDetailsComponent appServices={appServices} demands={demands} 
+        return <FamilyDetailsComponent 
+            analyticComponent="Management"
+            appServices={appServices} demands={demands} 
             districtBaseFamilyId={showFamilyDetails.districtBaseFamilyId} 
             family={showFamilyDetails}
             includeContacts={true} onClose={() => {

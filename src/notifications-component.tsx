@@ -24,6 +24,7 @@ import { Divider } from 'primereact/divider';
 import { AppServices, NotificationChannels, NotificationChannelsName } from './types';
 import { ScrollPanel } from 'primereact/scrollpanel';
 import { ChannelHeader } from './common-ui';
+import { analyticLog } from './api';
 
 dayjs.extend(isToday);
 dayjs.extend(isYesterday);
@@ -124,6 +125,7 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
             accept: async () => {
                 try {
                     await deleteAllNotifications();
+                    analyticLog("Notifications", "delete all");
                     setLocalReload(prev => prev + 1);
                 } catch (error) {
                     console.error('Error deleting all notifications:', error);
@@ -135,6 +137,7 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
     const markAllAsRead = async () => {
         const waitFor = notifications.map(n => updateNotification(n.id, 1));
         await Promise.all(waitFor);
+        analyticLog("Notifications", "mark all as read");
         setLocalReload(prev => prev + 1);
     };
 
@@ -153,7 +156,12 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                 <SelectButton
                     pt={{ root: { className: "select-button-container" } }}
                     unstyled
-                    value={filter} onChange={(e) => setFilter(e.value)} optionLabel="name" options={Filters.array}
+                    value={filter} 
+                    onChange={(e) => {
+                        setFilter(e.value)
+                        analyticLog("Notifications", "change filter (read/unread)");
+                    }} 
+                    optionLabel="name" options={Filters.array}
                     itemTemplate={(option) => (
                         <div className={`select-button-item ${filter === option.value ? 'p-highlight' : ''}`}>
                             {option.name}
@@ -172,6 +180,7 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                             onClick={() => {
                                 setCurrentChannel(channel);
                                 console.log("pushNavigationStep - channel", channel.name)
+                                analyticLog("Notifications", "enter channel " + channel.name);
                                 appServices.pushNavigationStep("channel", () => {
                                     setCurrentChannel(null);
                                 })
@@ -215,13 +224,19 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                                                 target: event.currentTarget,
                                                 message: "האם למחוק הודעה זו?",
                                                 icon: 'pi pi-exclamation-triangle',
-                                                accept: () => deleteOne(notification.id),
+                                                accept: () => {
+                                                    deleteOne(notification.id)
+                                                    analyticLog("Notifications", "delete one notification");
+                                                },
                                             });
                                         }}
                                         deleteLabel="מחק"
                                         buttons={buttons}
                                         onLineButtonPressed={NotificationActionHandler}
-                                        onRead={() => markAsRead(notification.id)}
+                                        onRead={() => {
+                                            analyticLog("Notifications", "click on one notification");
+                                            markAsRead(notification.id)
+                                        }}
                                     />
                                 }) :
                                 <div className='no-messages'>{getNoNotificationMessage(filter)}</div>

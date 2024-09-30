@@ -53,7 +53,7 @@ const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
 const userPairingRequest = urlParams.get('vid');
 const otpPairingRequest = urlParams.get('otp');
-const oldUrlParamID = urlParams.get('id');
+export const oldUrlParamID = urlParams.get('id');
 const isDev = !!urlParams.get('dev');
 const offline = !!urlParams.get('offline');
 const client = new ClientJS();
@@ -283,7 +283,7 @@ function App() {
                 // Logs in annonymously and then user is set with user.uid
                 console.log("Logging in...")
                 setLoading(true);
-                api.login()
+                api.login(oldUrlParamID !== null)
                     .then(() => console.log("Login successful"))
                     .catch((err: Error) => {
                         console.log("Login failed", err.message)

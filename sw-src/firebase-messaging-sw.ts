@@ -20,9 +20,9 @@ self.addEventListener("fetch", event => {
     // This is a dummy event listener
     // just to pass the PWA installation criteria on 
     // some browsers
-  });
+});
 
-self.addEventListener('push',  (event: any) => {
+self.addEventListener('push', (event: any) => {
     event.stopImmediatePropagation();
     console.log('[Service Worker] Push Received.');
 
@@ -51,6 +51,8 @@ self.addEventListener('push',  (event: any) => {
                 const unreadCount = await countUnreadNotifications();
                 const notificationOptions = {
                     requireInteraction: true,
+                    priority: 'high', // High priority for pop-up
+                    visibility: 'public',
                     ...payload.notification,
                     data: {
                         // ...payload.data,
@@ -69,8 +71,8 @@ self.addEventListener('push',  (event: any) => {
                     (self as any).registration.showNotification(notificationTitle, notificationOptions)
                 );
 
-                const clientList = await (self as any).clients.matchAll( { type: 'window', includeUncontrolled: true });
-                clientList.forEach((client:any) => {
+                const clientList = await (self as any).clients.matchAll({ type: 'window', includeUncontrolled: true });
+                clientList.forEach((client: any) => {
                     client.postMessage({ type: "newMessage" });
                 });
 

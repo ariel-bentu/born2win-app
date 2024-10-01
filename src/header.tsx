@@ -26,10 +26,11 @@ interface HeaderProps {
     setActualUserId: (newUserId: string) => void;
     appServices: AppServices;
     showLoading: boolean;
+    hideMenu: boolean;
 }
 
 function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onSendTestNotificationClick, onSyncNotifications,
-    onLogout, userInfo, setActualUserId, volunteerId, appServices, showLoading, actualUserId, version }: HeaderProps) {
+    onLogout, userInfo, setActualUserId, volunteerId, appServices, showLoading, actualUserId, version, hideMenu }: HeaderProps) {
     const [sidebarVisible, setSidebarVisible] = useState(false);
     const [showTechInfo, setShowTechInfo] = useState<boolean>(false);
     const toggleText = () => {
@@ -87,7 +88,7 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
     return (
         <div className="relative">
             <header className="flex justify-content-between align-items-center p-3" style={{ height: 65 }}>
-                <Button icon="pi pi-bars" className="p-button-rounded settings-btn" onClick={() => setSidebarVisible(true)} />
+                {!hideMenu && <Button icon="pi pi-bars" className="p-button-rounded settings-btn" onClick={() => setSidebarVisible(true)} />}
                 <img src={logoSrc} className="header-logo" alt="Logo" />
                 <span>{userName}</span>
                 {showLoading &&

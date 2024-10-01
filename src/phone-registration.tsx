@@ -15,7 +15,7 @@ export default function PhoneRegistration({ appServices, onPhoneRegistrationComp
     const [phoneInput, setPhoneInput] = useState<string>("");
     const [verificationCodeInput, setVerificationCodeInput] = useState<string>("");
     const [phonePhase, setPhonePhase] = useState<"phone" | "code">("phone");
-    const [loading, setLoading] = useState<boolean>(true);
+    const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | undefined>();
 
 

@@ -397,7 +397,7 @@ function App() {
             if (userInfo && userInfo.needToSignConfidentiality && userInfo.needToSignConfidentiality.length > 0) {
                 setBlockUserWithMessage(<div>
                     <h3>מתנדב.ת יקר.ה, נדרשת חתימה על הסכם סודיות עם העמותה</h3>
-                    <Button label="מעבר לחתימה על הסכם סודיות" onClick={()=>openAppUrl(userInfo.needToSignConfidentiality || "")}/>
+                    <Button label="מעבר לחתימה על הסכם סודיות" onClick={() => openAppUrl(userInfo.needToSignConfidentiality || "")} />
                 </div>);
             }
         }
@@ -614,6 +614,7 @@ function App() {
             <ConfirmPopup />
             <Toast ref={toast} />
             <Header
+                hideMenu={readyToInstall}
                 version={latestVersion}
                 userName={userInfo ? userInfo.firstName : ""}
                 actualUserId={actualUserId}

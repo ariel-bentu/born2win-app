@@ -41,7 +41,32 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
             ? navigationRequest.params[0] : undefined;
 
         getUserRegistrations().then((regs) => {
-            regs.sort((r1, r2) => sortByDateDesc(r1.date, r2.date));
+            //regs.sort((r1, r2) => sortByDateDesc(r1.date, r2.date));
+
+            regs.sort((r1, r2) => {
+                const today = dayjs(); // Get today's date
+            
+                const date1 = dayjs(r1.date);
+                const date2 = dayjs(r2.date);
+            
+                const isDate1FutureOrToday = date1.isToday() || date1.isAfter(today, 'day'); 
+                const isDate2FutureOrToday = date2.isToday() || date2.isAfter(today, 'day'); 
+            
+                // Case 1: Both dates are in the future or today
+                if (isDate1FutureOrToday && isDate2FutureOrToday) {
+                    return date1.isAfter(date2) ? 1 : -1; // Closer future date comes first
+                }
+            
+                // Case 2: Both dates are in the past
+                if (!isDate1FutureOrToday && !isDate2FutureOrToday) {
+                    return date1.isBefore(date2) ? 1 : -1; // More recent past date comes first
+                }
+            
+                // Case 3: One is in the future/today, the other is in the past
+                return isDate1FutureOrToday ? -1 : 1; // Future/today comes before past
+            });
+
+
             console.log("registrations loaded", regs?.length)
             setRegistrations(regs);
             if (setCurrentRegistrationByNavigationRequest) {

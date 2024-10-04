@@ -23,6 +23,7 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 const JERUSALEM = "Asia/Jerusalem";
 
+const DATE_AT = "YYYY-MM-DD";
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccountPath),
@@ -33,6 +34,18 @@ const db = admin.firestore();
 
 const baseId = process.env.BORM2WIN_MAIN_BASE;
 const apiKey = process.env.BORN2WIN_API_KEY;
+const NotificationActions = {
+    RegistrationDetails: "registration-details",
+    StartConversation: "start-conversation"
+}
+
+const NotificationChannels = {
+    General : "general",
+    Alerts : "alerts",
+    Links : "links",
+    Greetings : "greetings",
+    Registrations : "registrations",
+};
 
 
 const manualUsers = require(manualUsersPath);
@@ -40,7 +53,7 @@ const manualUsers = require(manualUsersPath);
 
 async function addNotificationToQueue(title, body, channel, toDistricts, toRecipients, data) {
     const docRef = db.collection("notifications").doc();
-    data = {channel, ...data}
+    data = { channel, ...data }
     return docRef.create({
         title,
         body,
@@ -67,7 +80,7 @@ async function updateAllUsers() {
             },
             params: {
                 //filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${modifiedSince}')`,
-                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "אמייל", "manychat_id","phone_e164", "תאריך לידה", "מגדר", "חתם על שמירת סודיות", "תעודת זהות"],
+                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "אמייל", "manychat_id", "phone_e164", "תאריך לידה", "מגדר", "חתם על שמירת סודיות", "תעודת זהות"],
                 offset: offset,
             }
         }).catch(e => console.log(e));
@@ -82,7 +95,7 @@ async function updateAllUsers() {
                 firstName: user.fields["שם פרטי"],
                 lastName: user.fields["שם משפחה"],
                 mahoz: user.fields["מחוז"][0],
-                birthDate: user.fields["תאריך לידה"]  ? dayjs(user.fields["תאריך לידה"]).format("DD-MM") : "",
+                birthDate: user.fields["תאריך לידה"] ? dayjs(user.fields["תאריך לידה"]).format("DD-MM") : "",
                 gender: (user.fields["מגדר"] || "לא ידוע"),
                 phone: user.fields.phone_e164,
                 volId: user.id,
@@ -143,7 +156,13 @@ async function getDestricts() {
         const districtResponse = await axios.get(`https://api.airtable.com/v0/${baseId}/מחוז`, {
             headers,
         });
-        districts = districtResponse.data.records.map((r) => ({ id: r.id, base_id: r.fields.base_id, name: r.fields["מחוז"] }));
+        districts = districtResponse.data.records.map((r) => ({
+            id: r.id,
+            name: r.fields["מחוז"],
+            base_id: r.fields.base_id,
+            demandsTable: r.fields.table_id,
+            familiesTable: r.fields.table_familyid,
+        }));
     }
     return districts || [];
 }
@@ -217,7 +236,7 @@ async function searchMeals() {
         },
     };
     const filterFormula = `DATETIME_FORMAT({DATE}, 'YYYY-MM-DD')="2024-09-24"`;
-    
+
 
     const findResult = await axios.get(urlMainBase, {
         ...httpOptions,
@@ -237,7 +256,7 @@ async function searchMeals() {
 //searchMeals()
 
 
-async function alertUpcomingCooking() {
+async function alertUpcomingCookingOld() {
     const districts = await getDestricts();
     const daysBefore = 7;
     for (let i = 0; i < districts.length; i++) {
@@ -259,7 +278,7 @@ async function alertUpcomingCooking() {
                 await addNotificationToQueue("תזכורת לבישול!", msgBody, "alerts", [], [demand.volunteerId], {
                     buttons: JSON.stringify([
                         { label: "צפה בפרטים", action: "registration-details", params: [demand.id] },
-                        { label: "צור קשר עם עמותה", action: "start-conversation", params:["Eh00Vs81taq5dv8QOvP0qS", "hello"] },
+                        { label: "צור קשר עם עמותה", action: "start-conversation", params: ["Eh00Vs81taq5dv8QOvP0qS", "hello"] },
                     ]),
                 }
                 );
@@ -269,33 +288,114 @@ async function alertUpcomingCooking() {
     }
 }
 
-async function getDemands(district, status, daysAhead) {
+async function alertUpcomingCooking() {
+    const districts = await getDestricts();
+    const daysBefore = 3;
+    for (let i = 0; i < districts.length; i++) {
+        if (districts[i].id !== "recxuE1Cwav0kfA7g") continue; // only in test for now
+        const upcomingDemands = await getDemands(districts[i].id, "תפוס", true, dayjs().format(DATE_AT), dayjs().add(daysBefore + 1, "days").format(DATE_AT));
+        for (let j = 0; j < upcomingDemands.length; j++) {
+            const demand = upcomingDemands[j];
+            const daysLeft = -dayjs().startOf("day").diff(demand.date, "days");
+
+            if (daysLeft === daysBefore) {
+                const msgBody = `תאריך הבישול: ${dayjs(demand.date).format(IL_DATE)}
+עוד: ${daysBefore} ימים
+משפחה: ${demand.familyLastName}
+עיר: ${demand.city}
+לא לשכוח לתאם עוד היום בשיחה או הודעה את שעת מסירת האוכל.
+אם אין באפשרותך לבשל יש לבטל באפליקציה, או ליצור קשר.`;
+                await addNotificationToQueue("תזכורת לבישול!", msgBody, NotificationChannels.Alerts, [], [demand.volunteerId], {
+                    buttons: JSON.stringify([
+                        { label: "צפה בפרטים", action: NotificationActions.RegistrationDetails, params: [demand.id] },
+                        { label: "צור קשר עם עמותה", action: NotificationActions.StartConversation },
+                    ]),
+                }
+                );
+            }
+        }
+        // TODO send summary notification to admin?
+    }
+}
+
+async function getDemands(
+    district,
+    status,
+    includeNonActiveFamily,
+    dateStart,
+    dateEnd,
+    volunteerId,
+    districtBaseFamilyId
+) {
     const headers = {
         "Authorization": `Bearer ${apiKey}`,
     };
     const mahuzRec = (await getDestricts()).find((d) => d.id === district);
     if (mahuzRec) {
+        let demantsResult = [];
         const baseId = mahuzRec.base_id;
-        const formula = encodeURIComponent(`AND(({זמינות שיבוץ}='${status}'),IS_AFTER({תאריך},TODAY()),IS_BEFORE({תאריך},DATEADD(TODAY(),${daysAhead+2},'days')))`);
-        const query = `https://api.airtable.com/v0/${baseId}/דרישות לשיבוצים?filterByFormula=${formula}`;
-        const demands = await axios.get(query, {
-            headers,
-        });
-        if (demands.data.records) {
-            return demands.data.records.map((demand) => ({
-                id: demand.id,
-                date: demand.fields["תאריך"],
-                city: demand.fields["עיר"][0],
-                familyLastName: demand.fields.Name,
-                district: district,
-                status: demand.fields["זמינות שיבוץ"],
-                mainBaseFamilyId: demand.fields.Family_id[0],
-                districtBaseFamilyId: demand.fields["משפחה"][0],
-                volunteerId: demand.fields.volunteer_id,
-            }));
+        const demandsTable = mahuzRec.demandsTable;
+        const filters = [];
+
+        if (!includeNonActiveFamily) {
+            filters.push("({סטטוס בעמותה} = 'פעיל')");
         }
+
+        if (districtBaseFamilyId) {
+            filters.push(`FIND("${districtBaseFamilyId}",  ARRAYJOIN({record_id (from משפחה)})) > 0`);
+        }
+        if (status) {
+            filters.push(`{זמינות שיבוץ}='${status}'`);
+        }
+        if (dateStart !== undefined) {
+            // eslint-disable-next-line quotes
+            filters.push(`IS_AFTER({תאריך},'${dateStart}')`);
+        }
+        if (dateEnd != undefined) {
+            filters.push(`IS_BEFORE({תאריך},'${dateEnd}')`);
+        }
+        if (volunteerId) {
+            filters.push(`{volunteer_id}='${volunteerId}'`);
+        }
+
+        const formula = `AND(${filters.join(",")})`;
+        const query = `https://api.airtable.com/v0/${baseId}/${demandsTable}`;
+        let offset;
+        do {
+            const demandsRespose = await axios.get(query, {
+                headers,
+                params: {
+                    offset: offset,
+                    filterByFormula: formula,
+                },
+            });
+            offset = demandsRespose.data.offset;
+            if (demandsRespose.data.records) {
+                demantsResult = demantsResult.concat(demandsRespose.data.records.map((demand) => demandAirtable2FamilyDemand(demand, district)));
+            }
+        } while (offset);
+
+        return demantsResult;
     }
-    return [];
+    throw ("not-found", "District not found");
+}
+
+function demandAirtable2FamilyDemand(demand, district) {
+    return {
+        id: demand.id,
+        date: demand.fields["תאריך"],
+        city: getSafeFirstArrayElement(demand.fields["עיר"], ""),
+        familyLastName: demand.fields.Name,
+        district: district,
+        status: demand.fields["זמינות שיבוץ"],
+        mainBaseFamilyId: getSafeFirstArrayElement(demand.fields.Family_id, ""), // The record ID of the main base table משפחות רשומות
+        districtBaseFamilyId: getSafeFirstArrayElement(demand.fields["משפחה"], ""), // The record ID in the district table of משפחות במחוז
+        volunteerId: demand.fields.volunteer_id,
+        isFamilyActive: demand.fields["סטטוס בעמותה"] == "פעיל",
+    };
+}
+function getSafeFirstArrayElement(arr, defaultValue) {
+    return arr && arr.length && arr[0] || defaultValue;
 }
 
 
@@ -311,7 +411,7 @@ async function updateAirTableAppinstalled() {
     };
 
 
-    for (let i = 0;i<users.docs.length;i++) {
+    for (let i = 0; i < users.docs.length; i++) {
         const user = users.docs[i];
 
         if (user.id.startsWith("rec")) {
@@ -324,14 +424,14 @@ async function updateAirTableAppinstalled() {
                         "תאריך התקנת אפליקציה": dayjs(date).format("YYYY-MM-DD"),
                     },
                 };
-                
-                await axios.patch(url + user.id, updatedFields, httpOptions).catch(err=>{
+
+                await axios.patch(url + user.id, updatedFields, httpOptions).catch(err => {
                     console.log(err)
                 })
 
             }
         }
-    }    
+    }
 }
 
 async function greetingsToBirthdays() {
@@ -341,7 +441,7 @@ async function greetingsToBirthdays() {
     for (let i = 0; i < users.docs.length; i++) {
         const user = users.docs[i];
         if (user.data().notificationOn === true) {
-            console.log("birthday", user.data().firstName,user.data().gender )
+            console.log("birthday", user.data().firstName, user.data().gender)
             // await addNotificationToQueue(`יום הולדת שמח ${user.data().firstName}`, "", NotificationChannels.Greetings,
             //     [], [user.id], { fullImage: user.data().gender === "אישה" ? "birthday-female" : "birthday-male" });
         }

@@ -1489,7 +1489,7 @@ const schedules = [
     { desc: "Refresh webhook registration", min: 0, hour: [12], weekDay: "*", callback: refreshWebhookToken },
     { desc: "Sync Born2Win users daily", min: 0, hour: [17], weekDay: "*", callback: syncBorn2WinUsers },
     { desc: "Alert 5 days ahead open demand", min: 40, hour: [13], weekDay: "*", callback: alertOpenDemands },
-    { desc: "Alert 72 hours before cooking", min: 0, hour: [16], weekDay: "*", callback: alertUpcomingCooking },
+    { desc: "Alert 72 hours before cooking", min: 0, hour: [10], weekDay: "*", callback: alertUpcomingCooking },
     { desc: "Birthdays greeting", min: 0, hour: [10], weekDay: "*", callback: greetingsToBirthdays },
     // todo - archive notifications
 ];
@@ -1525,10 +1525,10 @@ exports.doSchedule = onSchedule({
     await Promise.all(waitFor);
 });
 
-async function remindVolunteersToRegister() {
-    await addNotificationToQueue("התחלנו שיבוצים!",
-        "הכנסו לאפליקציה לבחור למי תתנו חיבוק החודש. ניתן להרשם בלשונית השיבוצים", NotificationChannels.Registrations, [], "all");
-}
+// async function remindVolunteersToRegister() {
+//     await addNotificationToQueue("התחלנו שיבוצים!",
+//         "הכנסו לאפליקציה לבחור למי תתנו חיבוק החודש. ניתן להרשם בלשונית השיבוצים", NotificationChannels.Registrations, [], "all");
+// }
 
 async function greetingsToBirthdays() {
     const today = dayjs().format(DATE_BIRTHDAY);
@@ -1595,10 +1595,10 @@ async function alertUpcomingCooking() {
     const districts = await getDestricts();
     const daysBefore = 3;
     for (let i = 0; i < districts.length; i++) {
-        const upcomingDemands = await getDemands(districts[i].id, "תפוס", true, dayjs().format(DATE_AT), dayjs().add(daysBefore, "days").format(DATE_AT));
+        const upcomingDemands = await getDemands(districts[i].id, "תפוס", true, dayjs().format(DATE_AT), dayjs().add(daysBefore + 1, "days").format(DATE_AT));
         for (let j = 0; j < upcomingDemands.length; j++) {
             const demand = upcomingDemands[j];
-            const daysLeft = -dayjs().diff(demand.date, "days");
+            const daysLeft = -dayjs().startOf("day").diff(demand.date, "days");
 
             if (daysLeft === daysBefore) {
                 const msgBody = `תאריך הבישול: ${dayjs(demand.date).format(IL_DATE)}

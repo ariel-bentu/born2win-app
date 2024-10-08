@@ -40,16 +40,23 @@ const NotificationActions = {
 }
 
 const NotificationChannels = {
-    General : "general",
-    Alerts : "alerts",
-    Links : "links",
-    Greetings : "greetings",
-    Registrations : "registrations",
+    General: "general",
+    Alerts: "alerts",
+    Links: "links",
+    Greetings: "greetings",
+    Registrations: "registrations",
 };
 
 
 const manualUsers = require(manualUsersPath);
 
+function chunkArray(array, chunkSize) {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+        chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
+}
 
 async function addNotificationToQueue(title, body, channel, toDistricts, toRecipients, data) {
     const docRef = db.collection("notifications").doc();
@@ -288,6 +295,146 @@ async function alertUpcomingCookingOld() {
     }
 }
 
+
+async function weeklyNotifyFamilies() {
+    const manychat4weekSummaryFlow = "content20241008192343_098603";
+    const tomorrow = dayjs().add(1, "days");
+    const notifications = [];
+    const volunteers = {};
+    const districts = await getDestricts();
+    for (let i = 0; i < districts.length; i++) {
+        const upcomingDemands = await getDemands(districts[i].id, undefined, true, tomorrow.format(DATE_AT), tomorrow.add(28, "days").format(DATE_AT));
+        for (let j = 0; j < upcomingDemands.length; j++) {
+            const demand = upcomingDemands[j];
+            if (demand.status === "חג") continue;
+
+            let notification = notifications.find(n => n.mainBaseFamilyId === demand.mainBaseFamilyId);
+            if (!notification) {
+                notification = {
+                    mainBaseFamilyId: demand.mainBaseFamilyId,
+                    familyLastName: demand.familyLastName,
+                    dates: [],
+                }
+                notifications.push(notification);
+            }
+            if (demand.volunteerId) {
+                volunteers[demand.volunteerId] = "";
+            }
+
+            notification.dates.push({
+                date: demand.date,
+                status: demand.status,
+                volunteerId: demand.volunteerId,
+            });
+        }
+    }
+
+    await getVolunteersNames(volunteers);
+
+
+    const activeFamilies = await db.collection("families").where("active", "==", true).get();
+    const waitFor = [];
+    for (const notification of notifications) {
+        const family = activeFamilies.docs.find(af => af.id === notification.mainBaseFamilyId);
+        if (family) {
+            // Add volunteer names
+            notification.dates.forEach(d => {
+                if (d.volunteerId) {
+                    d.volunteerName = volunteers[d.volunteerId];
+                }
+            });
+
+            waitFor.push(sendToManychat(family.data().manychat_id,
+                manychat4weekSummaryFlow,
+                categorizeDatesByWeek(notification.dates)));
+            break;
+        }
+    }
+
+    return Promise.all(waitFor);
+}
+
+// Helper function to categorize dates into weekly summaries
+function categorizeDatesByWeek(dates) {
+    const today = dayjs();
+    const thisWeek = [];
+    const nextWeek = [];
+    const weekAfterNext = [];
+    const in3Weeks = [];
+
+    dates.forEach(d => {
+        const date = dayjs(d.date);
+        const diffInWeeks = date.diff(today, 'week');
+        const name = d.volunteerId ? d.volunteerName : "טרם שובץ";
+        if (diffInWeeks === 0) {
+            thisWeek.push(date.format("dddd, DD-MM") + " - " + name); // Dates for this week
+        } else if (diffInWeeks === 1) {
+            nextWeek.push(date.format("dddd, DD-MM") + " - " + name); // Dates for next week
+        } else if (diffInWeeks === 2) {
+            weekAfterNext.push(date.format("dddd, DD-MM") + " - " + name); // Dates for the week after next
+        } else if (diffInWeeks === 3) {
+            in3Weeks.push(date.format("dddd, DD-MM") + " - " + name); // Dates for 3 weeks ahead
+        }
+    });
+
+    const noneMsg = "אין ימי בישול";
+    return {
+        this_week_sum: thisWeek.length ? thisWeek.join(", ") : noneMsg,
+        next_week_sum: nextWeek.length ? nextWeek.join(", ") : noneMsg,
+        week_after_next_sum: weekAfterNext.length ? weekAfterNext.join(", ") : noneMsg,
+        in_3_weeks_sum: in3Weeks.length ? in3Weeks.join(", ") : noneMsg,
+    };
+}
+
+async function getVolunteersNames(volunteers) {
+    const users = Object.keys(volunteers);
+    const usersRef = db.collection("users");
+
+    const chunks = chunkArray(users, 10);
+    for (const chunk of chunks) {
+        const chunkedUsersSnapshot = await usersRef.where(FieldPath.documentId(), "in", chunk).get();
+        chunkedUsersSnapshot.forEach(user => {
+            volunteers[user.id] = user.data().firstName + " " + user.data().lastName;
+        });
+    }
+}
+
+async function sendToManychat(manySubscriberId, manyChatFlowId, fields) {
+    console.log("sendToManychat", fields);
+
+    const apiKey = manyChatApiKey.value();
+    const httpOptions = {
+        headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        },
+    };
+
+    const fieldsArray = Object.keys(fields).map(fieldName => {
+        return {
+            field_name: fieldName,
+            field_value: fields[fieldName]
+        };
+    });
+
+    const payload = {
+        subscriber_id: manySubscriberId,
+        fields: fieldsArray
+    };
+
+    await axios.post("https://api.manychat.com/fb/subscriber/setCustomFields", payload, httpOptions).catch(err=>{
+        console.log(err)
+    });
+
+
+    return axios.post("https://api.manychat.com/fb/sending/sendFlow", {
+        subscriber_id: manySubscriberId,
+        flow_ns: manyChatFlowId,
+    }, httpOptions);
+}
+
+//weeklyNotifyFamilies()
+
 async function alertUpcomingCooking() {
     const districts = await getDestricts();
     const daysBefore = 3;
@@ -455,8 +602,84 @@ async function greetingsToBirthdays() {
 }
 //updateAirTableAppinstalled()
 
+async function syncBorn2WinFamilies() {
+    let offset = null;
+    let count = 0;
+    let countActive = 0;
+    const airTableMainBase = baseId// mainBase.value();
+    //const apiKey = born2winApiKey.value();
 
-//alertUpcomingCooking()
+    const sinceDate = dayjs().subtract(25, "hour");
+
+    const now = dayjs().format("YYYY-MM-DD HH:mm:ss[z]");
+
+
+    const url = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURI("משפחות רשומות")}`;
+    const batch = db.batch();
+    do {
+        const response = await axios.get(url, {
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+            },
+            params: {
+                //filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
+                fields: ["סטטוס בעמותה", "מחוז", "מאניצט לוגיסטי"],
+                offset: offset,
+            },
+        }).catch(err => {
+            console.log(err)
+        });
+        offset = response.data.offset;
+        for (let i = 0; i < response.data.records.length; i++) {
+            const family = response.data.records[i];
+            const familyId = family.id;
+
+            const docRef = db.collection("families").doc(familyId);
+            const familyDoc = await docRef.get();
+
+            const familyRecord = {
+                active: family.fields["סטטוס בעמותה"] == "פעיל",
+                lastModified: now,
+                mahoz: family.fields["מחוז"][0],
+                mainBaseFamilyId: family.id,
+                manychat_id: family.fields["מאניצט לוגיסטי"][0],
+            };
+
+            if (familyRecord.active) {
+                countActive++;
+            }
+
+            if (familyDoc && familyDoc.exists) {
+                const prevFamilyRecord = familyDoc.data();
+                if (prevFamilyRecord && familyRecord.active === prevFamilyRecord.active) {
+                    // No change!
+                    continue;
+                }
+                count++;
+                batch.update(familyDoc.ref, familyRecord);
+            } else {
+                count++;
+                batch.create(docRef, familyRecord);
+            }
+
+            if (familyRecord.active) {
+                // A new active family, or a family that has changed to active
+
+
+            }
+
+        }
+    } while (offset);
+
+    return batch.commit().then(async () => {
+        console.log("Sync Families: observed modified:", count, "observed Active", countActive);
+        return;
+    });
+}
+
+//syncBorn2WinFamilies()
+
+// alertUpcomingCooking()
 
 //sendNotification("hi", "2", { "a": "b" }, "")
 

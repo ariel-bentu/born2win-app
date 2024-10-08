@@ -69,6 +69,24 @@ curl -X POST "https://api.airtable.com/v0/bases/app5CI9AWJKt1ZwTy/webhooks" \
       }
     }
   }'
+
+curl -X POST "https://api.airtable.com/v0/bases/app5CI9AWJKt1ZwTy/webhooks" \
+-H "Authorization: Bearer $auth" \
+-H "Content-Type: application/json" \
+--data '{
+    "notificationUrl": "https://europe-west1-born2win-prod.cloudfunctions.net/httpApp/airtable/families/",
+    "specification": {
+      "options": {
+        "filters": {
+          "dataTypes": [
+            "tableData"
+          ],
+          "recordChangeScope": "tblUK5MDLCzi633An"
+        }
+      }
+    }
+  }'
+
 ```
 
 ## Setup custom domain for the site

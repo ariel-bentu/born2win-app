@@ -33,6 +33,7 @@ import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/fire
 import { IL_DATE, replaceAll, simplifyFamilyName } from "../../src/utils";
 import localeData = require("dayjs/plugin/localeData");
 import { Lock } from "./lock";
+import { weeklyNotifyFamilies } from "./scheduled-functions";
 
 // [END Imports]
 
@@ -51,19 +52,23 @@ dayjs.locale("he");
 
 const JERUSALEM = "Asia/Jerusalem";
 const DATE_TIME = "YYYY-MM-DD HH:mm";
-const DATE_AT = "YYYY-MM-DD";
+export const DATE_AT = "YYYY-MM-DD";
 const DATE_BIRTHDAY = "DD-MM";
-const db = getFirestore();
+export const db = getFirestore();
 
 const appHost = "app.born2win.org.il";
 
 const born2winApiKey = defineString("BORN2WIN_API_KEY");
-const manyChatApiKey = defineString("BORN2WIN_MANYCHAT_API_KEY");
+export const manyChatApiKey = defineString("BORN2WIN_MANYCHAT_API_KEY");
 
 const mainBase = defineString("BORM2WIN_MAIN_BASE");
 
 const usersWebHookID = defineString("BORM2WIN_AT_WEBHOOK_USERS_ID");
 const usersWebHookMacSecretBase64 = defineString("BORM2WIN_AT_WEBHOOK_USERS_MAC");
+
+const familiesWebHookID = defineString("BORM2WIN_AT_WEBHOOK_FAMILIES_ID");
+const familiesWebHookMacSecretBase64 = defineString("BORM2WIN_AT_WEBHOOK_FAMILIES_MAC");
+
 /**
  * users collection
  * doc-id = volunteerId
@@ -777,7 +782,7 @@ async function getWebTokens(to: string | string[]): Promise<DeviceInfo[]> {
 }
 
 // Utility function to chunk an array into smaller arrays
-function chunkArray(array: any[], chunkSize: number) {
+export function chunkArray(array: any[], chunkSize: number) {
     const chunks = [];
     for (let i = 0; i < array.length; i += chunkSize) {
         chunks.push(array.slice(i, i + chunkSize));
@@ -931,7 +936,7 @@ interface District {
     familiesTable: string;
 }
 
-async function getDestricts(): Promise<District[]> {
+export async function getDestricts(): Promise<District[]> {
     if (!districts) {
         // districts are cached
         const apiKey = born2winApiKey.value();
@@ -1016,7 +1021,7 @@ exports.GetMealRequests = onCall({ cors: true }, async (request) => {
     return "District not found";
 });
 
-async function getDemands(
+export async function getDemands(
     district: string,
     status: "תפוס" | "זמין" | undefined,
     includeNonActiveFamily: boolean,
@@ -1470,6 +1475,19 @@ app.post("/airtable/users", (req, res) => {
     });
 });
 
+app.post("/airtable/families", (req, res) => {
+    if (!verifyAirtableWebhook(req, familiesWebHookMacSecretBase64.value())) {
+        logger.info("Airtable Families Webhook GET: unverified", req.headers["x-airtable-content-mac"], JSON.stringify(req.body));
+        return res.status(403).send("Unauthorized request");
+    }
+    logger.info("Airtable Families Webhook GET: ", JSON.stringify(req.body));
+
+    return syncBorn2WinFamilies().then(() => {
+        res.json({});
+        return;
+    });
+});
+
 exports.httpApp = onRequest(app);
 
 
@@ -1486,11 +1504,14 @@ exports.httpApp = onRequest(app);
 
 const schedules = [
     // { desc: "Reminder on Sunday at 10:30", min: 30, hour: [10], weekDay: 0, callback: remindVolunteersToRegister },
-    { desc: "Refresh webhook registration", min: 0, hour: [12], weekDay: "*", callback: refreshWebhookToken },
+    { desc: "Refresh webhook registration", min: 0, hour: [12], weekDay: "*", callback: refreshWebhooksToken },
     { desc: "Sync Born2Win users daily", min: 0, hour: [17], weekDay: "*", callback: syncBorn2WinUsers },
+    { desc: "Sync Born2Win families daily", min: 1, hour: [17], weekDay: "*", callback: syncBorn2WinFamilies },
     { desc: "Alert 5 days ahead open demand", min: 40, hour: [13], weekDay: "*", callback: alertOpenDemands },
     { desc: "Alert 72 hours before cooking", min: 0, hour: [10], weekDay: "*", callback: alertUpcomingCooking },
     { desc: "Birthdays greeting", min: 0, hour: [10], weekDay: "*", callback: greetingsToBirthdays },
+    { desc: "Weekly Message to Families", min: 0, hour: [20], weekDay: "6", callback: weeklyNotifyFamilies },
+
     // todo - archive notifications
 ];
 
@@ -1598,6 +1619,13 @@ async function alertUpcomingCooking() {
         const upcomingDemands = await getDemands(districts[i].id, "תפוס", true, dayjs().format(DATE_AT), dayjs().add(daysBefore + 1, "days").format(DATE_AT));
         for (let j = 0; j < upcomingDemands.length; j++) {
             const demand = upcomingDemands[j];
+
+            if (!demand.volunteerId) {
+                // unexpected
+                logger.error(`Demand ${demand.id}, date:${demand.date}, district:${demand.district} name:${demand.familyLastName} is in status תפוס but has no volenteerId`);
+                continue;
+            }
+
             const daysLeft = -dayjs().startOf("day").diff(demand.date, "days");
 
             if (daysLeft === daysBefore) {
@@ -1620,8 +1648,12 @@ async function alertUpcomingCooking() {
     }
 }
 
-async function refreshWebhookToken() {
-    const webhookID = usersWebHookID.value();
+async function refreshWebhooksToken() {
+    await refreshWebhookToken(usersWebHookID.value());
+    await refreshWebhookToken(familiesWebHookID.value());
+}
+
+async function refreshWebhookToken(webhookID: string) {
     const airTableMainBase = mainBase.value();
     const apiKey = born2winApiKey.value();
 
@@ -1773,6 +1805,99 @@ async function syncBorn2WinUsers(sinceDate?: any) {
         //         }
         return;
     });
+}
+
+
+async function syncBorn2WinFamilies() {
+    let offset = null;
+    let count = 0;
+    let countActive = 0;
+    const airTableMainBase = mainBase.value();
+    const apiKey = born2winApiKey.value();
+
+    const sinceDate = dayjs().subtract(25, "hour");
+
+    const now = dayjs().format("YYYY-MM-DD HH:mm:ss[z]");
+    const becameActive = [];
+
+
+    const cities = await getCities();
+    const districts = await getDestricts();
+
+
+    const url = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURI("משפחות רשומות")}`;
+    const batch = db.batch();
+    do {
+        const response: any = await axios.get(url, {
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+            },
+            params: {
+                filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
+                fields: ["סטטוס בעמותה", "מחוז", "מאניצט לוגיסטי", "Name", "עיר"],
+                offset: offset,
+            },
+        }).catch(err => {
+            logger.error(err);
+        });
+        offset = response.data.offset;
+        for (let i = 0; i < response.data.records.length; i++) {
+            const family = response.data.records[i];
+            const familyId = family.id;
+
+            const docRef = db.collection("families").doc(familyId);
+            const familyDoc = await docRef.get();
+
+            const familyRecord = {
+                active: family.fields["סטטוס בעמותה"] == "פעיל",
+                lastModified: now,
+                mahoz: family.fields["מחוז"][0],
+                mainBaseFamilyId: family.id,
+                manychat_id: family.fields["מאניצט לוגיסטי"][0],
+            };
+
+            if (familyRecord.active) {
+                countActive++;
+            }
+
+            if (familyDoc && familyDoc.exists) {
+                const prevFamilyRecord = familyDoc.data();
+                if (prevFamilyRecord && familyRecord.active === prevFamilyRecord.active) {
+                    // No change!
+                    continue;
+                }
+                count++;
+                batch.update(familyDoc.ref, familyRecord);
+            } else {
+                count++;
+                batch.create(docRef, familyRecord);
+            }
+
+            if (familyRecord.active) {
+                // A new active family, or a family that has changed to active
+                becameActive.push({
+                    name: family.fields["Name"],
+                    city: cities.find(c => c.id === getSafeFirstArrayElement(family.fields["עיר"], ""))?.name || "",
+                    district: districts.find(d => d.id === getSafeFirstArrayElement(family.fields["מחוז"][0], ""))?.name || "",
+                });
+            }
+        }
+    } while (offset);
+
+    await batch.commit().then(async () => {
+        logger.info("Sync Families: observed modified:", count, "observed Active", countActive);
+    });
+
+    if (becameActive.length > 0) {
+        // Send notification to admins
+        const admins = await db.collection(Collections.Admins).get();
+        const adminsIds = admins.docs.map(doc => doc.id);
+
+        await addNotificationToQueue("משפחה חדשה", becameActive.map(nf => `
+משפחה: ${nf.name}
+מחוז: ${nf.district}
+עיר: ${nf.city}`).join("\n---\n"), NotificationChannels.Alerts, [], adminsIds);
+    }
 }
 
 function generateSignConfidentialityURL(firstName: string, identificationId: string, volunteerId: string) {

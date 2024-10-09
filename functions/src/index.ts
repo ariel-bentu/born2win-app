@@ -346,7 +346,7 @@ function updateVolunteerHasInstalled(volunteerId: string, date: string) {
     const apiKey = born2winApiKey.value();
     const airTableMainBase = mainBase.value();
 
-    const url = `https://api.airtable.com/v0/${airTableMainBase}/מתנדבים/${volunteerId}`;
+    const url = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("מתנדבים")}/${volunteerId}`;
     const httpOptions = {
         headers: {
             "Authorization": `Bearer ${apiKey}`,
@@ -945,7 +945,7 @@ export async function getDestricts(): Promise<District[]> {
             "Authorization": `Bearer ${apiKey}`,
         };
 
-        const districtResponse = await axios.get(`https://api.airtable.com/v0/${airTableMainBase}/מחוז`, {
+        const districtResponse = await axios.get(`https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("מחוז")}`, {
             headers,
         });
         districts = districtResponse.data.records.map((r: any) => ({
@@ -977,7 +977,7 @@ async function getCities(): Promise<City[]> {
         };
         cities = [];
         do {
-            const query = `https://api.airtable.com/v0/${airTableMainBase}/ערים`;
+            const query = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("ערים")}`;
             const citiesResponse: any = await axios.get(query, {
                 headers,
                 params: {
@@ -999,27 +999,6 @@ async function getCities(): Promise<City[]> {
     return cities || [];
 }
 
-
-exports.GetMealRequests = onCall({ cors: true }, async (request) => {
-    const doc = await authenticate(request);
-    const mahoz = doc.data().mahoz;
-
-    if (mahoz && mahoz.length > 0) {
-        const apiKey = born2winApiKey.value();
-        const headers = {
-            "Authorization": `Bearer ${apiKey}`,
-        };
-        const mahuzRec = (await getDestricts()).find((d: any) => d.id === mahoz);
-        if (mahuzRec) {
-            const baseId = mahuzRec.base_id;
-            const districtFamilies = await axios.get(`https://api.airtable.com/v0/${baseId}/משפחות במחוז?filterByFormula=AND(NOT({דרישות לשיבוצים}=''),({סטטוס בעמותה} = 'פעיל'))&sort[0][field]=שם משפחה של החולה&sort[0][direction]=asc`, {
-                headers,
-            });
-            return districtFamilies.data;
-        }
-    }
-    return "District not found";
-});
 
 export async function getDemands(
     district: string,
@@ -1091,7 +1070,7 @@ async function getDemand(district: string, familyDemandId: string): Promise<Fami
     };
     const districtRec = (await getDestricts()).find((d: any) => d.id === district);
     if (districtRec) {
-        const query = `https://api.airtable.com/v0/${districtRec.base_id}/דרישות לשיבוצים/${familyDemandId}`;
+        const query = `https://api.airtable.com/v0/${districtRec.base_id}/${encodeURIComponent("דרישות לשיבוצים")}/${familyDemandId}`;
 
         const demand = await axios.get(query, {
             headers,
@@ -1696,7 +1675,7 @@ async function syncBorn2WinUsers(sinceDate?: any) {
         link: string,
     }[];
 
-    const url = `https://api.airtable.com/v0/${airTableMainBase}/מתנדבים`;
+    const url = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("מתנדבים")}`;
     const batch = db.batch();
     const seenUsers: any = {};
     const duplicates: any = [];

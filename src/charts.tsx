@@ -49,6 +49,7 @@ interface DateInfo {
     demandId: string;
     mainBaseFamilyId: string;
     districtBaseFamilyId: string;
+    district:string;
 }
 
 interface GroupedFamily extends FamilyCompact {
@@ -322,7 +323,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                                     icon: 'pi pi-exclamation-triangle',
                                     accept: async () => {
                                         setCancelInProgress(true);
-                                        updateFamilityDemand(selectedDateInfo.demandId, selectedDateInfo.mainBaseFamilyId, "cityId(unknown)", false, `מנהל ${userInfo.firstName} ביטל.ה`)
+                                        updateFamilityDemand(selectedDateInfo.demandId, selectedDateInfo.mainBaseFamilyId, "cityId(unknown)", false, `מנהל ${userInfo.firstName} ביטל.ה`, selectedDateInfo.district)
                                             .then(onCancellationPerformed)
                                             .catch(err => appServices.showMessage("error", "ביטול נכשל", err.message))
                                             .finally(() => setCancelInProgress(false));
@@ -435,6 +436,7 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
 
         // Add the formatted date to the family's array under the city
         groupedByCityAndFamily[city][family.districtBaseFamilyId].dates.push({
+            district: family.district,
             demandId: family.id,
             districtBaseFamilyId: family.districtBaseFamilyId,
             mainBaseFamilyId: family.mainBaseFamilyId,

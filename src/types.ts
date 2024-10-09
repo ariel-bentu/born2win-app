@@ -74,6 +74,7 @@ export interface FamilityDemandUpdatePayload {
     cityId: string;
     isRegistering: boolean; // true means register, false mean unregister
     reason?: string;
+    district?:string; // defaults to the user's. for admin this is needed
 }
 
 export interface TokenInfo {

@@ -1143,12 +1143,15 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);
     const mahoz = doc.data().mahoz;
     const volunteerId = doc.id;
+    const fdup = request.data as FamilityDemandUpdatePayload;
 
     const districts = await getDestricts();
-    const district = districts.find(d => d.id == mahoz);
-    if (!district) throw new HttpsError("not-found", "District " + mahoz + " not found");
 
-    const fdup = request.data as FamilityDemandUpdatePayload;
+    const demandDistrictId = (fdup.district || mahoz);
+
+    const demandDistrict = districts.find(d => d.id == demandDistrictId);
+    if (!demandDistrict) throw new HttpsError("not-found", "District " + demandDistrictId + " not found");
+
     const apiKey = born2winApiKey.value();
 
     if (!fdup.isRegistering && !(fdup.reason && fdup.reason.trim().length > 0)) {
@@ -1169,7 +1172,7 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
     }
 
     // First read the recod to verify it is indeed free
-    const demand = await getDemand(district.id, fdup.demandId);
+    const demand = await getDemand(demandDistrict.id, fdup.demandId);
     if (demand.status !== (fdup.isRegistering ?
         "זמין" :
         "תפוס")) {
@@ -1182,7 +1185,7 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
         );
     }
 
-    const url = `https://api.airtable.com/v0/${district.base_id}/${district.demandsTable}/${fdup.demandId}`;
+    const url = `https://api.airtable.com/v0/${demandDistrict.base_id}/${demandDistrict.demandsTable}/${fdup.demandId}`;
     const httpOptions = {
         headers: {
             "Authorization": `Bearer ${apiKey}`,
@@ -1217,16 +1220,6 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
         };
 
         await axios.post(urlMainBase, newRegistrationRec, httpOptions).then(async () => {
-            // send notification to admins - disabled for now
-            //             const admins = await db.collection(Collections.Admins).get();
-            //             const adminsIds = admins.docs.map(doc => doc.id);
-
-            //             await addNotificationToQueue("שיבוץ חדש", `תאריך: ${demandDate}
-            // משפחה: ${updatedRecord.fields.Name}
-            // מתנדב: ${doc.data().firstName + " " + doc.data().lastName}
-            // עיר: ${updatedRecord.fields["עיר"]}
-            // `, NotificationChannels.Registrations, [], adminsIds);
-
             logger.info("New registration added", volunteerId, fdup.mainBaseFamilyId, demandDate);
         });
     } else {

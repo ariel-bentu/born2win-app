@@ -31,8 +31,14 @@ import { Gallery } from './gallery';
 import { Button } from 'primereact/button';
 
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
+const UNSUPPORTED_PWA = "born2win_pwa";
+
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+const queryString = window.location.search;
+const urlParams = new URLSearchParams(queryString);
+
+export const unsupportedDevice = urlParams.get('unsupported_device');
 
 export const testIsPWA = () => {
     // Check for iOS PWA
@@ -41,7 +47,9 @@ export const testIsPWA = () => {
     // Check for Android and other platforms
     const isDisplayModeStandalone = window.matchMedia('(display-mode: standalone)').matches;
 
-    return isStandalone || isDisplayModeStandalone;
+    const unsupporedPWADevice = isChrome && localStorage.getItem(UNSUPPORTED_PWA) === "true" && unsupportedDevice !== "true";
+
+    return isStandalone || isDisplayModeStandalone || unsupporedPWADevice;
 };
 
 export const isPWA = testIsPWA();
@@ -49,11 +57,10 @@ export const isAndroid = /android/i.test(navigator.userAgent);
 export const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
 
-const queryString = window.location.search;
-const urlParams = new URLSearchParams(queryString);
 const userPairingRequest = urlParams.get('vid');
 const otpPairingRequest = urlParams.get('otp');
 export const oldUrlParamID = urlParams.get('id');
+
 const isDev = !!urlParams.get('dev');
 const offline = !!urlParams.get('offline');
 const client = new ClientJS();
@@ -335,6 +342,12 @@ function App() {
                             setVolunteerId(userPairingRequest);
                             if (isAndroid) {
                                 localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
+
+                                if (unsupportedDevice === "true") {
+                                    localStorage.setItem(UNSUPPORTED_PWA, "true");
+                                    window.location.href = "https://app.born2win.org.il"
+                                    return;
+                                }
                             } else if (!isDev) {
                                 // Logout from Firebase - to cleanup
                                 setLoggedOut(true);

@@ -496,10 +496,10 @@ async function getDemands(
         }
         if (dateStart !== undefined) {
             // eslint-disable-next-line quotes
-            filters.push(`IS_AFTER({תאריך},'${dateStart}')`);
+            filters.push(`{תאריך}>='${dateStart}'`);
         }
         if (dateEnd != undefined) {
-            filters.push(`IS_BEFORE({תאריך},'${dateEnd}')`);
+            filters.push(`{תאריך}<='${dateEnd}'`);
         }
         if (volunteerId) {
             filters.push(`{volunteer_id}='${volunteerId}'`);
@@ -623,7 +623,7 @@ async function syncBorn2WinFamilies() {
             },
             params: {
                 //filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
-                fields: ["סטטוס בעמותה", "מחוז", "מאניצט לוגיסטי"],
+                fields: ["סטטוס בעמותה", "מחוז", "מאניצט לוגיסטי", "שם איש קשר לוגיסטי"],
                 offset: offset,
             },
         }).catch(err => {
@@ -642,6 +642,7 @@ async function syncBorn2WinFamilies() {
                 lastModified: now,
                 mahoz: family.fields["מחוז"][0],
                 mainBaseFamilyId: family.id,
+                contactName: family.fields["שם איש קשר לוגיסטי"][0],
                 manychat_id: family.fields["מאניצט לוגיסטי"][0],
             };
 
@@ -650,11 +651,11 @@ async function syncBorn2WinFamilies() {
             }
 
             if (familyDoc && familyDoc.exists) {
-                const prevFamilyRecord = familyDoc.data();
-                if (prevFamilyRecord && familyRecord.active === prevFamilyRecord.active) {
-                    // No change!
-                    continue;
-                }
+                // const prevFamilyRecord = familyDoc.data();
+                // if (prevFamilyRecord && familyRecord.active === prevFamilyRecord.active) {
+                //     // No change!
+                //     continue;
+                // }
                 count++;
                 batch.update(familyDoc.ref, familyRecord);
             } else {
@@ -707,3 +708,11 @@ function generateSignConfidentialityURL(firstName, identificationId, volunteerId
     return `https://born2win.org.il/confidentiality-and-privacy/?entry=${encodeURI(JSON.stringify(entry))}`;
 }
 
+
+
+async function testGetDamands() {
+    //rec7m86Ovsxgc5YPW
+    const demands = await getDemands("recLbwpPC80SdRmPO", undefined, false, "2024-10-14", "2024-10-31");
+    console.log(demands);
+}
+//testGetDamands()

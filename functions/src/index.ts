@@ -1032,10 +1032,10 @@ export async function getDemands(
         }
         if (dateStart !== undefined) {
             // eslint-disable-next-line quotes
-            filters.push(`IS_AFTER({תאריך},'${dateStart}')`);
+            filters.push(`{תאריך}>='${dateStart}'`);
         }
         if (dateEnd != undefined) {
-            filters.push(`IS_BEFORE({תאריך},'${dateEnd}')`);
+            filters.push(`{תאריך}<='${dateEnd}'`);
         }
         if (volunteerId) {
             filters.push(`{volunteer_id}='${volunteerId}'`);
@@ -1107,7 +1107,7 @@ exports.GetOpenDemands = onCall({ cors: true }, async (request): Promise<OpenFam
 
     const district = doc.data().mahoz;
     const cities = await getCities();
-    const demands = await getDemands(district, "זמין", false, dayjs().format(DATE_AT), dayjs().add(45, "days").format(DATE_AT));
+    const demands = await getDemands(district, "זמין", false, dayjs().add(1, "day").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT));
     return { demands, allDistrictCities: cities.filter(city => city.district === district) };
 });
 
@@ -1482,7 +1482,7 @@ const schedules = [
     { desc: "Alert 5 days ahead open demand", min: 40, hour: [13], weekDay: "*", callback: alertOpenDemands },
     { desc: "Alert 72 hours before cooking", min: 0, hour: [10], weekDay: "*", callback: alertUpcomingCooking },
     { desc: "Birthdays greeting", min: 0, hour: [10], weekDay: "*", callback: greetingsToBirthdays },
-    { desc: "Weekly Message to Families", min: 0, hour: [20], weekDay: "6", callback: weeklyNotifyFamilies },
+    { desc: "Weekly Message to Families", min: 0, hour: [20], weekDay: "0", callback: weeklyNotifyFamilies },
 
     // todo - archive notifications
 ];
@@ -1490,10 +1490,10 @@ const schedules = [
 function check(obj: any, fieldName: string, value: any) {
     const expectedValue = obj && obj[fieldName];
     if (expectedValue == "*") return true;
-    if (expectedValue === value) return true;
+    if (expectedValue == value) return true;
 
     if (Array.isArray(expectedValue)) {
-        return expectedValue.some(v => v === value);
+        return expectedValue.some(v => v == value);
     }
     return false;
 }
@@ -1556,7 +1556,7 @@ async function alertOpenDemands() {
     let notifyAdmins = false;
 
     for (let i = 0; i < districts.length; i++) {
-        const openDemands = await getDemands(districts[i].id, "זמין", false, dayjs().format(DATE_AT), dayjs().add(5, "days").format(DATE_AT));
+        const openDemands = await getDemands(districts[i].id, "זמין", false, dayjs().add(1, "day").format(DATE_AT), dayjs().add(5, "days").format(DATE_AT));
         let msgBody = "מחוז: " + districts[i].name + "\n";
         if (openDemands.length > 0) {
             let found = false;
@@ -1806,7 +1806,7 @@ async function syncBorn2WinFamilies() {
             },
             params: {
                 filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
-                fields: ["סטטוס בעמותה", "מחוז", "מאניצט לוגיסטי", "Name", "עיר"],
+                fields: ["סטטוס בעמותה", "מחוז", "מאניצט לוגיסטי", "Name", "עיר", "שם איש קשר לוגיסטי"],
                 offset: offset,
             },
         }).catch(err => {
@@ -1826,6 +1826,7 @@ async function syncBorn2WinFamilies() {
                 mahoz: family.fields["מחוז"][0],
                 mainBaseFamilyId: family.id,
                 manychat_id: family.fields["מאניצט לוגיסטי"][0],
+                contactName: family.fields["שם איש קשר לוגיסטי"][0],
             };
 
             if (familyRecord.active) {
@@ -1847,10 +1848,11 @@ async function syncBorn2WinFamilies() {
 
             if (familyRecord.active) {
                 // A new active family, or a family that has changed to active
+                const city = cities.find(c => c.id === getSafeFirstArrayElement(family.fields["עיר"], ""));
                 becameActive.push({
                     name: family.fields["Name"],
-                    city: cities.find(c => c.id === getSafeFirstArrayElement(family.fields["עיר"], ""))?.name || "",
-                    district: districts.find(d => d.id === getSafeFirstArrayElement(family.fields["מחוז"][0], ""))?.name || "",
+                    city: city?.name || "",
+                    district: city ? districts.find(d => d.id === city.district) || "" : "",
                 });
             }
         }

@@ -61,6 +61,7 @@ export async function weeklyNotifyFamilies() {
 
     const activeFamilies = await db.collection("families").where("active", "==", true).get();
     const waitFor = [];
+    let count = 0;
     for (const notification of notifications) {
         const family = activeFamilies.docs.find(af => af.id === notification.mainBaseFamilyId);
         if (family) {
@@ -73,7 +74,14 @@ export async function weeklyNotifyFamilies() {
 
             waitFor.push(sendToManychat(family.data().manychat_id,
                 manychat4weekSummaryFlow,
-                categorizeDatesByWeek(notification.dates)));
+                { coordinator_name: family.data().contactName, ...categorizeDatesByWeek(notification.dates) }));
+
+            // avoid hitting rate limit
+            count++;
+            if (count == 5) {
+                await delay(2000);
+                count = 0;
+            }
         }
     }
 
@@ -91,7 +99,7 @@ function categorizeDatesByWeek(dates: NotificationDate[]) {
     dates.forEach(d => {
         const date = dayjs(d.date);
         const diffInWeeks = date.diff(today, "week");
-        const name = d.volunteerId ? d.volunteerName : "טרם שובץ";
+        const name = d.volunteerId ? d.volunteerName : "טרם שובץ - עדיין עובדים על זה";
         if (diffInWeeks === 0) {
             thisWeek.push(date.format("dddd, DD-MM") + " - " + name); // Dates for this week
         } else if (diffInWeeks === 1) {
@@ -153,3 +161,5 @@ async function sendToManychat(manySubscriberId: string, manyChatFlowId: string, 
         flow_ns: manyChatFlowId,
     }, httpOptions);
 }
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));

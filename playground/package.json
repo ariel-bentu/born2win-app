@@ -1,0 +1,16 @@
+{
+  "name": "playground",
+  "version": "1.0.0",
+  "main": "ops.ts",
+  "scripts": {
+    "start": "node dist/playground/ops.js",
+    "build": "tsc"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+        "target": "es2016",
+        "module": "commonjs",
+        "outDir": "./dist",
+        "esModuleInterop": true,
+        "strict": true,
+        "skipLibCheck": true,
+        "sourceMap": true
+    },
+    "compileOnSave": true,
+    "include": [
+        "*",
+        "../src/types.ts", // Include source files
+    ]
+}

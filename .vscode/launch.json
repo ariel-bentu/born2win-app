@@ -1,0 +1,19 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+              {
+                "localRoot": "${workspaceFolder}/playground",
+                "type": "node",
+                "request": "launch",
+                "name": "Debug Ops",
+                "preLaunchTask": "npm: build - playground",
+                "program": "${workspaceFolder}/playground/ops.ts",
+                "outFiles": ["${workspaceFolder}/playground/dist/**/*.js"],
+                "skipFiles": ["<node_internals>/**"],
+                "envFile": "${workspaceFolder}/functions/.env.born2win-prod"
+              }
+    ]
+}

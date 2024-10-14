@@ -1,3 +1,24 @@
+## Remove Districts:
+
+- פתיחת דרישות לחודש הקרוב:
+  - runs at 1/7/14/21/28 at 08:00
+  - read all ארוחות
+  - call https://hook.eu1.make.com/23map22uhetykm513zqd8qe5wkan5hpk with id - activate scenario "יצירת דרישות ותאריכים בביסים השונים"
+- יצירת דרישות ותאריכים בביסים השונים:
+  - read family by ID
+  - read district
+  - for "day" each "days of the week":
+    - for i=1 to 7:
+      - {{if(formatDate(addDays(now; i); "dddd") = day; addDays(now; i); 0)}}
+      - for j=1 to 5
+        dates = ?
+        - read family record from district
+        - read demand - if missing create
+        - check exist
+
+
+
+
 ## Questions:
  - on-boading volunteers
    details

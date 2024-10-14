@@ -12,6 +12,10 @@ public/service-worker.js
 /.pnp
 .pnp.js
 
+/playground/dist
+/playground/node_modules
+/playground/package-lock.json
+
 
 
 temp.js

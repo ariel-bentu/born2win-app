@@ -757,7 +757,7 @@ async function QueryAirtable(isMainBase, tableName, filterArray) {
 //     //"{משפחה}='recwVL742srgkzO0u'"
 //     //`'recwVL742srgkzO0u'={משפחה}`
 //     //`FIND('recwVL742srgkzO0u',ARRAYJOIN({משפחה}))`,
-//     "{familyid}='recwVL742srgkzO0u'",
+//     //"{familyid}='recwVL742srgkzO0u'",
 // ]);
 
 

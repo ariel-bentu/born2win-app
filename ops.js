@@ -34,6 +34,8 @@ const db = admin.firestore();
 
 const baseId = process.env.BORM2WIN_MAIN_BASE;
 const apiKey = process.env.BORN2WIN_API_KEY;
+const manychatKey = process.env.BORN2WIN_MANYCHAT_API_KEY;
+
 const NotificationActions = {
     RegistrationDetails: "registration-details",
     StartConversation: "start-conversation"
@@ -422,7 +424,7 @@ async function sendToManychat(manySubscriberId, manyChatFlowId, fields) {
         fields: fieldsArray
     };
 
-    await axios.post("https://api.manychat.com/fb/subscriber/setCustomFields", payload, httpOptions).catch(err=>{
+    await axios.post("https://api.manychat.com/fb/subscriber/setCustomFields", payload, httpOptions).catch(err => {
         console.log(err)
     });
 
@@ -716,3 +718,121 @@ async function testGetDamands() {
     console.log(demands);
 }
 //testGetDamands()
+
+
+async function QueryAirtable(isMainBase, tableName, filterArray) {
+    const base = isMainBase ? baseId : "";
+
+    const url = `https://api.airtable.com/v0/${base}/${encodeURI(tableName)}`;
+    const response = await axios.get(url, {
+        headers: {
+            Authorization: `Bearer ${apiKey}`,
+        },
+        params: {
+            filterByFormula: `AND(${filterArray.join(",")})`,
+        },
+    }).catch(err => {
+        console.log(err)
+
+    });
+    const t = response.data.records.find(d => d.fields.Name.indexOf("בדיקה") >= 0)
+    console.log(response.data);
+}
+
+
+
+
+// QueryAirtable(true, "ארוחות", [
+//     "DATETIME_FORMAT({DATE}, 'YYYY-MM-DD')='2024-10-10'",
+//     //"{DATE}='2024-10-13'",
+//     //"{משפחה}='recwVL742srgkzO0u'"
+//     //`'recwVL742srgkzO0u'={משפחה}`
+//     //`FIND('recwVL742srgkzO0u',ARRAYJOIN({משפחה}))`,
+//     //"{REC}='recdAjtkUZwVhwZ7A'",
+// ]);
+
+// QueryAirtable(true, "משפחות רשומות", [
+//     //"DATETIME_FORMAT({DATE}, 'YYYY-MM-DD')='2024-10-13'",
+//     //"{DATE}='2024-10-13'",
+//     //"{משפחה}='recwVL742srgkzO0u'"
+//     //`'recwVL742srgkzO0u'={משפחה}`
+//     //`FIND('recwVL742srgkzO0u',ARRAYJOIN({משפחה}))`,
+//     "{familyid}='recwVL742srgkzO0u'",
+// ]);
+
+
+
+async function sendToManychat(manySubscriberId, manyChatFlowId, fields) {
+    const httpOptions = {
+        headers: {
+            "Authorization": `Bearer ${manychatKey}`,
+            "Content-Type": "application/json",
+        },
+    };
+
+    const fieldsArray = Object.keys(fields).map(fieldName => {
+        return {
+            field_name: fieldName,
+            field_value: fields[fieldName],
+        };
+    });
+
+    const payload = {
+        subscriber_id: manySubscriberId,
+        fields: fieldsArray,
+    };
+    if (fields.length > 0) {
+        await axios.post("https://api.manychat.com/fb/subscriber/setCustomFields", payload, httpOptions);
+    }
+
+    return axios.post("https://api.manychat.com/fb/sending/sendFlow", {
+        subscriber_id: manySubscriberId,
+        flow_ns: manyChatFlowId,
+    }, httpOptions);
+}
+
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+
+async function SendLinkOrInstall() {
+
+    const users = await db.collection("users").where("active", "==", true).get();
+    const relevantUsers = users.docs.filter(u => u.data().uid == undefined && u.data().manychat_id !== undefined);
+
+    const usersForInstallMsg = relevantUsers.filter(u => u.data().mahoz === "recmLo9MWRxmrLEsM");
+    const usersForLink = relevantUsers.filter(u => u.data().mahoz !== "recmLo9MWRxmrLEsM");
+
+    let count = 0;
+    let totalInstall = 0;
+    let totalLinks = 0;
+    for (const user of usersForInstallMsg) {
+        if (count == 10) {
+            await delay(1000);
+            count = 0;
+        }
+        //await sendToManychat(user.data().manychat_id, ManyChatFlows.SendInstallMessage, {});
+        console.log("sendInstall", user.data().manychat_id)
+        count++;
+        totalInstall++;
+    }
+
+    for (const user of usersForLink) {
+        if (count == 10) {
+            await delay(1000);
+            count = 0;
+        }
+        //await sendToManychat(user.data().manychat_id, ManyChatFlows.SendOldLink, {});
+        console.log("sendLink", user.data().manychat_id)
+        count++;
+        totalLinks++;
+    }
+
+    const admins = await db.collection(Collections.Admins).get();
+    const adminsIds = admins.docs.map(doc => doc.id);
+
+//     await addNotificationToQueue("נשלחו לינקים!", `סה״כ הודעות התקנה: ${totalInstall}
+// סה״כ לינקים: ${totalLinks}
+// מותקני אפליקציה: ${users.docs.length - totalInstall - totalLinks}`, NotificationChannels.Alerts, [], adminsIds);
+}
+
+//SendLinkOrInstall()

@@ -51,7 +51,7 @@ export interface FamilityDetailsPayload {
 
 
 export interface VolunteerInfoPayload {
-    volunteerId:string;
+    volunteerId: string;
 }
 
 export interface VolunteerInfo {
@@ -59,8 +59,8 @@ export interface VolunteerInfo {
     firstName: string;
     lastName: string;
     district: { id: string, name: string }
-    phone:string;
-    active:boolean;
+    phone: string;
+    active: boolean;
 }
 
 export interface City {
@@ -74,7 +74,8 @@ export interface FamilityDemandUpdatePayload {
     cityId: string;
     isRegistering: boolean; // true means register, false mean unregister
     reason?: string;
-    district?:string; // defaults to the user's. for admin this is needed
+    district?: string; // defaults to the user's. for admin this is needed
+    volunteerId?: string // defaults to the user's. for admin this is needed
 }
 
 export interface TokenInfo {
@@ -128,8 +129,8 @@ export interface UserRecord {
     otp?: string;
     otpCreatedAt?: string;
     birthDate: string;
-    gender:string;
-    needToSignConfidentiality?:string | any;
+    gender: string;
+    needToSignConfidentiality?: string | any;
 }
 
 

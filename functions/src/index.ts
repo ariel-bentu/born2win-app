@@ -33,7 +33,7 @@ import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/fire
 import { IL_DATE, replaceAll, simplifyFamilyName } from "../../src/utils";
 import localeData = require("dayjs/plugin/localeData");
 import { Lock } from "./lock";
-import { weeklyNotifyFamilies } from "./scheduled-functions";
+import { SendLinkOrInstall, weeklyNotifyFamilies } from "./scheduled-functions";
 
 // [END Imports]
 
@@ -244,7 +244,7 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
             await updateAdminClaim(uid, true);
         }
 
-        if (!uulp.isIOS) {
+        if (!uulp.isIOS && doc.data()?.manychat_id !== undefined) {
             await updateVolunteerHasInstalled(doc.id, now.format(DATE_AT));
         }
 
@@ -569,7 +569,7 @@ exports.SearchUsers = onCall({ cors: true }, async (request): Promise<Recipient[
  * @returns
  */
 
-async function addNotificationToQueue(title: string, body: string, channel: NotificationChannels, toDistricts: string[], toRecipients: string[] | string, data?: { [key: string]: string }) {
+export async function addNotificationToQueue(title: string, body: string, channel: NotificationChannels, toDistricts: string[], toRecipients: string[] | string, data?: { [key: string]: string }) {
     const docRef = db.collection(Collections.Notifications).doc();
     if (data) {
         data.channel = channel;
@@ -1142,12 +1142,12 @@ exports.GetUserRegistrations = onCall({ cors: true }, async (request): Promise<F
 exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);
     const mahoz = doc.data().mahoz;
-    const volunteerId = doc.id;
     const fdup = request.data as FamilityDemandUpdatePayload;
 
     const districts = await getDestricts();
 
     const demandDistrictId = (fdup.district || mahoz);
+    const volunteerId = (fdup.volunteerId || doc.id);
 
     const demandDistrict = districts.find(d => d.id == demandDistrictId);
     if (!demandDistrict) throw new HttpsError("not-found", "District " + demandDistrictId + " not found");
@@ -1256,7 +1256,7 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
 
                     await addNotificationToQueue("שיבוץ בוטל!", `תאריך: ${demandDate}
 משפחה: ${updatedRecord.fields.Name}
-מתנדב: ${doc.data().firstName + " " + doc.data().lastName}
+בוטל ע״י: ${doc.data().firstName + " " + doc.data().lastName}
 עיר: ${updatedRecord.fields["עיר"]}
 `, NotificationChannels.Registrations, [], adminsIds);
                 }
@@ -1475,7 +1475,6 @@ exports.httpApp = onRequest(app);
 */
 
 const schedules = [
-    // { desc: "Reminder on Sunday at 10:30", min: 30, hour: [10], weekDay: 0, callback: remindVolunteersToRegister },
     { desc: "Refresh webhook registration", min: 0, hour: [12], weekDay: "*", callback: refreshWebhooksToken },
     { desc: "Sync Born2Win users daily", min: 0, hour: [17], weekDay: "*", callback: syncBorn2WinUsers },
     { desc: "Sync Born2Win families daily", min: 1, hour: [17], weekDay: "*", callback: syncBorn2WinFamilies },
@@ -1483,7 +1482,7 @@ const schedules = [
     { desc: "Alert 72 hours before cooking", min: 0, hour: [10], weekDay: "*", callback: alertUpcomingCooking },
     { desc: "Birthdays greeting", min: 0, hour: [10], weekDay: "*", callback: greetingsToBirthdays },
     { desc: "Weekly Message to Families", min: 0, hour: [20], weekDay: "0", callback: weeklyNotifyFamilies },
-
+    { desc: "Links to install or old-link on Sunday at 09:30", min: 30, hour: [9], weekDay: 0, callback: SendLinkOrInstall },
     // todo - archive notifications
 ];
 
@@ -1503,6 +1502,7 @@ exports.doSchedule = onSchedule({
     schedule: "every 1 minutes",
     timeZone: "Asia/Jerusalem",
     region: "europe-west1",
+    timeoutSeconds: 300,
 }, async () => {
     const now = dayjs().utc().tz(JERUSALEM);
     const waitFor = [] as Promise<any>[];

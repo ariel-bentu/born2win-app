@@ -201,14 +201,15 @@ export function getOpenDemands(): Promise<OpenFamilyDemands> {
     return callFunctionWithImpersonation('GetOpenDemands').then((res: any) => res.data as OpenFamilyDemands);
 }
 
-export function updateFamilityDemand(demandId: string, mainBaseFamilyId: string, cityId: string, isRegistering: boolean, reason?: string, district?:string) {
+export function updateFamilityDemand(demandId: string, mainBaseFamilyId: string, cityId: string, isRegistering: boolean, reason?: string, district?:string, volunteerId?:string) {
     const payload = {
         demandId,
         mainBaseFamilyId,
         isRegistering,
         cityId,
         reason,
-        district
+        district,
+        volunteerId,
     } as FamilityDemandUpdatePayload;
 
     return callFunctionWithImpersonation('UpdateFamilityDemand', payload);

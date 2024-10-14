@@ -1,9 +1,10 @@
 import dayjs = require("dayjs");
 
 import axios from "axios";
-import { chunkArray, DATE_AT, db, getDemands, getDestricts, manyChatApiKey } from ".";
+import { addNotificationToQueue, chunkArray, DATE_AT, db, getDemands, getDestricts, manyChatApiKey } from ".";
 import { FieldPath } from "firebase-admin/firestore";
 import localeData = require("dayjs/plugin/localeData");
+import { Collections, NotificationChannels } from "../../src/types";
 
 require("dayjs/locale/he");
 dayjs.extend(localeData);
@@ -23,8 +24,13 @@ interface Notification {
 
 }
 
+enum ManyChatFlows {
+    FamilyFourWeekSummary = "content20241008192343_098603",
+    SendOldLink = "content20230824123136_725765",
+    SendInstallMessage = "content20241013201532_353172",
+}
+
 export async function weeklyNotifyFamilies() {
-    const manychat4weekSummaryFlow = "content20241008192343_098603";
     const tomorrow = dayjs().add(1, "days");
     const notifications: Notification[] = [];
     const volunteers: { [key: string]: string } = {};
@@ -73,7 +79,7 @@ export async function weeklyNotifyFamilies() {
             });
 
             waitFor.push(sendToManychat(family.data().manychat_id,
-                manychat4weekSummaryFlow,
+                ManyChatFlows.FamilyFourWeekSummary,
                 { coordinator_name: family.data().contactName, ...categorizeDatesByWeek(notification.dates) }));
 
             // avoid hitting rate limit
@@ -113,10 +119,10 @@ function categorizeDatesByWeek(dates: NotificationDate[]) {
 
     const noneMsg = "אין ימי בישול";
     return {
-        this_week_sum: thisWeek.length ? thisWeek.join(", ") : noneMsg,
-        next_week_sum: nextWeek.length ? nextWeek.join(", ") : noneMsg,
-        week_after_next_sum: weekAfterNext.length ? weekAfterNext.join(", ") : noneMsg,
-        in_3_weeks_sum: in3Weeks.length ? in3Weeks.join(", ") : noneMsg,
+        this_week_sum: thisWeek.length ? thisWeek.join("\n") : noneMsg,
+        next_week_sum: nextWeek.length ? nextWeek.join("\n") : noneMsg,
+        week_after_next_sum: weekAfterNext.length ? weekAfterNext.join("\n") : noneMsg,
+        in_3_weeks_sum: in3Weeks.length ? in3Weeks.join("\n") : noneMsg,
     };
 }
 
@@ -154,7 +160,9 @@ async function sendToManychat(manySubscriberId: string, manyChatFlowId: string, 
         fields: fieldsArray,
     };
 
-    await axios.post("https://api.manychat.com/fb/subscriber/setCustomFields", payload, httpOptions);
+    if (fieldsArray.length > 0) {
+        await axios.post("https://api.manychat.com/fb/subscriber/setCustomFields", payload, httpOptions);
+    }
 
     return axios.post("https://api.manychat.com/fb/sending/sendFlow", {
         subscriber_id: manySubscriberId,
@@ -163,3 +171,42 @@ async function sendToManychat(manySubscriberId: string, manyChatFlowId: string, 
 }
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+
+export async function SendLinkOrInstall() {
+    const users = await db.collection(Collections.Users).where("active", "==", true).get();
+    const relevantUsers = users.docs.filter(u => u.data().uid == undefined && u.data().manychat_id !== undefined);
+
+    const usersForInstallMsg = relevantUsers.filter(u => u.data().mahoz === "recmLo9MWRxmrLEsM");
+    const usersForLink = relevantUsers.filter(u => u.data().mahoz !== "recmLo9MWRxmrLEsM");
+
+    let count = 0;
+    let totalInstall = 0;
+    let totalLinks = 0;
+    for (const user of usersForInstallMsg) {
+        if (count == 10) {
+            await delay(1000);
+            count = 0;
+        }
+        await sendToManychat(user.data().manychat_id, ManyChatFlows.SendInstallMessage, {});
+        count++;
+        totalInstall++;
+    }
+
+    for (const user of usersForLink) {
+        if (count == 10) {
+            await delay(1000);
+            count = 0;
+        }
+        await sendToManychat(user.data().manychat_id, ManyChatFlows.SendOldLink, {});
+        count++;
+        totalLinks++;
+    }
+
+    const admins = await db.collection(Collections.Admins).get();
+    const adminsIds = admins.docs.map(doc => doc.id);
+
+    await addNotificationToQueue("נשלחו לינקים!", `סה״כ הודעות התקנה: ${totalInstall}
+סה״כ לינקים: ${totalLinks}
+מותקני אפליקציה: ${users.docs.length - totalInstall - totalLinks}`, NotificationChannels.Alerts, [], adminsIds);
+}

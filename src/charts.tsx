@@ -323,7 +323,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                                     icon: 'pi pi-exclamation-triangle',
                                     accept: async () => {
                                         setCancelInProgress(true);
-                                        updateFamilityDemand(selectedDateInfo.demandId, selectedDateInfo.mainBaseFamilyId, "cityId(unknown)", false, `מנהל ${userInfo.firstName} ביטל.ה`, selectedDateInfo.district)
+                                        updateFamilityDemand(selectedDateInfo.demandId, selectedDateInfo.mainBaseFamilyId, "cityId(unknown)", false, `מנהל ${userInfo.firstName} ביטל.ה`, selectedDateInfo.district, selectedDateInfo.volunteerId)
                                             .then(onCancellationPerformed)
                                             .catch(err => appServices.showMessage("error", "ביטול נכשל", err.message))
                                             .finally(() => setCancelInProgress(false));

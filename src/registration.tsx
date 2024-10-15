@@ -97,7 +97,7 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
     }
 
 
-    const selectedFamilyDemand = selectedFamily ? familyDemands.filter(fd => fd.districtBaseFamilyId === selectedFamily.districtBaseFamilyId) : undefined;
+    const selectedFamilyDemand = selectedFamily ? familyDemands.filter(fd => fd.mainBaseFamilyId === selectedFamily.mainBaseFamilyId) : undefined;
     const filteredFamilies = families.filter(family => selectedCities.some(sc => compareCities(sc.name, family.city)));
     return (
         <div className="registration-component">
@@ -130,8 +130,7 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
                     {selectedFamily ?
                         <FamilyDetailsComponent
                             analyticComponent={analyticComponent}
-
-                            districtBaseFamilyId={selectedFamily.districtBaseFamilyId} family={selectedFamily} onClose={() => {
+                            mainBaseFamilyId={selectedFamily.mainBaseFamilyId} family={selectedFamily} onClose={() => {
                                 setSelectedFamily(null);
                                 appServices.popNavigationStep();
                             }}

@@ -44,6 +44,7 @@ export interface NotificationUpdatePayload {
 
 export interface FamilityDetailsPayload {
     districtBaseFamilyId: string;
+    mainBaseFamilyId?:string;
     district: string;
     includeContacts: boolean;
     familyDemandId: string;
@@ -229,6 +230,7 @@ export type AppServices = {
 
 export interface FamilyCompact {
     districtBaseFamilyId: string;
+    mainBaseFamilyId:string;
     district: string;
     familyLastName: string;
     city: string;
@@ -269,4 +271,11 @@ export interface FamilyDetails {
 export const Errors = {
     UserAlreadyOnboardedToApp: "User is already onboarded to the app",
     InactiveUser: "Inactive user",
+}
+
+export enum Status {
+    Cancelled = "בוטל",
+    Occupied = "תפוס",
+    Available = "זמין",
+    Active = "פעיל",
 }

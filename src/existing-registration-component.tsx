@@ -102,6 +102,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
         const currentFamily = {
             city: currentRegistration.city,
             districtBaseFamilyId: currentRegistration.districtBaseFamilyId,
+            mainBaseFamilyId: currentRegistration.mainBaseFamilyId,
             familyLastName: currentRegistration.familyLastName,
             district: currentRegistration.district,
             active: currentRegistration.isFamilyActive,
@@ -110,7 +111,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
         return <FamilyDetailsComponent 
             analyticComponent="ExistingRegistration"
             detailsOnly={true} familyDemandId={currentRegistration.id} date={currentRegistration.date}
-            districtBaseFamilyId={currentRegistration.districtBaseFamilyId} family={currentFamily} onClose={() => {
+            mainBaseFamilyId={currentRegistration.mainBaseFamilyId} family={currentFamily} onClose={() => {
                 setCurrentRegistration(undefined)
                 appServices.popNavigationStep();
             }}

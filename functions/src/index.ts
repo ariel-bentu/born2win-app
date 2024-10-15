@@ -25,15 +25,19 @@ import {
     VolunteerInfoPayload,
     GetDemandsPayload,
     Errors,
+    Status,
 } from "../../src/types";
 import axios from "axios";
 import express = require("express");
 import crypto = require("crypto");
 import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
-import { IL_DATE, replaceAll, simplifyFamilyName } from "../../src/utils";
+import { getSafeFirstArrayElement, IL_DATE, replaceAll, simplifyFamilyName } from "../../src/utils";
 import localeData = require("dayjs/plugin/localeData");
 import { Lock } from "./lock";
 import { SendLinkOrInstall, weeklyNotifyFamilies } from "./scheduled-functions";
+import { CachedAirTable } from "./airtable";
+import { getDemands2, updateFamilityDemand } from "./demands";
+import { getFamilyDetails2 } from "./families";
 
 // [END Imports]
 
@@ -58,10 +62,10 @@ export const db = getFirestore();
 
 const appHost = "app.born2win.org.il";
 
-const born2winApiKey = defineString("BORN2WIN_API_KEY");
+export const born2winApiKey = defineString("BORN2WIN_API_KEY");
 export const manyChatApiKey = defineString("BORN2WIN_MANYCHAT_API_KEY");
 
-const mainBase = defineString("BORM2WIN_MAIN_BASE");
+export const mainBase = defineString("BORM2WIN_MAIN_BASE");
 
 const usersWebHookID = defineString("BORM2WIN_AT_WEBHOOK_USERS_ID");
 const usersWebHookMacSecretBase64 = defineString("BORM2WIN_AT_WEBHOOK_USERS_MAC");
@@ -959,44 +963,25 @@ export async function getDestricts(): Promise<District[]> {
     return districts || [];
 }
 
-let cities: City[] | undefined = undefined;
+// let cities: City[] | undefined = undefined;
 interface City {
     id: string;
     name: string;
     district: string;
 }
 
-async function getCities(): Promise<City[]> {
-    if (!cities) {
-        const apiKey = born2winApiKey.value();
-        const airTableMainBase = mainBase.value();
+// Cities cache
+const cities = new CachedAirTable<City>("ערים", (city => {
+    return {
+        id: city.id,
+        name: city.fields["שם"].replaceAll("\n", ""),
+        district: city.fields["מחוז"][0],
+    };
+}), ["{כמות משפחות פעילות בעיר}>0"], 60 * 24);
 
-        let offset = null;
-        const headers = {
-            "Authorization": `Bearer ${apiKey}`,
-        };
-        cities = [];
-        do {
-            const query = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("ערים")}`;
-            const citiesResponse: any = await axios.get(query, {
-                headers,
-                params: {
-                    offset,
-                    filterByFormula: "{כמות משפחות פעילות בעיר}>0",
-                },
-            });
-            offset = citiesResponse.data.offset;
-            if (citiesResponse.data.records) {
-                citiesResponse.data.records.forEach((city: AirTableRecord) => (cities?.push({
-                    id: city.id,
-                    name: city.fields["שם"],
-                    district: city.fields["מחוז"][0],
-                    // numOfFamilies: city.fields["כמות משפחות פעילות בעיר"],
-                })));
-            }
-        } while (offset);
-    }
-    return cities || [];
+
+export async function getCities(): Promise<City[]> {
+    return cities.get();
 }
 
 
@@ -1097,10 +1082,14 @@ function demandAirtable2FamilyDemand(demand: AirTableRecord, district: string): 
     };
 }
 
-function getSafeFirstArrayElement(arr: any[], defaultValue: any) {
-    return arr && arr.length && arr[0] || defaultValue;
-}
+exports.GetOpenDemands2 = onCall({ cors: true }, async (request): Promise<OpenFamilyDemands> => {
+    const doc = await authenticate(request);
 
+    const district = doc.data().mahoz;
+    const cities = await getCities();
+    const demands = await getDemands2(district, Status.Available, dayjs().add(1, "day").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT));
+    return { demands, allDistrictCities: cities.filter(city => city.district === district) };
+});
 
 exports.GetOpenDemands = onCall({ cors: true }, async (request): Promise<OpenFamilyDemands> => {
     const doc = await authenticate(request);
@@ -1110,6 +1099,16 @@ exports.GetOpenDemands = onCall({ cors: true }, async (request): Promise<OpenFam
     const demands = await getDemands(district, "זמין", false, dayjs().add(1, "day").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT));
     return { demands, allDistrictCities: cities.filter(city => city.district === district) };
 });
+
+exports.GetDemandsNew = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
+    const userInfo = await getUserInfo(request);
+    if (userInfo.isAdmin) {
+        const gdp = request.data as GetDemandsPayload;
+        return await getDemands2(gdp.districts, undefined, gdp.from, gdp.to);
+    }
+    throw new HttpsError("permission-denied", "Unauthorized user to read all demands");
+});
+
 
 exports.GetDemands = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
     const userInfo = await getUserInfo(request);
@@ -1131,11 +1130,38 @@ exports.GetDemands = onCall({ cors: true }, async (request): Promise<FamilyDeman
     throw new HttpsError("permission-denied", "Unauthorized user to read all demands");
 });
 
+exports.GetUserRegistrationsNew = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
+    const doc = await authenticate(request);
+    const district = doc.data().mahoz;
+    const volunteerId = doc.id;
+    return getDemands2(district, Status.Occupied, dayjs().startOf("month").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT), volunteerId);
+});
+
+
 exports.GetUserRegistrations = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
     const doc = await authenticate(request);
     const district = doc.data().mahoz;
     const volunteerId = doc.id;
     return getDemands(district, "תפוס", true, dayjs().startOf("month").format(DATE_AT), undefined, volunteerId);
+});
+
+exports.UpdateFamilityDemandNew = onCall({ cors: true }, async (request) => {
+    const doc = await authenticate(request);
+    const mahoz = doc.data().mahoz;
+    const fdup = request.data as FamilityDemandUpdatePayload;
+
+    const districts = await getDestricts();
+
+    const demandDistrictId = (fdup.district || mahoz);
+    const volunteerId = (fdup.volunteerId || doc.id);
+
+    const demandDistrict = districts.find(d => d.id == demandDistrictId);
+    if (!demandDistrict) throw new HttpsError("not-found", "District " + demandDistrictId + " not found");
+
+    if (!fdup.isRegistering && !(fdup.reason && fdup.reason.trim().length > 0)) {
+        throw new HttpsError("invalid-argument", "Missing cancellation reason");
+    }
+    return updateFamilityDemand(fdup.demandId, demandDistrictId, fdup.isRegistering, volunteerId, doc.data().firstName + " " + doc.data().lastName, fdup.reason);
 });
 
 
@@ -1274,6 +1300,28 @@ exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
     return;
 });
 
+
+exports.GetFamilyDetailsNew = onCall({ cors: true }, async (request): Promise<FamilyDetails> => {
+    const userInfo = await getUserInfo(request);
+    const gfp = request.data as FamilityDetailsPayload;
+    const district = userInfo.userDistrict.id;
+
+    if (!gfp.mainBaseFamilyId) {
+        throw new HttpsError("invalid-argument", "Family ID is missing");
+    }
+
+    if (gfp.district !== district &&
+        (!userInfo.isAdmin || !userInfo.districts?.find(d => d.id === gfp.district))) {
+        logger.error("Permission denied to read family details", userInfo.id, userInfo.userDistrict, userInfo.isAdmin, gfp.district, "admin regions:", userInfo.districts);
+        throw new HttpsError("permission-denied", "Unauthorized to read family details from this district");
+    }
+
+    const family = getFamilyDetails2(gfp.mainBaseFamilyId, gfp.includeContacts);
+    if (family) {
+        return family;
+    }
+    throw new HttpsError("not-found", "Family not found");
+});
 
 exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<FamilyDetails> => {
     const userInfo = await getUserInfo(request);
@@ -1482,7 +1530,7 @@ const schedules = [
     { desc: "Alert 72 hours before cooking", min: 0, hour: [10], weekDay: "*", callback: alertUpcomingCooking },
     { desc: "Birthdays greeting", min: 0, hour: [10], weekDay: "*", callback: greetingsToBirthdays },
     { desc: "Weekly Message to Families", min: 0, hour: [20], weekDay: "0", callback: weeklyNotifyFamilies },
-    { desc: "Links to install or old-link on Sunday at 09:30", min: 30, hour: [9], weekDay: 0, callback: SendLinkOrInstall },
+    { desc: "Links to install or old-link on Sunday at 09:00", min: 0, hour: [9], weekDay: 0, callback: SendLinkOrInstall },
     // todo - archive notifications
 ];
 

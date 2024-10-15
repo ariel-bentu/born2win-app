@@ -11,9 +11,10 @@ export const IL_DATE = "DD-MM-YYYY";
 export const getUniqueFamilies = (records: FamilyDemand[]): FamilyCompact[] => {
     const result = [] as FamilyCompact[];
     records.forEach(fd => {
-        if (!result.find(f => f.districtBaseFamilyId === fd.districtBaseFamilyId)) {
+        if (!result.find(f => f.mainBaseFamilyId === fd.mainBaseFamilyId)) {
             result.push({
                 districtBaseFamilyId: fd.districtBaseFamilyId,
+                mainBaseFamilyId: fd.mainBaseFamilyId,
                 familyLastName: fd.familyLastName,
                 city: fd.city,
                 district: fd.district,
@@ -46,7 +47,7 @@ export function getNiceDateTime(d: number | string) {
     return theDate.format("[יום ]dddd, D [ב]MMMM HH:mm");
 }
 
-export function getReferenceDays(date:string) {
+export function getReferenceDays(date: string) {
     const d = dayjs(date);
     const today = dayjs();
     if (d.isAfter(today)) {
@@ -96,4 +97,12 @@ export function simplifyFamilyName(name: string): string {
         return match[1]; // Extracted family name
     }
     return name;
+}
+
+export function getSafeFirstArrayElement(arr: any[], defaultValue: any) {
+    return arr && arr.length && arr[0] || defaultValue;
+}
+
+export function airtableArrayCondition(fieldName: string, value: string): string {
+    return `FIND("${value}", ARRAYJOIN({${fieldName}}))> 0`;
 }

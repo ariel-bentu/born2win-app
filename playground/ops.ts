@@ -1,7 +1,7 @@
 import axios from "axios";
 import dayjs from "dayjs";
 
-import { AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilyDemand, FamilyDetails, LoginInfo, NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord, FamilityDetailsPayload, NotificationChannels, GenerateLinkPayload, OpenFamilyDemands, VolunteerInfo, VolunteerInfoPayload, GetDemandsPayload, Errors } from "../src/types";
+import { AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilyDemand, FamilyDetails, LoginInfo, NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord, FamilityDetailsPayload, NotificationChannels, GenerateLinkPayload, OpenFamilyDemands, VolunteerInfo, VolunteerInfoPayload, GetDemandsPayload, Errors, Status } from "../src/types";
 export const DATE_AT = "YYYY-MM-DD";
 
 
@@ -68,13 +68,13 @@ function demandAirtable2FamilyDemand(demand: AirTableRecord, district: string): 
         mainBaseFamilyId: getSafeFirstArrayElement(demand.fields.Family_id, ""), // The record ID of the main base table משפחות רשומות
         districtBaseFamilyId: getSafeFirstArrayElement(demand.fields["משפחה"], ""), // The record ID in the district table of משפחות במחוז
         volunteerId: demand.fields.volunteer_id,
-        isFamilyActive: demand.fields["סטטוס בעמותה"] == "פעיל",
+        isFamilyActive: demand.fields["סטטוס בעמותה"] == Status.Active,
     };
 }
 
 async function getDemands(
     district: string,
-    status: "תפוס" | "זמין" | undefined,
+    status: Status.Occupied | Status.Available | undefined,
     includeNonActiveFamily: boolean,
     dateStart?: string,
     dateEnd?: string,
@@ -93,7 +93,7 @@ async function getDemands(
         const filters: string[] = [];
 
         if (!includeNonActiveFamily) {
-            filters.push("({סטטוס בעמותה} = 'פעיל')");
+            filters.push(`({סטטוס בעמותה} = '${Status.Active}')`);
         }
 
         if (districtBaseFamilyId) {
@@ -222,7 +222,7 @@ class CachedAirTable<T> {
 
         this.cachedData = await this.query.execute(this.filters);
         this.lastFetched = now.valueOf();
-        return this.cachedData;
+        return filterFromCache ? this.cachedData.filter(filterFromCache) : this.cachedData;
     }
 }
 
@@ -255,47 +255,44 @@ interface Holiday {
     id: string;
     date: string;
     name: string;
+    familyId?: string;
+    alternateDate?: string
+    addAvailability: boolean; // when true, it means the main "date" should be added to family
 }
 
-// interface Meal {
-//     id: string;
-//     date: string;
-//     status: string;
-//     volunteerId: string;
-//     district: string;
-
-// }
 function familyAirtable2Family(family: AirTableRecord): Family {
     return {
         id: family.id,
-        name: family.fields["שם"],
+        name: family.fields.Name,
         district: getSafeFirstArrayElement(family.fields["מחוז"], ""),
-        days: family.fields["Days of the Week"]? family.fields["Days of the Week"].map((d: string) => daysMap[d]):[],
+        days: family.fields["Days of the Week"] ? family.fields["Days of the Week"].map((d: string) => daysMap[d]) : [],
         cityId: getSafeFirstArrayElement(family.fields["עיר"], ""),
-        active: family.fields["סטטוס בעמותה"] == "פעיל",
+        active: family.fields["סטטוס בעמותה"] == Status.Active,
     }
 }
 
 function holidayAirtable2Holiday(holiday: AirTableRecord): Holiday {
     return {
         id: holiday.id,
-        name: holiday.fields["שם"],
+        name: holiday.fields.Name,
         date: holiday.fields["תאריך"],
+        alternateDate: holiday.fields["תאריך חלופי"],
+        addAvailability: holiday.fields["זמין"],
     }
 }
 
-function mealAirtable2FamilyDemand(demand: AirTableRecord, cityName: string): FamilyDemand {
+function mealAirtable2FamilyDemand(demand: AirTableRecord, cityName: string, active: boolean): FamilyDemand {
     return {
         id: demand.id,
         date: demand.fields["DATE"],
         city: cityName, // id and needs to be name
         familyLastName: demand.fields.Name,
         district: getSafeFirstArrayElement(demand.fields["מחוז"], ""),
-        status: "תפוס",
+        status: Status.Occupied,
         mainBaseFamilyId: getSafeFirstArrayElement(demand.fields["משפחה"], ""),
         districtBaseFamilyId: "N/A",
         volunteerId: getSafeFirstArrayElement(demand.fields["מתנדב"], undefined),
-        isFamilyActive: demand.fields["סטטוס בעמותה"] == "פעיל",
+        isFamilyActive: active,
     };
     // return {
     //     id: holiday.id,
@@ -307,7 +304,7 @@ function mealAirtable2FamilyDemand(demand: AirTableRecord, cityName: string): Fa
 }
 
 
-const families = new CachedAirTable<Family>("משפחות רשומות", familyAirtable2Family, []);//"{סטאטוס בעמותה}='פעיל'"]);
+const activeFamilies = new CachedAirTable<Family>("משפחות רשומות", familyAirtable2Family, [`{סטטוס בעמותה}='${Status.Active}'`]);
 const cities = new CachedAirTable<City>("ערים", (city => {
     return {
         id: city.id,
@@ -316,59 +313,49 @@ const cities = new CachedAirTable<City>("ערים", (city => {
     }
 }), ["{כמות משפחות פעילות בעיר}>0"], 60 * 24);
 
-//const holidays = new CachedAirTable<Holiday>("חופשות", holidayAirtable2Holiday, ["AND(IS_AFTER({date}, DATEADD(TODAY(), -1, 'days')))"]);
-const holidays = {
-    get: () => {
-        return [
-            { id: "1", date: "2024-10-16", name: "ערב חג" },
-            { id: "2", date: "2024-10-17", name: "סוכות" },
-        ];
-    }
-}
 
-// read meals (no cache)
-// ignores status = בוטל
-// calculates days
+const holidays = new CachedAirTable<Holiday>("חגים וחריגים", holidayAirtable2Holiday, ["AND(IS_AFTER({תאריך}, DATEADD(TODAY(), -1, 'days')))"], 5);
+
+
 
 async function getDemands2(
-    district: string,
-    status: "תפוס" | "זמין" | undefined,
-    includeNonActiveFamily: boolean,
+    district: string | string[],
+    status: Status.Occupied | Status.Available | undefined,
     dateStart: string,
     dateEnd: string,
-    volunteerId?: string,
-    districtBaseFamilyId?: string
+    volunteerId?: string
 ): Promise<FamilyDemand[]> {
 
-    const activeFamilies = await families.get((f => f.district === district));
+    const checkDistrict = ((districtId: string) => Array.isArray(district) ? district.some(d => d == districtId) : district == districtId);
+
+    const families = await activeFamilies.get((f => checkDistrict(f.district)));
     const _cities = await cities.get();
     const getCityName = (id: string) => _cities.find(c => c.id == id)?.name || "";
 
     const mealsQuery = new AirTableQuery<FamilyDemand>("ארוחות", (m) => {
-        return mealAirtable2FamilyDemand(m, getCityName(getSafeFirstArrayElement(m.fields["עיר"], "")));
+        const family = families.find(f => f.id == getSafeFirstArrayElement(m.fields["משפחה"], ""));
+        return mealAirtable2FamilyDemand(m, getCityName(getSafeFirstArrayElement(m.fields["עיר"], "")), family ? family.active : false);
     });
 
     const filters: string[] = [];
+    const startDateParam = dayjs(dateStart).format(DATE_AT);
+    const endDateParam = dayjs(dateEnd).format(DATE_AT);
+
 
     filters.push("{סטטוס}!='בוטל'");
-    //filters.push(`FIND('${district}', ARRAYJOIN({מחוז}))>0`);
 
-    if (dateStart !== undefined) {
-        // eslint-disable-next-line quotes
-        filters.push(`{DATE}>='${dateStart}'`);
+    // eslint-disable-next-line quotes
+    filters.push(`{DATE}>='${startDateParam}'`);
+    filters.push(`IS_BEFORE({DATE}, '${dayjs(dateEnd).add(1,"day").format(DATE_AT)}')`);
+
+    if (volunteerId) {
+        filters.push(airtableArrayCondition("vol_id", volunteerId));
     }
-    if (dateEnd != undefined) {
-        filters.push(`{DATE}<='${dateEnd}'`);
-    }
-    // if (volunteerId) {
-    //     // filters.push(`{מתנדב}='${volunteerId}'`);
-    //     filters.push(airtableArrayCondition("REC (from מחוז)", volunteerId));
-    // }
 
     const meals = await mealsQuery.execute(filters);
-    const filteredMeals = meals.filter(m => m.district === district && (volunteerId == undefined || m.volunteerId == volunteerId));
+    const filteredMeals = meals.filter(m => checkDistrict(m.district)); // && (volunteerId == undefined || m.volunteerId == volunteerId));
 
-    if (status === "תפוס") {
+    if (status === Status.Occupied) {
         // no need to calculate dates
         return filteredMeals;
     }
@@ -376,24 +363,41 @@ async function getDemands2(
     // calculate dates
     const relevantHolidays = await holidays.get();
 
+
     const endDate = dayjs().add(45, "days");
     const addedOpenDemands: FamilyDemand[] = [];
     for (let date = dayjs(); endDate.isAfter(date); date = date.add(1, "day")) {
-        if (date.format(DATE_AT) < dateStart) continue;
-        if (date.format(DATE_AT) > dateEnd) break;
-        if (relevantHolidays.find(h => h.date == date.format(DATE_AT))) continue;
+        if (date.format(DATE_AT) < startDateParam) continue;
+        if (date.format(DATE_AT) > endDateParam) break;
+        const holidays = relevantHolidays.filter(h => dayjs(h.date).format(DATE_AT) == date.format(DATE_AT));
+
+        // Skip if this date is blocked for all and no alternate exists
+        if (holidays.length && holidays.some(h => !h.familyId && !h.alternateDate)) continue;
 
         const day = date.day()
-        const familiesInDay = activeFamilies.filter(f => f.days.some(d => d == day));
+        const familiesInDay = families.filter(f => f.days.some(d => d == day));
         // Now check if this date for this family does not exist
         for (const family of familiesInDay) {
-            if (!meals.find(m => m.date == date.format(DATE_AT) && m.mainBaseFamilyId == family.id)) {
+
+            if (family.name.indexOf("חרצ")> 0) {
+                console.log("a")
+            }
+
+            // skip if this family is blocked for this date with no alternate
+            if (holidays.length && holidays.some(h => h.familyId == family.id && !h.addAvailability && !h.alternateDate)) continue;
+            const alternate = holidays.length > 0 ? holidays.find(h => (!h.familyId || h.familyId == family.id) && h.alternateDate): undefined;
+            const actualDate = alternate ?
+                dayjs(alternate.alternateDate).format(DATE_AT) :
+                date.format(DATE_AT);
+
+            if (!meals.find(m => dayjs(m.date).format(DATE_AT) == actualDate && m.mainBaseFamilyId == family.id)) {
+
                 addedOpenDemands.push({
-                    id: family.id + date,
-                    date: date.format(DATE_AT),
+                    id: family.id + actualDate,
+                    date: actualDate,
                     city: getCityName(family.cityId),
                     district: family.district,
-                    status: "פנוי",
+                    status: Status.Available,
                     familyLastName: family.name,
                     mainBaseFamilyId: family.id,
                     districtBaseFamilyId: "N/A",
@@ -401,10 +405,31 @@ async function getDemands2(
                     isFamilyActive: family.active,
                 });
             }
+
+            // Add special added holidays:
+            holidays.forEach(holiday => {
+                if (holiday.addAvailability && holiday.familyId == family.id) {
+                    const holidayDate = dayjs(holiday.date).format(DATE_AT);
+                    if (!meals.find(m => dayjs(m.date).format(DATE_AT) == holidayDate && m.mainBaseFamilyId == family.id)) {
+                        addedOpenDemands.push({
+                            id: family.id + holidayDate,
+                            date: holidayDate,
+                            city: getCityName(family.cityId),
+                            district: family.district,
+                            status: Status.Available,
+                            familyLastName: family.name,
+                            mainBaseFamilyId: family.id,
+                            districtBaseFamilyId: "N/A",
+                            volunteerId: "",
+                            isFamilyActive: family.active,
+                        });
+                    }
+                }
+            });
         }
     }
 
-    if (status == "זמין") {
+    if (status == Status.Available) {
         return addedOpenDemands;
     }
     return filteredMeals.concat(addedOpenDemands);
@@ -466,10 +491,14 @@ async function GetFamilyDetails2(familyId: string, includeContacts: boolean): Pr
 // יהודה ושומרון recxuE1Cwav0kfA7g
 // שרון recmLo9MWRxmrLEsM
 // מרכז recP17rsfOseG3Frx
-getDemands2("recxuE1Cwav0kfA7g", "זמין", false, "2024-09-10", "2024-11-10", "recqAUvw8rqaiMiX4").then(demands=>{
-    for (let i = 0;i<3;i++) {
-        GetFamilyDetails2(demands[i].mainBaseFamilyId, true).then(fd=>console.log(fd));
-    }
-});
+// getDemands2(["recxuE1Cwav0kfA7g"], Status.Available, "2024-10-15T10:00:30.684Z", "2024-11-12T11:00:30.684Z",undefined).then(demands => {
+//         demands.forEach(d=>console.log(d.date, d.status))
+//         //GetFamilyDetails2(demands[i].mainBaseFamilyId, true).then(fd => console.log(fd));
+// });
 
 
+
+
+// getDemands2(["recxuE1Cwav0kfA7g"], Status.Available, "2024-10-31", "2024-10-31").then(demands=>{
+//     demands.filter(d=>d.mainBaseFamilyId == "recwVL742srgkzO0u$$2024").forEach(d=>console.log(d.date, d.status))
+// })

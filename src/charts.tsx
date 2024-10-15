@@ -58,7 +58,7 @@ interface GroupedFamily extends FamilyCompact {
 
 interface GroupedData {
     [city: string]: {
-        [districtBaseFamilyId: string]: GroupedFamily;
+        [mainBaseFamilyId: string]: GroupedFamily;
     };
 }
 
@@ -237,7 +237,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
         return <FamilyDetailsComponent 
             analyticComponent="Management"
             appServices={appServices} demands={demands} 
-            districtBaseFamilyId={showFamilyDetails.districtBaseFamilyId} 
+            mainBaseFamilyId={showFamilyDetails.mainBaseFamilyId} 
             family={showFamilyDetails}
             includeContacts={true} onClose={() => {
                 appServices.popNavigationStep();
@@ -423,11 +423,12 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
         }
 
         // Initialize family under the city if not exists
-        if (!groupedByCityAndFamily[city][family.districtBaseFamilyId]) {
-            groupedByCityAndFamily[city][family.districtBaseFamilyId] = {
+        if (!groupedByCityAndFamily[city][family.mainBaseFamilyId]) {
+            groupedByCityAndFamily[city][family.mainBaseFamilyId] = {
                 dates: [],
                 familyLastName: familyName,
                 districtBaseFamilyId: family.districtBaseFamilyId,
+                mainBaseFamilyId: family.mainBaseFamilyId,
                 city: family.city,
                 district: family.district,
                 active: family.isFamilyActive,
@@ -435,7 +436,7 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
         }
 
         // Add the formatted date to the family's array under the city
-        groupedByCityAndFamily[city][family.districtBaseFamilyId].dates.push({
+        groupedByCityAndFamily[city][family.mainBaseFamilyId].dates.push({
             district: family.district,
             demandId: family.id,
             districtBaseFamilyId: family.districtBaseFamilyId,
@@ -448,9 +449,9 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
     return groupedByCityAndFamily;
 };
 
-function sortFamilies(familiesMap: { [districtBaseFamilyId: string]: GroupedFamily }) {
+function sortFamilies(familiesMap: { [mainBaseFamilyId: string]: GroupedFamily }) {
     return Object.keys(familiesMap)
-        .map(districtBaseFamilyId => familiesMap[districtBaseFamilyId])
+        .map(mainBaseFamilyId => familiesMap[mainBaseFamilyId])
         .sort((a, b) => {
             if (a.familyLastName < b.familyLastName) {
                 return -1;

@@ -19,13 +19,13 @@ interface FamilyDetailsComponentProps {
     demands: FamilyDemand[];
     family: FamilyCompact;
     familyDemandId?: string; // this is required only if not admin, so the server can check the user is indeed volunter of this demand and allow see details
-    districtBaseFamilyId: string; // added to avoid refresh when family object is recreated for the same family
+    mainBaseFamilyId: string; // added to avoid refresh when family object is recreated for the same family
     detailsOnly?: boolean;
     appServices: AppServices;
     onClose: () => void;
     reloadOpenDemands: () => void;
     includeContacts: boolean;
-    date?:string //used to include it in the message to impersonated users
+    date?: string //used to include it in the message to impersonated users
     analyticComponent: string;
 }
 
@@ -38,7 +38,7 @@ function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
 
 
 
-export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDemandId, 
+export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandId,
     onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts, date, analyticComponent }: FamilyDetailsComponentProps) {
     const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
     const [selectedDate, setSelectedDate] = useState<Nullable<Date>>(null);
@@ -78,16 +78,16 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
     // };
 
     useEffect(() => {
-        if (districtBaseFamilyId) {
+        if (mainBaseFamilyId) {
             setLoading(true);
-            console.log("get family details", districtBaseFamilyId)
-            getFamilyDetails(family.districtBaseFamilyId, family.district, familyDemandId, includeContacts)
+            console.log("get family details", mainBaseFamilyId, family.districtBaseFamilyId)
+            getFamilyDetails(family.districtBaseFamilyId, family.district, familyDemandId, family.mainBaseFamilyId, includeContacts)
                 .then(res => setFamilyDetails(res))
                 .catch(err => setError(err))
                 .finally(() => setLoading(false));
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [districtBaseFamilyId, detailsOnly, reload]);
+    }, [mainBaseFamilyId, detailsOnly, reload]);
 
     const availableDates = demands.map(demand => new Date(demand.date));
     const isDateAvailable = (event: CalendarDateTemplateEvent) => {
@@ -101,7 +101,7 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
 
     const handleScrollToDetails = () => {
         if (divRef.current) {
-            analyticLog( analyticComponent, "scroll to details");
+            analyticLog(analyticComponent, "scroll to details");
             divRef.current.scrollIntoView({ behavior: 'smooth' });
         }
     };
@@ -198,7 +198,7 @@ export function FamilyDetailsComponent({ districtBaseFamilyId, family, familyDem
                             setSelectedDate(null);
                             if (availabilityRecord && familyDetails) {
                                 setSaving(true);
-                                analyticLog( analyticComponent, "save new Registration");
+                                analyticLog(analyticComponent, "save new Registration");
                                 updateFamilityDemand(availabilityRecord.id, familyDetails.mainBaseFamilyId, familyDetails.cityId, true).then(() => {
                                     appServices.showMessage("success", "שיבוץ נקלט בהצלחה", "");
                                     reloadOpenDemands();
@@ -263,12 +263,12 @@ function getAddress(fd: FamilyDetails) {
         ", " + fd.city;
 }
 
-const generateDetailsForWhatapp = (familyDetails: FamilyDetails, city: string, date?:string) => {
+const generateDetailsForWhatapp = (familyDetails: FamilyDetails, city: string, date?: string) => {
     const alergies = familyDetails?.alergies;
 
     let msg = `*פרטי בישול*:\n`;
     msg += `*משפחה*: ${familyDetails.familyLastName}\n`;
-    msg += `*תאריך*: ${date? dayjs(date).format("DD-MMM-YYYY") : ""}\n`;
+    msg += `*תאריך*: ${date ? dayjs(date).format("DD-MMM-YYYY") : ""}\n`;
     msg += `*עיר*: ${city}\n`;
     msg += `*המשפחה בת*: ${familyDetails.adultsCount} נפשות\n`;
     msg += `*הרכב בני המשפחה*: ${familyDetails.familyStructure}\n`;

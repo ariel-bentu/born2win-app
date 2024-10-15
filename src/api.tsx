@@ -198,10 +198,10 @@ function callFunctionWithImpersonation(functionName: string, payload?: any) {
 
 
 export function getOpenDemands(): Promise<OpenFamilyDemands> {
-    return callFunctionWithImpersonation('GetOpenDemands').then((res: any) => res.data as OpenFamilyDemands);
+    return callFunctionWithImpersonation('GetOpenDemands2').then((res: any) => res.data as OpenFamilyDemands);
 }
 
-export function updateFamilityDemand(demandId: string, mainBaseFamilyId: string, cityId: string, isRegistering: boolean, reason?: string, district?:string, volunteerId?:string) {
+export function updateFamilityDemand(demandId: string, mainBaseFamilyId: string, cityId: string, isRegistering: boolean, reason?: string, district?: string, volunteerId?: string) {
     const payload = {
         demandId,
         mainBaseFamilyId,
@@ -212,22 +212,22 @@ export function updateFamilityDemand(demandId: string, mainBaseFamilyId: string,
         volunteerId,
     } as FamilityDemandUpdatePayload;
 
-    return callFunctionWithImpersonation('UpdateFamilityDemand', payload);
+    return callFunctionWithImpersonation('UpdateFamilityDemandNew', payload);
 }
 
-export function getFamilyDetails(districtBaseFamilyId: string, district: string, familyDemandId: string | undefined, includeContacts: boolean): Promise<FamilyDetails> {
+export function getFamilyDetails(districtBaseFamilyId: string, district: string, familyDemandId: string | undefined, mainBaseFamilyId: string, includeContacts: boolean): Promise<FamilyDetails> {
     const payload = {
-        districtBaseFamilyId, district, includeContacts, familyDemandId,
+        districtBaseFamilyId, district, includeContacts, familyDemandId, mainBaseFamilyId,
     } as FamilityDetailsPayload;
 
-    return callFunctionWithImpersonation('GetFamilyDetails', payload)
+    return callFunctionWithImpersonation('GetFamilyDetailsNew', payload)
         .then((res: any) => {
             return res.data as FamilyDetails;
         });
 }
 
 export function getUserRegistrations(): Promise<FamilyDemand[]> {
-    return callFunctionWithImpersonation('GetUserRegistrations')
+    return callFunctionWithImpersonation('GetUserRegistrationsNew')
         .then((res: any) => res.data);
 }
 
@@ -253,7 +253,7 @@ export async function getDemands(dateRange: [string, string], districts: string[
     if (!dateRange[0] || !dateRange[1]) return [];
 
     // No impersonation
-    const getDemandsFunc = httpsCallable(functions, 'GetDemands');
+    const getDemandsFunc = httpsCallable(functions, 'GetDemandsNew');
     const payload = {
         from: dateRange[0],
         to: dateRange[1],

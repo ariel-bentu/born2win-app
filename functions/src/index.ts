@@ -14,7 +14,7 @@ import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
 import {
-    AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilyDemand, FamilyDetails, LoginInfo,
+    Collections, FamilityDemandUpdatePayload, FamilyDemand, FamilyDetails, LoginInfo,
     NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload,
     SendNotificationStats, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord,
     FamilityDetailsPayload,
@@ -33,9 +33,8 @@ import crypto = require("crypto");
 import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { getSafeFirstArrayElement, IL_DATE, replaceAll, simplifyFamilyName } from "../../src/utils";
 import localeData = require("dayjs/plugin/localeData");
-import { Lock } from "./lock";
 import { SendLinkOrInstall, weeklyNotifyFamilies } from "./scheduled-functions";
-import { CachedAirTable } from "./airtable";
+import { AirTableUpdate, CachedAirTable } from "./airtable";
 import { getDemands2, updateFamilityDemand } from "./demands";
 import { getFamilyDetails2 } from "./families";
 
@@ -346,24 +345,14 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
     }
 });
 
-function updateVolunteerHasInstalled(volunteerId: string, date: string) {
-    const apiKey = born2winApiKey.value();
-    const airTableMainBase = mainBase.value();
-
-    const url = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("מתנדבים")}/${volunteerId}`;
-    const httpOptions = {
-        headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-        },
-    };
+async function updateVolunteerHasInstalled(volunteerId: string, date: string) {
     const updatedFields = {
         fields: {
             "תאריך התקנת אפליקציה": dayjs(date).format("YYYY-MM-DD"),
         },
     };
-
-    return axios.patch(url, updatedFields, httpOptions).catch(err => {
+    // eslint-disable-next-line new-cap
+    return AirTableUpdate("מתנדבים", volunteerId, updatedFields).catch(err => {
         logger.error("Error saving installation info in AirTable", err);
     });
 }
@@ -931,39 +920,25 @@ async function authenticate(request: CallableRequest<any>): Promise<QueryDocumen
     return doc;
 }
 
-let districts: District[] | undefined = undefined;
 interface District {
     id: string;
     name: string;
-    base_id: string;
-    demandsTable: string;
-    familiesTable: string;
+    // base_id: string;
+    // demandsTable: string;
+    // familiesTable: string;
 }
 
-export async function getDestricts(): Promise<District[]> {
-    if (!districts) {
-        // districts are cached
-        const apiKey = born2winApiKey.value();
-        const airTableMainBase = mainBase.value();
-        const headers = {
-            "Authorization": `Bearer ${apiKey}`,
-        };
+const districts = new CachedAirTable<District>("מחוז", (district => {
+    return {
+        id: district.id,
+        name: district.fields["שם"],
+    };
+}), [], 60 * 24);
 
-        const districtResponse = await axios.get(`https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("מחוז")}`, {
-            headers,
-        });
-        districts = districtResponse.data.records.map((r: any) => ({
-            id: r.id,
-            name: r.fields["מחוז"],
-            base_id: r.fields.base_id,
-            demandsTable: r.fields.table_id,
-            familiesTable: r.fields.table_familyid,
-        }));
-    }
-    return districts || [];
+export async function getDestricts() {
+    return districts.get();
 }
 
-// let cities: City[] | undefined = undefined;
 interface City {
     id: string;
     name: string;
@@ -985,103 +960,6 @@ export async function getCities(): Promise<City[]> {
 }
 
 
-export async function getDemands(
-    district: string,
-    status: "תפוס" | "זמין" | undefined,
-    includeNonActiveFamily: boolean,
-    dateStart?: string,
-    dateEnd?: string,
-    volunteerId?: string,
-    districtBaseFamilyId?: string
-): Promise<FamilyDemand[]> {
-    const apiKey = born2winApiKey.value();
-    const headers = {
-        "Authorization": `Bearer ${apiKey}`,
-    };
-    const mahuzRec = (await getDestricts()).find((d: any) => d.id === district);
-    if (mahuzRec) {
-        let demantsResult: FamilyDemand[] = [];
-        const baseId = mahuzRec.base_id;
-        const demandsTable = mahuzRec.demandsTable;
-        const filters = [];
-
-        if (!includeNonActiveFamily) {
-            filters.push("({סטטוס בעמותה} = 'פעיל')");
-        }
-
-        if (districtBaseFamilyId) {
-            filters.push(`FIND("${districtBaseFamilyId}",  ARRAYJOIN({record_id (from משפחה)})) > 0`);
-        }
-        if (status) {
-            filters.push(`{זמינות שיבוץ}='${status}'`);
-        }
-        if (dateStart !== undefined) {
-            // eslint-disable-next-line quotes
-            filters.push(`{תאריך}>='${dateStart}'`);
-        }
-        if (dateEnd != undefined) {
-            filters.push(`{תאריך}<='${dateEnd}'`);
-        }
-        if (volunteerId) {
-            filters.push(`{volunteer_id}='${volunteerId}'`);
-        }
-
-        const formula = `AND(${filters.join(",")})`;
-        const query = `https://api.airtable.com/v0/${baseId}/${demandsTable}`;
-        let offset;
-        do {
-            const demandsRespose: any = await axios.get(query, {
-                headers,
-                params: {
-                    offset: offset,
-                    filterByFormula: formula,
-                },
-            });
-            offset = demandsRespose.data.offset;
-            if (demandsRespose.data.records) {
-                demantsResult = demantsResult.concat(demandsRespose.data.records.map((demand: AirTableRecord) => demandAirtable2FamilyDemand(demand, district)));
-            }
-        } while (offset);
-
-        return demantsResult;
-    }
-    throw new HttpsError("not-found", "District not found");
-}
-
-async function getDemand(district: string, familyDemandId: string): Promise<FamilyDemand> {
-    const apiKey = born2winApiKey.value();
-    const headers = {
-        "Authorization": `Bearer ${apiKey}`,
-    };
-    const districtRec = (await getDestricts()).find((d: any) => d.id === district);
-    if (districtRec) {
-        const query = `https://api.airtable.com/v0/${districtRec.base_id}/${encodeURIComponent("דרישות לשיבוצים")}/${familyDemandId}`;
-
-        const demand = await axios.get(query, {
-            headers,
-        });
-        if (demand.data) {
-            return demandAirtable2FamilyDemand(demand.data, district);
-        }
-    }
-    throw new HttpsError("not-found", "Family demand " + familyDemandId + " not found");
-}
-
-function demandAirtable2FamilyDemand(demand: AirTableRecord, district: string): FamilyDemand {
-    return {
-        id: demand.id,
-        date: demand.fields["תאריך"],
-        city: getSafeFirstArrayElement(demand.fields["עיר"], ""),
-        familyLastName: demand.fields.Name,
-        district: district,
-        status: demand.fields["זמינות שיבוץ"],
-        mainBaseFamilyId: getSafeFirstArrayElement(demand.fields.Family_id, ""), // The record ID of the main base table משפחות רשומות
-        districtBaseFamilyId: getSafeFirstArrayElement(demand.fields["משפחה"], ""), // The record ID in the district table of משפחות במחוז
-        volunteerId: demand.fields.volunteer_id,
-        isFamilyActive: demand.fields["סטטוס בעמותה"] == "פעיל",
-    };
-}
-
 exports.GetOpenDemands2 = onCall({ cors: true }, async (request): Promise<OpenFamilyDemands> => {
     const doc = await authenticate(request);
 
@@ -1091,14 +969,6 @@ exports.GetOpenDemands2 = onCall({ cors: true }, async (request): Promise<OpenFa
     return { demands, allDistrictCities: cities.filter(city => city.district === district) };
 });
 
-exports.GetOpenDemands = onCall({ cors: true }, async (request): Promise<OpenFamilyDemands> => {
-    const doc = await authenticate(request);
-
-    const district = doc.data().mahoz;
-    const cities = await getCities();
-    const demands = await getDemands(district, "זמין", false, dayjs().add(1, "day").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT));
-    return { demands, allDistrictCities: cities.filter(city => city.district === district) };
-});
 
 exports.GetDemandsNew = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
     const userInfo = await getUserInfo(request);
@@ -1109,40 +979,11 @@ exports.GetDemandsNew = onCall({ cors: true }, async (request): Promise<FamilyDe
     throw new HttpsError("permission-denied", "Unauthorized user to read all demands");
 });
 
-
-exports.GetDemands = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
-    const userInfo = await getUserInfo(request);
-    if (userInfo.isAdmin) {
-        const gdp = request.data as GetDemandsPayload;
-        let resultDemands: FamilyDemand[] = [];
-
-        for (let i = 0; i < gdp.districts.length; i++) {
-            const requestedDistrict = gdp.districts[i];
-            // Verify the user is admin of that district
-            if (userInfo.districts?.find((d: any) => d.id === requestedDistrict)) {
-                const districtDemands = await getDemands(requestedDistrict, undefined, true, gdp.from, gdp.to);
-                resultDemands = resultDemands.concat(districtDemands);
-            }
-        }
-        return resultDemands;
-    }
-
-    throw new HttpsError("permission-denied", "Unauthorized user to read all demands");
-});
-
 exports.GetUserRegistrationsNew = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
     const doc = await authenticate(request);
     const district = doc.data().mahoz;
     const volunteerId = doc.id;
     return getDemands2(district, Status.Occupied, dayjs().startOf("month").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT), volunteerId);
-});
-
-
-exports.GetUserRegistrations = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
-    const doc = await authenticate(request);
-    const district = doc.data().mahoz;
-    const volunteerId = doc.id;
-    return getDemands(district, "תפוס", true, dayjs().startOf("month").format(DATE_AT), undefined, volunteerId);
 });
 
 exports.UpdateFamilityDemandNew = onCall({ cors: true }, async (request) => {
@@ -1163,143 +1004,6 @@ exports.UpdateFamilityDemandNew = onCall({ cors: true }, async (request) => {
     }
     return updateFamilityDemand(fdup.demandId, demandDistrictId, fdup.isRegistering, volunteerId, doc.data().firstName + " " + doc.data().lastName, fdup.reason);
 });
-
-
-exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
-    const doc = await authenticate(request);
-    const mahoz = doc.data().mahoz;
-    const fdup = request.data as FamilityDemandUpdatePayload;
-
-    const districts = await getDestricts();
-
-    const demandDistrictId = (fdup.district || mahoz);
-    const volunteerId = (fdup.volunteerId || doc.id);
-
-    const demandDistrict = districts.find(d => d.id == demandDistrictId);
-    if (!demandDistrict) throw new HttpsError("not-found", "District " + demandDistrictId + " not found");
-
-    const apiKey = born2winApiKey.value();
-
-    if (!fdup.isRegistering && !(fdup.reason && fdup.reason.trim().length > 0)) {
-        throw new HttpsError("invalid-argument", "Missing reason to cancellation");
-    }
-
-    const updatedFields = {
-        fields: {
-            "זמינות שיבוץ": fdup.isRegistering ? "תפוס" : "זמין",
-            "volunteer_id": fdup.isRegistering ? volunteerId : null,
-        },
-    };
-
-    // Add Locking - so only one user can update the same family & date
-    const lock = await Lock.acquire(db, fdup.demandId);
-    if (!lock) {
-        throw new HttpsError("already-exists", "מתנדב אחר מעדכן את הרשומה הזו ממש עכשיו");
-    }
-
-    // First read the recod to verify it is indeed free
-    const demand = await getDemand(demandDistrict.id, fdup.demandId);
-    if (demand.status !== (fdup.isRegistering ?
-        "זמין" :
-        "תפוס")) {
-        logger.info("Attept to a duplicated update family demand", fdup);
-        await lock.release();
-        // record does not fit expected state, reject the action
-        throw new HttpsError("already-exists", fdup.isRegistering ?
-            "התאריך המבוקש עבור משפחה זו נתפס" :
-            "התאריך המבוטל כבר מסומן כפנוי"
-        );
-    }
-
-    const url = `https://api.airtable.com/v0/${demandDistrict.base_id}/${demandDistrict.demandsTable}/${fdup.demandId}`;
-    const httpOptions = {
-        headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-        },
-    };
-    const updatedRecord = await axios.patch(url, updatedFields, httpOptions).then(response => response.data);
-
-    // Update main base
-    const airTableMainBase = mainBase.value();
-    const demandDate = updatedRecord.fields["תאריך"];
-    const urlMainBase = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("ארוחות")}`;
-
-    if (fdup.isRegistering) {
-        const newRegistrationRec = {
-            "records": [
-                {
-                    "fields": {
-                        "משפחה": [
-                            fdup.mainBaseFamilyId,
-                        ],
-                        "מתנדב": [
-                            volunteerId,
-                        ],
-                        "עיר": [
-                            fdup.cityId,
-                        ],
-                        "DATE": demandDate,
-                    },
-                },
-            ],
-        };
-
-        await axios.post(urlMainBase, newRegistrationRec, httpOptions).then(async () => {
-            logger.info("New registration added", volunteerId, fdup.mainBaseFamilyId, demandDate);
-        });
-    } else {
-        // Need to find the record:
-        const filterFormula = `DATETIME_FORMAT({DATE}, 'YYYY-MM-DD')="${demandDate}"`;
-        const findResult = await axios.get(urlMainBase, {
-            ...httpOptions,
-            params: {
-                filterByFormula: filterFormula,
-                maxRecords: 1000, // Just in case there are multiple, get only the first match
-            },
-        });
-        if (findResult.data.records.length > 0) {
-            const rec = findResult.data.records.find((r: AirTableRecord) => r.fields["משפחה"][0] == fdup.mainBaseFamilyId && r.fields["מתנדב"][0] == volunteerId);
-            if (rec) {
-                // Delete the records
-                const updateCancelUrl = `${urlMainBase}/${rec.id}`;
-
-                const updateCancelFields = {
-                    fields: {
-                        "סטטוס": "בוטל",
-                        "סיבת ביטול": fdup.reason,
-                    },
-                };
-
-                await axios.patch(updateCancelUrl, updateCancelFields, httpOptions);
-                logger.info("Existing registration was cancelled", rec.id, "main-base-family", fdup.mainBaseFamilyId, "vid", volunteerId);
-
-                // send notification to admins - if date is less than 10 days:
-                const daysDiff = dayjs().diff(demandDate, "days");
-                if (Math.abs(daysDiff) <= 10) {
-                    const admins = await db.collection(Collections.Admins).get();
-                    const adminsIds = admins.docs.map(doc => doc.id);
-
-                    await addNotificationToQueue("שיבוץ בוטל!", `תאריך: ${demandDate}
-משפחה: ${updatedRecord.fields.Name}
-בוטל ע״י: ${doc.data().firstName + " " + doc.data().lastName}
-עיר: ${updatedRecord.fields["עיר"]}
-`, NotificationChannels.Registrations, [], adminsIds);
-                }
-            } else {
-                logger.info("Unable to find registration id in main base", filterFormula);
-            }
-        }
-    }
-
-    await lock.release().catch(err => {
-        logger.error("Error releasing lock", lock.lockId, err);
-        return;
-    });
-    logger.info("Lock released for ", lock.lockId);
-    return;
-});
-
 
 exports.GetFamilyDetailsNew = onCall({ cors: true }, async (request): Promise<FamilyDetails> => {
     const userInfo = await getUserInfo(request);
@@ -1322,124 +1026,6 @@ exports.GetFamilyDetailsNew = onCall({ cors: true }, async (request): Promise<Fa
     }
     throw new HttpsError("not-found", "Family not found");
 });
-
-exports.GetFamilyDetails = onCall({ cors: true }, async (request): Promise<FamilyDetails> => {
-    const userInfo = await getUserInfo(request);
-    const gfp = request.data as FamilityDetailsPayload;
-    const district = userInfo.userDistrict.id;
-
-    if (gfp.district !== district &&
-        (!userInfo.isAdmin || !userInfo.districts?.find(d => d.id === gfp.district))) {
-        logger.error("Permission denied to read family details", userInfo.id, userInfo.userDistrict, userInfo.isAdmin, gfp.district, "admin regions:", userInfo.districts);
-        throw new HttpsError("permission-denied", "Unauthorized to read family details from this district");
-    }
-
-    const mahuzRec = (await getDestricts()).find((d: any) => d.id === gfp.district);
-    if (mahuzRec) {
-        const apiKey = born2winApiKey.value();
-        const headers = {
-            "Authorization": `Bearer ${apiKey}`,
-        };
-        const baseId = mahuzRec.base_id;
-        const familiesTable = mahuzRec.familiesTable;
-
-        const userRegistrations = await axios.get(`https://api.airtable.com/v0/${baseId}/${familiesTable}/${gfp.districtBaseFamilyId}`, {
-            headers,
-        });
-        const rec = userRegistrations.data;
-        const contactDetails = {
-            name: "",
-            phone: "",
-        };
-        if (gfp.includeContacts && (userInfo.isAdmin || gfp.familyDemandId)) {
-            try {
-                let allowed = true;
-                if (!userInfo.isAdmin) {
-                    // read the demand and verify belongs to this user and not older that 7 days ago
-                    const demand = await getDemand(gfp.district, gfp.familyDemandId);
-                    if (demand.volunteerId !== userInfo.id || dayjs(demand.date).add(7, "days").isBefore(dayjs())) {
-                        allowed = false;
-                    }
-                }
-                if (allowed) {
-                    const fetchedDetails = await getFamilyContactDetails(rec.fields.familyid);
-
-                    // Save the returned contact details as constants
-                    contactDetails.name = fetchedDetails.name;
-                    contactDetails.phone = fetchedDetails.phone;
-                }
-            } catch (error) {
-                logger.error("Error fetching contact details:", (error as any).message);
-            }
-        }
-        return ({
-            id: rec.id,
-            mainBaseFamilyId: rec.fields.familyid,
-            familyLastName: rec.fields.Name,
-            patientAge: rec.fields["גיל החולה"],
-            prefferedMeal: rec.fields["העדפה לסוג ארוחה"],
-            meatPreferences: rec.fields["העדפות בשר"],
-            fishPreferences: rec.fields["העדפות דגים"],
-            avoidDishes: rec.fields["לא אוכלים"],
-            sideDishes: rec.fields["תוספות"],
-            kosherLevel: rec.fields["כשרות מטבח"],
-            favoriteFood: rec.fields["אוהבים לאכול"],
-            alergies: rec.fields["רגישויות ואלרגיות (from בדיקת ההתאמה)"],
-            adultsCount: rec.fields["נפשות מבוגרים בבית"],
-            familyStructure: rec.fields["הרכב הורים"],
-            familyMembersAge: rec.fields["גילאים של הרכב המשפחה"],
-            cookingDays: rec.fields["ימים"],
-            city: rec.fields["עיר"],
-            cityId: rec.fields.city_id_1,
-            street: rec.fields["רחוב"],
-            floor: rec.fields["קומה"],
-            appartment: rec.fields["דירה"],
-            streatNumber: rec.fields["מספר דירה"], // todo verify the right number
-            district: mahuzRec.id,
-            contactName: contactDetails.name,
-            phone: contactDetails.phone,
-        }) as FamilyDetails;
-    }
-    throw new HttpsError("not-found", "Family not found");
-});
-
-async function getFamilyContactDetails(mainBaseFamilyId: string) {
-    try {
-        logger.info("getFamilyContactDetails main-base-familyId:", mainBaseFamilyId);
-
-        const airTableMainBase = mainBase.value();
-        const apiKey = born2winApiKey.value();
-
-        // Construct the URL
-        const url = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("משפחות רשומות")}/${mainBaseFamilyId}`;
-
-        // Make the request
-        const response = await axios.get(url, {
-            headers: {
-                "Authorization": `Bearer ${apiKey}`,
-            },
-        });
-        // Check if the response has the fields you need
-        if (response.data && response.data.fields) {
-            const name = response.data.fields["שם איש קשר לוגיסטי"] ? response.data.fields["שם איש קשר לוגיסטי"][0] : "";
-            const phone = response.data.fields["טלפון איש קשר לוגיסטי"] ? response.data.fields["טלפון איש קשר לוגיסטי"][0] : "";
-
-            return {
-                name,
-                phone,
-            };
-        } else {
-            return {
-                error: "No contact details found for the given familyId",
-            };
-        }
-    } catch (error) {
-        logger.error("Error fetching contact details:", error);
-        return {
-            error: (error as any).message,
-        };
-    }
-}
 
 exports.GetVolunteerInfo = onCall({ cors: true }, async (request): Promise<VolunteerInfo | undefined> => {
     const userInfo = await getUserInfo(request);
@@ -1604,7 +1190,7 @@ async function alertOpenDemands() {
     let notifyAdmins = false;
 
     for (let i = 0; i < districts.length; i++) {
-        const openDemands = await getDemands(districts[i].id, "זמין", false, dayjs().add(1, "day").format(DATE_AT), dayjs().add(5, "days").format(DATE_AT));
+        const openDemands = await getDemands2(districts[i].id, Status.Available, dayjs().add(1, "day").format(DATE_AT), dayjs().add(5, "days").format(DATE_AT));
         let msgBody = "מחוז: " + districts[i].name + "\n";
         if (openDemands.length > 0) {
             let found = false;
@@ -1633,39 +1219,36 @@ async function alertOpenDemands() {
 }
 
 async function alertUpcomingCooking() {
-    const districts = await getDestricts();
     const daysBefore = 3;
-    for (let i = 0; i < districts.length; i++) {
-        const upcomingDemands = await getDemands(districts[i].id, "תפוס", true, dayjs().format(DATE_AT), dayjs().add(daysBefore + 1, "days").format(DATE_AT));
-        for (let j = 0; j < upcomingDemands.length; j++) {
-            const demand = upcomingDemands[j];
+    const upcomingDemands = await getDemands2(undefined, Status.Occupied, dayjs().format(DATE_AT), dayjs().add(daysBefore + 1, "days").format(DATE_AT));
+    for (let j = 0; j < upcomingDemands.length; j++) {
+        const demand = upcomingDemands[j];
 
-            if (!demand.volunteerId) {
-                // unexpected
-                logger.error(`Demand ${demand.id}, date:${demand.date}, district:${demand.district} name:${demand.familyLastName} is in status תפוס but has no volenteerId`);
-                continue;
-            }
+        if (!demand.volunteerId) {
+            // unexpected
+            logger.error(`Demand ${demand.id}, date:${demand.date}, district:${demand.district} name:${demand.familyLastName} is in status תפוס but has no volenteerId`);
+            continue;
+        }
 
-            const daysLeft = -dayjs().startOf("day").diff(demand.date, "days");
+        const daysLeft = -dayjs().startOf("day").diff(demand.date, "days");
 
-            if (daysLeft === daysBefore) {
-                const msgBody = `תאריך הבישול: ${dayjs(demand.date).format(IL_DATE)}
+        if (daysLeft === daysBefore) {
+            const msgBody = `תאריך הבישול: ${dayjs(demand.date).format(IL_DATE)}
 עוד: ${daysBefore} ימים
 משפחה: ${demand.familyLastName}
 עיר: ${demand.city}
 לא לשכוח לתאם עוד היום בשיחה או הודעה את שעת מסירת האוכל.
 אם אין באפשרותך לבשל יש לבטל באפליקציה, או ליצור קשר.`;
-                await addNotificationToQueue("תזכורת לבישול!", msgBody, NotificationChannels.Alerts, [], [demand.volunteerId], {
-                    buttons: JSON.stringify([
-                        { label: "צפה בפרטים", action: NotificationActions.RegistrationDetails, params: [demand.id] },
-                        { label: "צור קשר עם עמותה", action: NotificationActions.StartConversation },
-                    ]),
-                }
-                );
+            await addNotificationToQueue("תזכורת לבישול!", msgBody, NotificationChannels.Alerts, [], [demand.volunteerId], {
+                buttons: JSON.stringify([
+                    { label: "צפה בפרטים", action: NotificationActions.RegistrationDetails, params: [demand.id] },
+                    { label: "צור קשר עם עמותה", action: NotificationActions.StartConversation },
+                ]),
             }
+            );
         }
-        // TODO send summary notification to admin?
     }
+    // TODO send summary notification to admin?
 }
 
 async function refreshWebhooksToken() {

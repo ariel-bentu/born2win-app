@@ -1,3 +1,4 @@
+import { Dayjs } from "dayjs";
 import { FamilyCompact, FamilyDemand } from "./types";
 const dayjs = require("dayjs");
 
@@ -105,4 +106,13 @@ export function getSafeFirstArrayElement(arr: any[], defaultValue: any) {
 
 export function airtableArrayCondition(fieldName: string, value: string): string {
     return `FIND("${value}", ARRAYJOIN({${fieldName}}))> 0`;
+}
+const DATE_AT = "YYYY-MM-DD";
+
+export function dateInRange(date: string | Dayjs, start: string | Dayjs, end: string | Dayjs) {
+    const dateS = dayjs(date).format(DATE_AT);
+    const startS = dayjs(start).format(DATE_AT);
+    const endS = dayjs(end).format(DATE_AT);
+
+    return dateS >= startS && dateS <= endS;
 }

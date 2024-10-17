@@ -1,10 +1,11 @@
 import dayjs = require("dayjs");
 
 import axios from "axios";
-import { addNotificationToQueue, chunkArray, DATE_AT, db, getDemands, getDestricts, manyChatApiKey } from ".";
+import { addNotificationToQueue, chunkArray, DATE_AT, db, manyChatApiKey } from ".";
 import { FieldPath } from "firebase-admin/firestore";
 import localeData = require("dayjs/plugin/localeData");
 import { Collections, NotificationChannels } from "../../src/types";
+import { getDemands2 } from "./demands";
 
 require("dayjs/locale/he");
 dayjs.extend(localeData);
@@ -34,36 +35,29 @@ export async function weeklyNotifyFamilies() {
     const tomorrow = dayjs().add(1, "days");
     const notifications: Notification[] = [];
     const volunteers: { [key: string]: string } = {};
-    const districts = await getDestricts();
-    for (let i = 0; i < districts.length; i++) {
-        const upcomingDemands = await getDemands(districts[i].id, undefined, true, tomorrow.format(DATE_AT), tomorrow.add(28, "days").format(DATE_AT));
-        for (let j = 0; j < upcomingDemands.length; j++) {
-            const demand = upcomingDemands[j];
-            if (demand.status === "חג") continue;
-
-            let notification = notifications.find(n => n.mainBaseFamilyId === demand.mainBaseFamilyId);
-            if (!notification) {
-                notification = {
-                    mainBaseFamilyId: demand.mainBaseFamilyId,
-                    familyLastName: demand.familyLastName,
-                    dates: [],
-                } as Notification;
-                notifications.push(notification);
-            }
-            if (demand.volunteerId) {
-                volunteers[demand.volunteerId] = "";
-            }
-
-            notification.dates.push({
-                date: demand.date,
-                status: demand.status,
-                volunteerId: demand.volunteerId,
-            } as NotificationDate);
+    const upcomingDemands = await getDemands2(undefined, undefined, tomorrow.format(DATE_AT), tomorrow.add(28, "days").format(DATE_AT));
+    for (const demand of upcomingDemands) {
+        let notification = notifications.find(n => n.mainBaseFamilyId === demand.mainBaseFamilyId);
+        if (!notification) {
+            notification = {
+                mainBaseFamilyId: demand.mainBaseFamilyId,
+                familyLastName: demand.familyLastName,
+                dates: [],
+            } as Notification;
+            notifications.push(notification);
         }
+        if (demand.volunteerId) {
+            volunteers[demand.volunteerId] = "";
+        }
+
+        notification.dates.push({
+            date: demand.date,
+            status: demand.status,
+            volunteerId: demand.volunteerId,
+        } as NotificationDate);
     }
 
     await getVolunteersNames(volunteers);
-
 
     const activeFamilies = await db.collection("families").where("active", "==", true).get();
     const waitFor = [];

@@ -4,6 +4,8 @@ import dayjs from "dayjs";
 import { AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilyDemand, FamilyDetails, LoginInfo, NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord, FamilityDetailsPayload, NotificationChannels, GenerateLinkPayload, OpenFamilyDemands, VolunteerInfo, VolunteerInfoPayload, GetDemandsPayload, Errors, Status } from "../src/types";
 export const DATE_AT = "YYYY-MM-DD";
 
+import { getFirestore, FieldValue, QueryDocumentSnapshot, DocumentSnapshot, FieldPath } from "firebase-admin/firestore";
+var admin = require("firebase-admin");
 
 interface District {
     id: string;
@@ -12,6 +14,18 @@ interface District {
     demandsTable: string;
     familiesTable: string;
 }
+const os = require('os');
+const path = require('path');
+
+const homeDirectory = os.homedir();
+const serviceAccountPath = path.join(homeDirectory, 'Library', 'CloudStorage', 'OneDrive-SAPSE', 'Documents', 'born2win', 'firebase', 'born2win-prod-firebase-adminsdk-dltch-7d0cd3c9f4.json');
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccountPath),
+});
+
+export const db = getFirestore();
+
 
 class HttpsError extends Error {
     code: string;
@@ -278,6 +292,7 @@ function holidayAirtable2Holiday(holiday: AirTableRecord): Holiday {
         date: holiday.fields["תאריך"],
         alternateDate: holiday.fields["תאריך חלופי"],
         addAvailability: holiday.fields["זמין"],
+        familyId: holiday.fields["משפחה"],
     }
 }
 
@@ -314,7 +329,7 @@ const cities = new CachedAirTable<City>("ערים", (city => {
 }), ["{כמות משפחות פעילות בעיר}>0"], 60 * 24);
 
 
-const holidays = new CachedAirTable<Holiday>("חגים וחריגים", holidayAirtable2Holiday, ["AND(IS_AFTER({תאריך}, DATEADD(TODAY(), -1, 'days')))"], 5);
+const holidays = new CachedAirTable<Holiday>("חגים וחריגים", holidayAirtable2Holiday, ["AND(IS_AFTER({תאריך}, DATEADD(TODAY(), -1, 'days')))"], 1);
 
 
 
@@ -346,7 +361,7 @@ async function getDemands2(
 
     // eslint-disable-next-line quotes
     filters.push(`{DATE}>='${startDateParam}'`);
-    filters.push(`IS_BEFORE({DATE}, '${dayjs(dateEnd).add(1,"day").format(DATE_AT)}')`);
+    filters.push(`IS_BEFORE({DATE}, '${dayjs(dateEnd).add(1, "day").format(DATE_AT)}')`);
 
     if (volunteerId) {
         filters.push(airtableArrayCondition("vol_id", volunteerId));
@@ -379,13 +394,13 @@ async function getDemands2(
         // Now check if this date for this family does not exist
         for (const family of familiesInDay) {
 
-            if (family.name.indexOf("חרצ")> 0) {
+            if (family.name.indexOf("בירנ") > 0) {
                 console.log("a")
             }
 
             // skip if this family is blocked for this date with no alternate
             if (holidays.length && holidays.some(h => h.familyId == family.id && !h.addAvailability && !h.alternateDate)) continue;
-            const alternate = holidays.length > 0 ? holidays.find(h => (!h.familyId || h.familyId == family.id) && h.alternateDate): undefined;
+            const alternate = holidays.length > 0 ? holidays.find(h => (!h.familyId || h.familyId == family.id) && h.alternateDate) : undefined;
             const actualDate = alternate ?
                 dayjs(alternate.alternateDate).format(DATE_AT) :
                 date.format(DATE_AT);
@@ -405,10 +420,15 @@ async function getDemands2(
                     isFamilyActive: family.active,
                 });
             }
+        }
 
-            // Add special added holidays:
-            holidays.forEach(holiday => {
-                if (holiday.addAvailability && holiday.familyId == family.id) {
+
+        // Add special added holidays:
+        relevantHolidays.filter(h => h.date == date.format(DATE_AT)).forEach(holiday => {
+            if (holiday.addAvailability && holiday.familyId) {
+                // find family
+                const family = families.find(f => f.id == holiday.familyId)
+                if (family) {
                     const holidayDate = dayjs(holiday.date).format(DATE_AT);
                     if (!meals.find(m => dayjs(m.date).format(DATE_AT) == holidayDate && m.mainBaseFamilyId == family.id)) {
                         addedOpenDemands.push({
@@ -425,8 +445,8 @@ async function getDemands2(
                         });
                     }
                 }
-            });
-        }
+            }
+        });
     }
 
     if (status == Status.Available) {
@@ -491,14 +511,108 @@ async function GetFamilyDetails2(familyId: string, includeContacts: boolean): Pr
 // יהודה ושומרון recxuE1Cwav0kfA7g
 // שרון recmLo9MWRxmrLEsM
 // מרכז recP17rsfOseG3Frx
-// getDemands2(["recxuE1Cwav0kfA7g"], Status.Available, "2024-10-15T10:00:30.684Z", "2024-11-12T11:00:30.684Z",undefined).then(demands => {
-//         demands.forEach(d=>console.log(d.date, d.status))
-//         //GetFamilyDetails2(demands[i].mainBaseFamilyId, true).then(fd => console.log(fd));
-// });
+getDemands2(["recP17rsfOseG3Frx"], Status.Available, "2024-11-11", "2024-11-14", undefined).then(demands => {
+    demands.forEach(d => console.log(d.date, d.status))
 
-
+});
 
 
 // getDemands2(["recxuE1Cwav0kfA7g"], Status.Available, "2024-10-31", "2024-10-31").then(demands=>{
 //     demands.filter(d=>d.mainBaseFamilyId == "recwVL742srgkzO0u$$2024").forEach(d=>console.log(d.date, d.status))
 // })
+
+async function syncBorn2WinFamilies() {
+    let offset = null;
+    let count = 0;
+    let countActive = 0;
+    const airTableMainBase = mainBase.value();
+    const apiKey = born2winApiKey.value();
+
+    const sinceDate = dayjs().subtract(25, "hour");
+
+    const now = dayjs().format("YYYY-MM-DD HH:mm:ss[z]");
+    const becameActive = [];
+
+
+    const _cities = await cities.get();
+    const districts = await getDestricts();
+
+
+    const url = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURI("משפחות רשומות")}`;
+    const batch = db.batch();
+    do {
+        const response: any = await axios.get(url, {
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+            },
+            params: {
+                filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
+                fields: ["סטטוס בעמותה", "מחוז", "מאניצט לוגיסטי", "Name", "עיר", "שם איש קשר לוגיסטי"],
+                offset: offset,
+            },
+        }).catch(err => {
+            console.error(err);
+        });
+        offset = response.data.offset;
+        for (let i = 0; i < response.data.records.length; i++) {
+            const family = response.data.records[i];
+            const familyId = family.id;
+
+            const docRef = db.collection("families").doc(familyId);
+            const familyDoc = await docRef.get();
+
+            const familyRecord = {
+                active: family.fields["סטטוס בעמותה"] == "פעיל",
+                lastModified: now,
+                mahoz: family.fields["מחוז"][0],
+                mainBaseFamilyId: family.id,
+                manychat_id: family.fields["מאניצט לוגיסטי"][0],
+                contactName: family.fields["שם איש קשר לוגיסטי"][0],
+            };
+
+            if (familyRecord.active) {
+                countActive++;
+            }
+
+            if (familyDoc && familyDoc.exists) {
+                const prevFamilyRecord = familyDoc.data();
+                if (prevFamilyRecord && familyRecord.active === prevFamilyRecord.active) {
+                    // No change!
+                    continue;
+                }
+                count++;
+                batch.update(familyDoc.ref, familyRecord);
+            } else {
+                count++;
+                batch.create(docRef, familyRecord);
+            }
+
+            if (familyRecord.active) {
+                // A new active family, or a family that has changed to active
+                const city = _cities.find(c => c.id === getSafeFirstArrayElement(family.fields["עיר"], ""));
+                becameActive.push({
+                    name: family.fields["Name"],
+                    city: city?.name || "",
+                    district: city ? districts.find(d => d.id === city.district) || "" : "",
+                });
+            }
+        }
+    } while (offset);
+
+    await batch.commit().then(async () => {
+        console.info("Sync Families: observed modified:", count, "observed Active", countActive);
+    });
+
+    if (becameActive.length > 0) {
+        // Send notification to admins
+        const admins = await db.collection(Collections.Admins).get();
+        const adminsIds = admins.docs.map(doc => doc.id);
+
+        console.log("משפחה חדשה", becameActive.map(nf => `
+משפחה: ${nf.name}
+מחוז: ${nf.district}
+עיר: ${nf.city}`).join("\n---\n"), NotificationChannels.Alerts, [], adminsIds);
+    }
+}
+
+//syncBorn2WinFamilies();

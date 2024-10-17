@@ -4,28 +4,12 @@ import dayjs = require("dayjs");
 import {
     AirTableRecord, Collections, FamilyDemand, NotificationChannels, Status,
 } from "../../src/types";
-import { airtableArrayCondition, getSafeFirstArrayElement } from "../../src/utils";
+import { airtableArrayCondition, dateInRange, getSafeFirstArrayElement } from "../../src/utils";
 import { AirTableGet, AirTableInsert, AirTableQuery, AirTableUpdate, CachedAirTable } from "./airtable";
 import { activeFamilies } from "./families";
 import { Lock } from "./lock";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
-
-// function demandAirtable2FamilyDemand(demand: AirTableRecord, district: string): FamilyDemand {
-//     return {
-//         id: demand.id,
-//         date: demand.fields["תאריך"],
-//         city: getSafeFirstArrayElement(demand.fields["עיר"], ""),
-//         familyLastName: demand.fields.Name,
-//         district: district,
-//         status: demand.fields["זמינות שיבוץ"],
-//         mainBaseFamilyId: getSafeFirstArrayElement(demand.fields.Family_id, ""), // The record ID of the main base table משפחות רשומות
-//         districtBaseFamilyId: getSafeFirstArrayElement(demand.fields["משפחה"], ""), // The record ID in the district table of משפחות במחוז
-//         volunteerId: demand.fields.volunteer_id,
-//         isFamilyActive: demand.fields["סטטוס בעמותה"] == Status.Active,
-//     };
-// }
-
 
 interface Holiday {
     id: string;
@@ -36,7 +20,6 @@ interface Holiday {
     addAvailability: boolean; // when true, it means the main "date" should be added to family
 }
 
-
 function holidayAirtable2Holiday(holiday: AirTableRecord): Holiday {
     return {
         id: holiday.id,
@@ -44,6 +27,7 @@ function holidayAirtable2Holiday(holiday: AirTableRecord): Holiday {
         date: holiday.fields["תאריך"],
         alternateDate: holiday.fields["תאריך חלופי"],
         addAvailability: holiday.fields["זמין"],
+        familyId: holiday.fields["משפחה"],
     };
 }
 function mealAirtable2FamilyDemand(demand: AirTableRecord, cityName: string, active: boolean): FamilyDemand {
@@ -65,13 +49,13 @@ function mealAirtable2FamilyDemand(demand: AirTableRecord, cityName: string, act
 const holidays = new CachedAirTable<Holiday>("חגים וחריגים", holidayAirtable2Holiday, ["AND(IS_AFTER({תאריך}, DATEADD(TODAY(), -1, 'days')))"], 5);
 
 export async function getDemands2(
-    district: string | string[],
+    district: string | string[] | undefined,
     status: Status.Occupied | Status.Available | undefined,
     dateStart: string,
     dateEnd: string,
     volunteerId?: string
 ): Promise<FamilyDemand[]> {
-    const checkDistrict = ((districtId: string) => Array.isArray(district) ? district.some(d => d == districtId) : district == districtId);
+    const checkDistrict = ((districtId: string) => Array.isArray(district) ? district.some(d => d == districtId) : !district || district == districtId);
 
     const families = await activeFamilies.get((f => checkDistrict(f.district)));
     const _cities = await getCities();
@@ -106,12 +90,12 @@ export async function getDemands2(
     }
 
     // calculate dates
-    const relevantHolidays = await holidays.get();
+    const relevantHolidays = await holidays.get(h => dateInRange(h.date, dateStart, dateEnd));
 
-
-    const endDate = dayjs().add(45, "days");
+    const endDate = dayjs(dateEnd);
     const addedOpenDemands: FamilyDemand[] = [];
-    for (let date = dayjs(); endDate.isAfter(date); date = date.add(1, "day")) {
+    const startVacant = dayjs().add(1, "day");
+    for (let date = startVacant; endDate.isAfter(date); date = date.add(1, "day")) {
         if (date.format(DATE_AT) < startDateParam) continue;
         if (date.format(DATE_AT) > endDateParam) break;
         const holidays = relevantHolidays.filter(h => dayjs(h.date).format(DATE_AT) == date.format(DATE_AT));
@@ -130,6 +114,8 @@ export async function getDemands2(
                 dayjs(alternate.alternateDate).format(DATE_AT) :
                 date.format(DATE_AT);
 
+            if (!dateInRange(actualDate, startVacant, endDate)) continue;
+
             if (!meals.find(m => dayjs(m.date).format(DATE_AT) == actualDate && m.mainBaseFamilyId == family.id)) {
                 addedOpenDemands.push({
                     id: getCalcDemandID(family.id, actualDate, family.cityId),
@@ -144,14 +130,18 @@ export async function getDemands2(
                     isFamilyActive: family.active,
                 });
             }
+        }
 
-            // Add special added holidays:
-            holidays.forEach(holiday => {
-                if (holiday.addAvailability && holiday.familyId == family.id) {
+        // Add special added holidays:
+        relevantHolidays.filter(h => dayjs(h.date).format(DATE_AT) == date.format(DATE_AT)).forEach(holiday => {
+            if (holiday.addAvailability && holiday.familyId) {
+                // find family
+                const family = families.find(f => f.id == holiday.familyId);
+                if (family) {
                     const holidayDate = dayjs(holiday.date).format(DATE_AT);
                     if (!meals.find(m => dayjs(m.date).format(DATE_AT) == holidayDate && m.mainBaseFamilyId == family.id)) {
                         addedOpenDemands.push({
-                            id: getCalcDemandID(family.id, holidayDate, family.cityId),
+                            id: family.id + holidayDate,
                             date: holidayDate,
                             city: getCityName(family.cityId),
                             district: family.district,
@@ -164,8 +154,8 @@ export async function getDemands2(
                         });
                     }
                 }
-            });
-        }
+            }
+        });
     }
 
     if (status == Status.Available) {
@@ -195,26 +185,6 @@ function parseDemandID(id: string): { familyId: string, date: string, cityId: st
         cityId: parts[2],
     };
 }
-
-
-// exports.UpdateFamilityDemand = onCall({ cors: true }, async (request) => {
-//     const doc = await authenticate(request);
-//     const mahoz = doc.data().mahoz;
-//     const fdup = request.data as FamilityDemandUpdatePayload;
-
-//     const districts = await getDestricts();
-
-//     const demandDistrictId = (fdup.district || mahoz);
-//     const volunteerId = (fdup.volunteerId || doc.id);
-
-//     const demandDistrict = districts.find(d => d.id == demandDistrictId);
-//     if (!demandDistrict) throw new HttpsError("not-found", "District " + demandDistrictId + " not found");
-
-//     const apiKey = born2winApiKey.value();
-
-//     if (!fdup.isRegistering && !(fdup.reason && fdup.reason.trim().length > 0)) {
-//         throw new HttpsError("invalid-argument", "Missing reason to cancellation");
-//     }
 
 export async function updateFamilityDemand(demandId: string, demandDistrict: string,
     isRegistering: boolean, volunteerId: string, performingUser: string, cancelReason?: string) {

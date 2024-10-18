@@ -201,9 +201,12 @@ export async function updateFamilityDemand(demandId: string, demandDistrict: str
         const possibleDemands = await getDemands2(demandDistrict, Status.Occupied, date, date);
         demand = possibleDemands.find(d => d.mainBaseFamilyId == familyId && d.date == date);
     } else {
+        const cities = await getCities();
+
         // eslint-disable-next-line new-cap
         demand = await AirTableGet<FamilyDemand>("ארוחות", demandId, (rec) => {
-            return mealAirtable2FamilyDemand(rec, "N/A", true);
+            const city = cities.find(c=>c.id == getSafeFirstArrayElement(rec.fields["עיר"], ""));
+            return mealAirtable2FamilyDemand(rec, city?.name || "N/A", true);
         });
     }
 

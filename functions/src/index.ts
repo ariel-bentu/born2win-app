@@ -541,12 +541,14 @@ exports.SearchUsers = onCall({ cors: true }, async (request): Promise<Recipient[
         const all = await Promise.all(waitFor);
         const users = new Map();
         all.forEach(list => list.forEach(doc => users.set(doc.id, doc)));
-        return Array.from(users.values()).map(u => ({
-            name: u.data().firstName + " " + u.data().lastName,
-            id: u.id,
-            phone: u.data().phone,
-            mahoz: u.data().mahoz,
-        }));
+        return Array.from(users.values())
+            .filter(u => !u.data().needToSignConfidentiality) // ommit users who did not sign confidentiality agreement
+            .map(u => ({
+                name: u.data().firstName + " " + u.data().lastName,
+                id: u.id,
+                phone: u.data().phone,
+                mahoz: u.data().mahoz,
+            }));
     }
     throw new HttpsError("unauthenticated", "Only admin can send message.");
 });
@@ -931,7 +933,7 @@ interface District {
 const districts = new CachedAirTable<District>("מחוז", (district => {
     return {
         id: district.id,
-        name: district.fields["שם"],
+        name: district.fields.Name,
     };
 }), [], 60 * 24);
 

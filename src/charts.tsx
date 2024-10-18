@@ -24,6 +24,7 @@ interface DemandChartProps {
     userInfo: UserInfo;
     showFilterByVolunteer?: boolean;
     onCancellationPerformed?: () => void;
+    onSelectFamily?: (family: GroupedFamily | undefined) => void,
 }
 
 const Modes = {
@@ -49,7 +50,7 @@ interface DateInfo {
     demandId: string;
     mainBaseFamilyId: string;
     districtBaseFamilyId: string;
-    district:string;
+    district: string;
 }
 
 interface GroupedFamily extends FamilyCompact {
@@ -76,6 +77,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
     const [mode, setMode] = useState(Modes.Open);
     const [showFilterByVolunteer, setShowFilterByVolunteer] = useState<boolean>(false);
     const [reload, setReload] = useState<number>(0);
+    const [selectedFamily, setSelectedFamily] = useState<GroupedFamily | undefined>();
 
     useEffect(() => {
         if (userInfo?.isAdmin && selectedWeeks && selectedDistricts.length > 0) {
@@ -98,8 +100,9 @@ export function Stats({ userInfo, appServices }: StatsProps) {
     }, [userInfo]);
 
 
-    const handlePrepareMessageToSend = () => {
-        const groupedData = groupByCityAndFamily(data.filter(filterOnlyOpen));
+    const handlePrepareMessageToSend = (familyId: string | undefined) => {
+        const filteredData = data.filter(filterOnlyOpen);
+        const groupedData = groupByCityAndFamily(familyId ? filteredData.filter(d => d.mainBaseFamilyId == familyId) : filteredData);
         prepareMessageToSend(groupedData);
     }
 
@@ -112,21 +115,30 @@ export function Stats({ userInfo, appServices }: StatsProps) {
 מי יכול.ה לסייע בבישול בחודש הקרוב 🙏
     
 `;
-
-        sortedCities.forEach((city) => {
-            message += `*${city}*\n`;
-
+        for (const city of sortedCities){
             // Sort families alphabetically within each city
             const sortedFamilies = sortFamilies(groupedData[city]);
+
+            if (sortedCities.length == 1 && sortedFamilies.length == 1) {
+                // only one family
+                message += `*משפחת ${sortedFamilies[0].familyLastName}*\n`;
+                message += `עיר: ${city}\n`;
+                const dates = sortedFamilies[0].dates.map(d => dayjs(d.date).format("DD.MM")).join(', ');
+
+                message += `תאריכים: ${dates}\n`;
+                break;
+            }
+
+            message += `*${city}*\n`;
             sortedFamilies.forEach((family) => {
                 const dates = family.dates.map(d => dayjs(d.date).format("DD.MM")).join(', ');
                 message += `${family.familyLastName} - ${dates}\n`;
             });
 
             message += '\n'; // Add an extra newline after each city's group
-        });
+        }
 
-        message += `ניתן להשתבץ בלינק ב🤖
+        message += `ניתן להשתבץ בלינק או באפליקציה ב🤖
 מסתבכים? אני פה כדי לעזור`;
         navigator.clipboard.writeText(message)
         appServices.showMessage("success", "הודעה הוכנה והועתקה - הדבקו היכן שתרצו", "");
@@ -182,7 +194,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
                 />
                 {mode === Modes.Open && <Button disabled={!data.some(filterOnlyOpen)}
                     className="btn-on-the-right" label="הכן הודעה"
-                    onClick={handlePrepareMessageToSend} />}
+                    onClick={() => handlePrepareMessageToSend(selectedFamily?.mainBaseFamilyId)} />}
                 {mode === Modes.Fulfilled && <Button unstyled label="סנן" icon={"pi pi-filter" + (showFilterByVolunteer ? "-slash" : "")} className={"icon-btn icon-btn-withLabel"} onClick={(e) => {
                     setShowFilterByVolunteer(!showFilterByVolunteer)
                 }} />}
@@ -193,6 +205,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
 
             {mode === Modes.Open || mode === Modes.Fulfilled ?
                 <DemandList data={data} isShowOpen={mode === Modes.Open} appServices={appServices} userInfo={userInfo}
+                    onSelectFamily={family => setSelectedFamily(family)}
                     showFilterByVolunteer={showFilterByVolunteer}
                     onCancellationPerformed={() => {
                         appServices.showMessage("success", "בוטל בהצלחה", "")
@@ -205,7 +218,8 @@ export function Stats({ userInfo, appServices }: StatsProps) {
     );
 }
 
-export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appServices, userInfo, showFilterByVolunteer, onCancellationPerformed }) => {
+export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appServices, userInfo, showFilterByVolunteer, 
+    onCancellationPerformed, onSelectFamily }) => {
     let demands = data.filter(isShowOpen ? filterOnlyOpen : filterOnlyFulfilled);
     const [showFamilyDetails, setShowFamilyDetails] = useState<GroupedFamily | undefined>();
     const [filterByVolunteer, setFilterByVolunteer] = useState<any | undefined>();
@@ -234,14 +248,15 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
     const sortedCities = Object.keys(groupedData).sort();
 
     if (showFamilyDetails) {
-        return <FamilyDetailsComponent 
+        return <FamilyDetailsComponent
             analyticComponent="Management"
-            appServices={appServices} demands={demands} 
-            mainBaseFamilyId={showFamilyDetails.mainBaseFamilyId} 
+            appServices={appServices} demands={demands}
+            mainBaseFamilyId={showFamilyDetails.mainBaseFamilyId}
             family={showFamilyDetails}
             includeContacts={true} onClose={() => {
                 appServices.popNavigationStep();
                 setShowFamilyDetails(undefined);
+                if (onSelectFamily) onSelectFamily(undefined);
 
                 // todo push nav state
             }} reloadOpenDemands={() => { }} detailsOnly={true} />;
@@ -286,6 +301,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                                             onClick={() => {
                                                 appServices.pushNavigationStep("family-details-management", () => setShowFamilyDetails(undefined));
                                                 setShowFamilyDetails(family)
+                                                if (onSelectFamily) onSelectFamily(family);
                                             }}> {family.familyLastName}{family.active ? "" : "-לא פעילה"}:</span>
                                         <div className='flex w-12 flex-wrap'>{
                                             isShowOpen ?

@@ -1485,7 +1485,7 @@ async function syncBorn2WinFamilies() {
                 becameActive.push({
                     name: family.fields["Name"],
                     city: city?.name || "",
-                    district: city ? districts.find(d => d.id === city.district) || "" : "",
+                    district: city ? districts.find(d => d.id === city.district)?.name || "" : "",
                 });
             }
         }

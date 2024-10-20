@@ -17,7 +17,7 @@ import {
     FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyDemand,
     FamilyDetails, GenerateLinkPayload, GetDemandsPayload, NotificationChannels,
     NotificationUpdatePayload, OpenFamilyDemands, Recipient, SearchUsersPayload,
-    SendMessagePayload, UpdateUserLoginPayload, UserInfo, VolunteerInfo, VolunteerInfoPayload
+    SendMessagePayload, UpdateDemandTransportationPayload, UpdateUserLoginPayload, UserInfo, VolunteerInfo, VolunteerInfoPayload
 } from "./types";
 import { readAllNotifications } from "./notifications";
 import { getDB } from "./db";
@@ -213,6 +213,16 @@ export function updateFamilityDemand(demandId: string, mainBaseFamilyId: string,
     } as FamilityDemandUpdatePayload;
 
     return callFunctionWithImpersonation('UpdateFamilityDemandNew', payload);
+}
+
+
+export function updateDemandTransportation(demandId: string, transpotingVolunteerId:string) {
+    const payload = {
+        demandId,
+        transpotingVolunteerId,
+    } as UpdateDemandTransportationPayload;
+
+    return callFunctionWithImpersonation('UpdateDemandTransportation', payload);
 }
 
 export function getFamilyDetails(districtBaseFamilyId: string, district: string, familyDemandId: string | undefined, mainBaseFamilyId: string, includeContacts: boolean): Promise<FamilyDetails> {

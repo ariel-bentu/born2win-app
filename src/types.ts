@@ -79,6 +79,11 @@ export interface FamilityDemandUpdatePayload {
     volunteerId?: string // defaults to the user's. for admin this is needed
 }
 
+export interface UpdateDemandTransportationPayload {
+    demandId: string;
+    transpotingVolunteerId?: string;
+}
+
 export interface TokenInfo {
     token: string;
     isSafari: boolean;
@@ -151,6 +156,7 @@ export interface FamilyDemand {
     mainBaseFamilyId: string;
     districtBaseFamilyId: string;
     volunteerId: string;
+    transpotingVolunteerId?: string
     isFamilyActive: boolean;
 }
 

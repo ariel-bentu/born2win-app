@@ -180,7 +180,6 @@ export async function SendLinkOrInstall() {
     let bulk: Promise<any>[] = [];
     let totalInstall = 0;
     let totalLinks = 0;
-    let errCount = 0;
     for (const user of usersForInstallMsg) {
         if (bulk.length == 10) {
             await Promise.all(bulk);
@@ -192,7 +191,6 @@ export async function SendLinkOrInstall() {
             .then(() => user.ref.update({ sendWeeklyMessage: date }))
             .catch(error => {
                 console.log("Error sending install app message", error.message, "man_id", user.data().manychat_id);
-                errCount++;
                 return { user, error };
             }));
 
@@ -211,7 +209,6 @@ export async function SendLinkOrInstall() {
             .then(() => user.ref.update({ sendWeeklyMessage: date }))
             .catch(error => {
                 console.log("Error sending old link", error.message, "man_id", user.data().manychat_id);
-                errCount++;
                 return { user, error };
             }));
 

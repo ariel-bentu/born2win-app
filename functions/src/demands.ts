@@ -42,6 +42,7 @@ function mealAirtable2FamilyDemand(demand: AirTableRecord, cityName: string, act
         districtBaseFamilyId: "N/A",
         volunteerId: getSafeFirstArrayElement(demand.fields["מתנדב"], undefined),
         isFamilyActive: active,
+        transpotingVolunteerId: getSafeFirstArrayElement(demand.fields["מתנדב משנע"], undefined),
     };
 }
 

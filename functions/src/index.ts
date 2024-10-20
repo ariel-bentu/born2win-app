@@ -26,6 +26,7 @@ import {
     GetDemandsPayload,
     Errors,
     Status,
+    UpdateDemandTransportationPayload,
 } from "../../src/types";
 import axios from "axios";
 import express = require("express");
@@ -37,6 +38,7 @@ import { SendLinkOrInstall, weeklyNotifyFamilies } from "./scheduled-functions";
 import { AirTableUpdate, CachedAirTable } from "./airtable";
 import { getDemands2, updateFamilityDemand } from "./demands";
 import { getFamilyDetails2 } from "./families";
+import { Lock } from "./lock";
 
 // [END Imports]
 
@@ -994,6 +996,31 @@ exports.GetUserRegistrationsNew = onCall({ cors: true }, async (request): Promis
     const volunteerId = doc.id;
     return getDemands2(district, Status.Occupied, dayjs().startOf("month").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT), volunteerId);
 });
+
+exports.UpdateDemandTransportation = onCall({ cors: true }, async (request) => {
+    const userInfo = await getUserInfo(request);
+    if (!userInfo.isAdmin) {
+        throw new HttpsError("permission-denied", "Only Admin may set transportation");
+    }
+
+    const udtp = request.data as UpdateDemandTransportationPayload;
+
+    const transpotingVolunteerId = udtp.transpotingVolunteerId;
+    const lock = await Lock.acquire(db, udtp.demandId);
+    if (!lock) {
+        throw new HttpsError("already-exists", "מתנדב אחר מעדכן את הרשומה הזו ממש עכשיו");
+    }
+
+    const updateTransportationFields = {
+        fields: {
+            "מתנדב משנע": transpotingVolunteerId && transpotingVolunteerId.length > 0 ? [transpotingVolunteerId] : [],
+        },
+    };
+    // eslint-disable-next-line new-cap
+    await AirTableUpdate("ארוחות", udtp.demandId, updateTransportationFields);
+    logger.info("Transporating volunteer is added", udtp.demandId, "transport-vid", transpotingVolunteerId);
+});
+
 
 exports.UpdateFamilityDemandNew = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);

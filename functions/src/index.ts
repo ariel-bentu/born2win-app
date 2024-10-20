@@ -1065,7 +1065,9 @@ exports.GetFamilyDetailsNew = onCall({ cors: true }, async (request): Promise<Fa
 
 exports.GetVolunteerInfo = onCall({ cors: true }, async (request): Promise<VolunteerInfo | undefined> => {
     const userInfo = await getUserInfo(request);
+
     if (userInfo.isAdmin) {
+        const cities = await getCities();
         const vip = request.data as VolunteerInfoPayload;
         const volunteerDoc = await db.collection(Collections.Users).doc(vip.volunteerId).get();
         if (volunteerDoc && volunteerDoc.exists) {
@@ -1077,7 +1079,7 @@ exports.GetVolunteerInfo = onCall({ cors: true }, async (request): Promise<Volun
                     id: volunteerDoc.id,
                     firstName: data.firstName,
                     lastName: data.lastName,
-                    city: "N/A",
+                    city: cities.find(c=>c.id == data.cityId)?.district || "N/A",
                     district: { id: data.mahoz, name: volunteerDistrict ? volunteerDistrict.name : "" },
                     phone: data.phone,
                     active: data.active,
@@ -1347,7 +1349,7 @@ async function syncBorn2WinUsers(sinceDate?: any) {
             },
             params: {
                 filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
-                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "phone_e164", "manychat_id", "תאריך לידה", "מגדר", "חתם על שמירת סודיות", "תעודת זהות"],
+                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "phone_e164", "manychat_id", "תאריך לידה", "מגדר", "חתם על שמירת סודיות", "תעודת זהות", "ערים"],
                 offset: offset,
             },
         });
@@ -1369,15 +1371,16 @@ async function syncBorn2WinUsers(sinceDate?: any) {
 
             const userRecord = {
                 active: user.fields["פעיל"] == "פעיל",
-                firstName: user.fields["שם פרטי"],
-                lastName: user.fields["שם משפחה"],
+                firstName: user.fields["שם פרטי"] || "missing",
+                lastName: user.fields["שם משפחה"] || "missing",
                 lastModified: now,
-                phone: user.fields.phone_e164,
-                mahoz: user.fields["מחוז"][0],
+                phone: user.fields.phone_e164 || "",
+                mahoz: getSafeFirstArrayElement(user.fields["מחוז"], ""),
                 birthDate: user.fields["תאריך לידה"] ? dayjs(user.fields["תאריך לידה"]).format(DATE_BIRTHDAY) : "",
                 gender: (user.fields["מגדר"] || "לא ידוע"),
                 volId: user.id,
-                manychat_id: user.fields.manychat_id,
+                manychat_id: user.fields.manychat_id || "",
+                cityId: getSafeFirstArrayElement(user.fields["ערים"], ""),
             } as UserRecord;
 
             if (userDoc && userDoc.exists) {
@@ -1389,6 +1392,7 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                     userRecord.phone === prevUserRecord.phone &&
                     userRecord.birthDate === prevUserRecord.birthDate &&
                     userRecord.gender === prevUserRecord.gender &&
+                    userRecord.cityId === prevUserRecord.cityId &&
                     (isNeedToSignConfidentiality && prevUserRecord.needToSignConfidentiality ||
                         (!isNeedToSignConfidentiality && !prevUserRecord.needToSignConfidentiality))
                 ) {

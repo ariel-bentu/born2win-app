@@ -138,6 +138,7 @@ export interface UserRecord {
     birthDate: string;
     gender: string;
     needToSignConfidentiality?: string | any;
+    cityId: string;
 }
 
 

@@ -1077,6 +1077,7 @@ exports.GetVolunteerInfo = onCall({ cors: true }, async (request): Promise<Volun
                     id: volunteerDoc.id,
                     firstName: data.firstName,
                     lastName: data.lastName,
+                    city: "N/A",
                     district: { id: data.mahoz, name: volunteerDistrict ? volunteerDistrict.name : "" },
                     phone: data.phone,
                     active: data.active,

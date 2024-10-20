@@ -62,6 +62,7 @@ export interface VolunteerInfo {
     district: { id: string, name: string }
     phone: string;
     active: boolean;
+    city: string;
 }
 
 export interface City {

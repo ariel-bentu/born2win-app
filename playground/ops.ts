@@ -52,6 +52,9 @@ const mainBase = {
     value: () => { return process.env.BORM2WIN_MAIN_BASE }
 }
 
+const manyChatApiKey = {
+    value: () => { return process.env.BORN2WIN_MANYCHAT_API_KEY }
+}
 async function getDestricts(): Promise<District[]> {
     const apiKey = born2winApiKey.value();
     const airTableMainBase = mainBase.value();
@@ -511,10 +514,10 @@ async function GetFamilyDetails2(familyId: string, includeContacts: boolean): Pr
 // יהודה ושומרון recxuE1Cwav0kfA7g
 // שרון recmLo9MWRxmrLEsM
 // מרכז recP17rsfOseG3Frx
-getDemands2(["recP17rsfOseG3Frx"], Status.Available, "2024-11-11", "2024-11-14", undefined).then(demands => {
-    demands.forEach(d => console.log(d.date, d.status))
+// getDemands2(["recP17rsfOseG3Frx"], Status.Available, "2024-11-11", "2024-11-14", undefined).then(demands => {
+//     demands.forEach(d => console.log(d.date, d.status))
 
-});
+// });
 
 
 // getDemands2(["recxuE1Cwav0kfA7g"], Status.Available, "2024-10-31", "2024-10-31").then(demands=>{
@@ -616,3 +619,98 @@ async function syncBorn2WinFamilies() {
 }
 
 //syncBorn2WinFamilies();
+async function sendToManychat(manySubscriberId: string, manyChatFlowId: string, fields: { [key: string]: string }) {
+    const apiKey = manyChatApiKey.value();
+    const httpOptions = {
+        headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        },
+    };
+
+    const fieldsArray = Object.keys(fields).map(fieldName => {
+        return {
+            field_name: fieldName,
+            field_value: fields[fieldName],
+        };
+    });
+
+    const payload = {
+        subscriber_id: manySubscriberId,
+        fields: fieldsArray,
+    };
+
+    if (fieldsArray.length > 0) {
+        await axios.post("https://api.manychat.com/fb/subscriber/setCustomFields", payload, httpOptions);
+    }
+
+    return axios.post("https://api.manychat.com/fb/sending/sendFlow", {
+        subscriber_id: manySubscriberId,
+        flow_ns: manyChatFlowId,
+    }, httpOptions);
+}
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+enum ManyChatFlows {
+    FamilyFourWeekSummary = "content20241008192343_098603",
+    SendOldLink = "content20230824123136_725765",
+    SendInstallMessage = "content20241013201532_353172",
+}
+
+export async function SendLinkOrInstall() {
+    const date = dayjs().format(DATE_AT);
+
+    const users = await db.collection(Collections.Users).where("active", "==", true).get();
+    const relevantUsers = users.docs.filter(u => u.data().uid == undefined && u.data().manychat_id !== undefined && u.data().sendWeeklyMessage !== date);
+
+    const usersForInstallMsg = relevantUsers.filter(u => u.data().mahoz === "recmLo9MWRxmrLEsM");
+    const usersForLink = relevantUsers.filter(u => u.data().mahoz !== "recmLo9MWRxmrLEsM");
+
+
+    let bulk: Promise<any>[] = [];
+    let totalInstall = 0;
+    let totalLinks = 0;
+    let errCount = 0;
+    for (const user of usersForInstallMsg) {
+        if (bulk.length == 10) {
+            await Promise.all(bulk);
+            console.log("10 more send", totalInstall, "of", usersForInstallMsg.length);
+            await delay(1000);
+            bulk = [];
+        }
+        bulk.push(sendToManychat(user.data().manychat_id, ManyChatFlows.SendInstallMessage, {})
+            .then(() => user.ref.update({ sendWeeklyMessage: date }))
+            .catch(error => {
+                console.log("Error sending install app message", error.message, "man_id", user.data().manychat_id);
+                errCount++;
+                return { user, error };
+            }));
+
+        totalInstall++;
+    }
+    await Promise.all(bulk);
+    bulk = [];
+    for (const user of usersForLink) {
+        if (bulk.length == 10) {
+            await Promise.all(bulk);
+            await delay(1000);
+            console.log("10 more send", totalLinks, "of", usersForLink.length);
+            bulk = [];
+        }
+        bulk.push(sendToManychat(user.data().manychat_id, ManyChatFlows.SendOldLink, {})
+            .then(() => user.ref.update({ sendWeeklyMessage: date }))
+            .catch(error => {
+                console.log("Error sending old link", error.message, "man_id", user.data().manychat_id);
+                errCount++;
+                return { user, error };
+            }));
+
+        totalLinks++;
+    }
+    await Promise.all(bulk);
+
+    console.log("Finish running. err", errCount, "install", totalInstall, "links", totalLinks);
+}
+
+//SendLinkOrInstall()

@@ -868,10 +868,12 @@ const sendNotification = (title: string, body: string, devices: DeviceInfo[], da
 
 async function authenticate(request: CallableRequest<any>): Promise<QueryDocumentSnapshot> {
     if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Request had invalid credentials.");
+        logger.info("Request has invalid credentials.");
+        throw new HttpsError("unauthenticated", "Request has invalid credentials.");
     }
     const uid = request.auth.uid;
     if (!uid) {
+        logger.info("Request is missing uid.", request.auth);
         throw new HttpsError("unauthenticated", "Request is missing uid.");
     }
 
@@ -896,24 +898,29 @@ async function authenticate(request: CallableRequest<any>): Promise<QueryDocumen
 
     const doc = await findUserByUID(uid);
     if (!doc) {
+        logger.warn("unauthorized user - unknown uid", uid);
         throw new HttpsError("unauthenticated", "unauthorized user");
     }
     if (!doc.data().active) {
+        logger.warn("unauthorized user - user inactive", doc.id);
         throw new HttpsError("unauthenticated", Errors.InactiveUser);
     }
 
     if (request.data && impersonateUser) {
         const adminDoc = await db.collection(Collections.Admins).doc(doc.id).get();
         if (!adminDoc.exists) {
+            logger.error("not authorized to impersonate", doc.id);
             throw new HttpsError("permission-denied", "not authorized to impersonate");
         }
 
         // Admin can impersonate to another user
         const impersonateDoc = await getUserByID(impersonateUser);
         if (!impersonateDoc) {
+            logger.warn("not authorized to impersonate", doc.id, impersonateUser);
             throw new HttpsError("not-found", "impersonated user not found");
         }
         if (impersonateDoc && !impersonateDoc.data()?.active) {
+            logger.info("Inactive impersonated user", doc.id, impersonateUser);
             throw new HttpsError("permission-denied", "Inactive impersonated user");
         }
         // for change of type, as we only use id and data() - hack

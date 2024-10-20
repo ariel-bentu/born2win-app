@@ -168,34 +168,56 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 
 export async function SendLinkOrInstall() {
+    const date = dayjs().format(DATE_AT);
+
     const users = await db.collection(Collections.Users).where("active", "==", true).get();
-    const relevantUsers = users.docs.filter(u => u.data().uid == undefined && u.data().manychat_id !== undefined);
+    const relevantUsers = users.docs.filter(u => u.data().uid == undefined && u.data().manychat_id !== undefined && u.data().sendWeeklyMessage !== date);
 
     const usersForInstallMsg = relevantUsers.filter(u => u.data().mahoz === "recmLo9MWRxmrLEsM");
     const usersForLink = relevantUsers.filter(u => u.data().mahoz !== "recmLo9MWRxmrLEsM");
 
-    let count = 0;
+
+    let bulk: Promise<any>[] = [];
     let totalInstall = 0;
     let totalLinks = 0;
+    let errCount = 0;
     for (const user of usersForInstallMsg) {
-        if (count == 10) {
+        if (bulk.length == 10) {
+            await Promise.all(bulk);
+            console.log("10 more send", totalInstall, "of", usersForInstallMsg.length);
             await delay(1000);
-            count = 0;
+            bulk = [];
         }
-        await sendToManychat(user.data().manychat_id, ManyChatFlows.SendInstallMessage, {});
-        count++;
+        bulk.push(sendToManychat(user.data().manychat_id, ManyChatFlows.SendInstallMessage, {})
+            .then(() => user.ref.update({ sendWeeklyMessage: date }))
+            .catch(error => {
+                console.log("Error sending install app message", error.message, "man_id", user.data().manychat_id);
+                errCount++;
+                return { user, error };
+            }));
+
         totalInstall++;
     }
-
+    await Promise.all(bulk);
+    bulk = [];
     for (const user of usersForLink) {
-        if (count == 10) {
+        if (bulk.length == 10) {
+            await Promise.all(bulk);
             await delay(1000);
-            count = 0;
+            console.log("10 more send", totalLinks, "of", usersForLink.length);
+            bulk = [];
         }
-        await sendToManychat(user.data().manychat_id, ManyChatFlows.SendOldLink, {});
-        count++;
+        bulk.push(sendToManychat(user.data().manychat_id, ManyChatFlows.SendOldLink, {})
+            .then(() => user.ref.update({ sendWeeklyMessage: date }))
+            .catch(error => {
+                console.log("Error sending old link", error.message, "man_id", user.data().manychat_id);
+                errCount++;
+                return { user, error };
+            }));
+
         totalLinks++;
     }
+    await Promise.all(bulk);
 
     const admins = await db.collection(Collections.Admins).get();
     const adminsIds = admins.docs.map(doc => doc.id);

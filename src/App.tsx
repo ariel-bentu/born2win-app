@@ -38,7 +38,7 @@ const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigat
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
 
-export const unsupportedDevice = urlParams.get('unsupported_device');
+export const unsupportedDeviceParam = urlParams.get('unsupported_device');
 
 export const testIsPWA = () => {
     // Check for iOS PWA
@@ -47,7 +47,7 @@ export const testIsPWA = () => {
     // Check for Android and other platforms
     const isDisplayModeStandalone = window.matchMedia('(display-mode: standalone)').matches;
 
-    const unsupporedPWADevice = isChrome && localStorage.getItem(UNSUPPORTED_PWA) === "true" && unsupportedDevice !== "true";
+    const unsupporedPWADevice = isChrome && localStorage.getItem(UNSUPPORTED_PWA) === "true" && unsupportedDeviceParam !== "true";
 
     return isStandalone || isDisplayModeStandalone || unsupporedPWADevice;
 };
@@ -340,10 +340,10 @@ function App() {
                     api.updateLoginInfo(userPairingRequest, otpPairingRequest, fingerprint, undefined, isIOS)
                         .then(() => {
                             setVolunteerId(userPairingRequest);
-                            if (isAndroid) {
+                            if (isAndroid || unsupportedDeviceParam == "true") {
                                 localStorage.setItem(VOL_ID_STORAGE_KEY, userPairingRequest);
 
-                                if (unsupportedDevice === "true") {
+                                if (unsupportedDeviceParam == "true") {
                                     localStorage.setItem(UNSUPPORTED_PWA, "true");
                                     window.location.href = "https://app.born2win.org.il"
                                     return;

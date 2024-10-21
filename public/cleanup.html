@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>ניקוי התקנה של נולדת לנצח</title>
+</head>
+
+<body dir="rtl">
+    <h1>ניקוי התקנה של נולדת לנצח</h1>
+    <button id="clearButton">מחק הכל ממכשיר זה</button>
+
+    <script>
+        document.getElementById('clearButton').addEventListener('click', function () {
+            // Clear localStorage
+            localStorage.clear();
+            console.log('localStorage cleared.');
+
+            // Delete all IndexedDB databases
+            if ('indexedDB' in window) {
+                // Check if indexedDB.databases() is available
+                if (indexedDB.databases) {
+                    // Get list of databases and delete each
+                    indexedDB.databases().then(function (databases) {
+                        databases.forEach(function (dbInfo) {
+                            if (dbInfo.name.startsWith("firebase") || dbInfo.name == "born2win") {
+                                indexedDB.deleteDatabase(dbInfo.name);
+                                console.log('Deleted IndexedDB database:', dbInfo.name);
+                            } else console.log("skip", dbInfo.name)
+                        });
+                    }).catch(function (error) {
+                        console.error('Error listing IndexedDB databases:', error);
+                    });
+                } else {
+                    // For browsers that do not support indexedDB.databases()
+                    console.warn('indexedDB.databases() not supported in this browser.');
+                    // Attempt to delete known Firebase databases
+                    var firebaseDBs = ['firebaseLocalStorageDb', 'firebase-heartbeat-database'];
+                    firebaseDBs.forEach(function (dbName) {
+                        var request = indexedDB.deleteDatabase(dbName);
+                        request.onsuccess = function () {
+                            console.log('Deleted IndexedDB database:', dbName);
+                        };
+                        request.onerror = function () {
+                            console.error('Error deleting database:', dbName);
+                        };
+                    });
+                }
+            } else {
+                console.warn('IndexedDB is not supported in this browser.');
+            }
+        });
+    </script>
+</body>
+
+</html>

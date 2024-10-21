@@ -95,7 +95,7 @@ export async function getDemands2(
 
     const endDate = dayjs(dateEnd);
     const addedOpenDemands: FamilyDemand[] = [];
-    const startVacant = dayjs().add(1, "day");
+    const startVacant = dayjs(dateStart);
     for (let date = startVacant; endDate.isAfter(date); date = date.add(1, "day")) {
         if (date.format(DATE_AT) < startDateParam) continue;
         if (date.format(DATE_AT) > endDateParam) break;
@@ -134,29 +134,30 @@ export async function getDemands2(
         }
 
         // Add special added holidays:
-        relevantHolidays.filter(h => dayjs(h.date).format(DATE_AT) == date.format(DATE_AT)).forEach(holiday => {
-            if (holiday.addAvailability && holiday.familyId) {
-                // find family
-                const family = families.find(f => f.id == holiday.familyId);
-                if (family) {
-                    const holidayDate = dayjs(holiday.date).format(DATE_AT);
-                    if (!meals.find(m => dayjs(m.date).format(DATE_AT) == holidayDate && m.mainBaseFamilyId == family.id)) {
-                        addedOpenDemands.push({
-                            id: family.id + holidayDate,
-                            date: holidayDate,
-                            city: getCityName(family.cityId),
-                            district: family.district,
-                            status: Status.Available,
-                            familyLastName: family.name,
-                            mainBaseFamilyId: family.id,
-                            districtBaseFamilyId: "N/A",
-                            volunteerId: "",
-                            isFamilyActive: family.active,
-                        });
+        relevantHolidays.filter(h => dayjs(h.date).format(DATE_AT) == date.format(DATE_AT))
+            .forEach(holiday => {
+                if (holiday.addAvailability && holiday.familyId) {
+                    // find family
+                    const family = families.find(f => f.id == holiday.familyId);
+                    if (family) {
+                        const holidayDate = dayjs(holiday.date).format(DATE_AT);
+                        if (!meals.find(m => dayjs(m.date).format(DATE_AT) == holidayDate && m.mainBaseFamilyId == family.id)) {
+                            addedOpenDemands.push({
+                                id: family.id + holidayDate,
+                                date: holidayDate,
+                                city: getCityName(family.cityId),
+                                district: family.district,
+                                status: Status.Available,
+                                familyLastName: family.name,
+                                mainBaseFamilyId: family.id,
+                                districtBaseFamilyId: "N/A",
+                                volunteerId: "",
+                                isFamilyActive: family.active,
+                            });
+                        }
                     }
                 }
-            }
-        });
+            });
     }
 
     if (status == Status.Available) {
@@ -206,7 +207,7 @@ export async function updateFamilityDemand(demandId: string, demandDistrict: str
 
         // eslint-disable-next-line new-cap
         demand = await AirTableGet<FamilyDemand>("ארוחות", demandId, (rec) => {
-            const city = cities.find(c=>c.id == getSafeFirstArrayElement(rec.fields["עיר"], ""));
+            const city = cities.find(c => c.id == getSafeFirstArrayElement(rec.fields["עיר"], ""));
             return mealAirtable2FamilyDemand(rec, city?.name || "N/A", true);
         });
     }

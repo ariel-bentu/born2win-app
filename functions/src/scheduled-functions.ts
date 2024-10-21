@@ -173,17 +173,11 @@ export async function SendLinkOrInstall() {
     const users = await db.collection(Collections.Users).where("active", "==", true).get();
     const relevantUsers = users.docs.filter(u => u.data().uid == undefined && u.data().manychat_id !== undefined && u.data().sendWeeklyMessage !== date);
 
-    const usersForInstallMsg = relevantUsers.filter(u => u.data().mahoz === "recmLo9MWRxmrLEsM");
-    const usersForLink = relevantUsers.filter(u => u.data().mahoz !== "recmLo9MWRxmrLEsM");
-
-
     let bulk: Promise<any>[] = [];
     let totalInstall = 0;
-    let totalLinks = 0;
-    for (const user of usersForInstallMsg) {
+    for (const user of relevantUsers) {
         if (bulk.length == 10) {
             await Promise.all(bulk);
-            console.log("10 more send", totalInstall, "of", usersForInstallMsg.length);
             await delay(1000);
             bulk = [];
         }
@@ -197,29 +191,29 @@ export async function SendLinkOrInstall() {
         totalInstall++;
     }
     await Promise.all(bulk);
-    bulk = [];
-    for (const user of usersForLink) {
-        if (bulk.length == 10) {
-            await Promise.all(bulk);
-            await delay(1000);
-            console.log("10 more send", totalLinks, "of", usersForLink.length);
-            bulk = [];
-        }
-        bulk.push(sendToManychat(user.data().manychat_id, ManyChatFlows.SendOldLink, {})
-            .then(() => user.ref.update({ sendWeeklyMessage: date }))
-            .catch(error => {
-                console.log("Error sending old link", error.message, "man_id", user.data().manychat_id);
-                return { user, error };
-            }));
+    // bulk = [];
+    // for (const user of usersForLink) {
+    //     if (bulk.length == 10) {
+    //         await Promise.all(bulk);
+    //         await delay(1000);
+    //         console.log("10 more send", totalLinks, "of", usersForLink.length);
+    //         bulk = [];
+    //     }
+    //     bulk.push(sendToManychat(user.data().manychat_id, ManyChatFlows.SendOldLink, {})
+    //         .then(() => user.ref.update({ sendWeeklyMessage: date }))
+    //         .catch(error => {
+    //             console.log("Error sending old link", error.message, "man_id", user.data().manychat_id);
+    //             return { user, error };
+    //         }));
 
-        totalLinks++;
-    }
-    await Promise.all(bulk);
+    //     totalLinks++;
+    // }
+    // await Promise.all(bulk);
 
     const admins = await db.collection(Collections.Admins).get();
     const adminsIds = admins.docs.map(doc => doc.id);
 
-    await addNotificationToQueue("נשלחו לינקים!", `סה״כ הודעות התקנה: ${totalInstall}
-סה״כ לינקים: ${totalLinks}
-מותקני אפליקציה: ${users.docs.length - totalInstall - totalLinks}`, NotificationChannels.Alerts, [], adminsIds);
+    await addNotificationToQueue("נשלחו הודעות בווטסאפ!", `סה״כ הודעות התקנה: ${totalInstall}
+סה״כ לינקים: 0
+מותקני אפליקציה: ${users.docs.length - totalInstall}`, NotificationChannels.Alerts, [], adminsIds);
 }

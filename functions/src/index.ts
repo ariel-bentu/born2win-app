@@ -1156,6 +1156,7 @@ const schedules = [
     { desc: "Birthdays greeting", min: 0, hour: [10], weekDay: "*", callback: greetingsToBirthdays },
     { desc: "Weekly Message to Families", min: 0, hour: [20], weekDay: "0", callback: weeklyNotifyFamilies },
     { desc: "Links to install or old-link on Sunday at 09:00", min: 0, hour: [9], weekDay: 0, callback: SendLinkOrInstall },
+    { desc: "Reminder to all volunteers via app", min: 0, hour: [10], weekDay: 0, callback: remindVolunteersToRegister },
     // todo - archive notifications
 ];
 
@@ -1191,10 +1192,10 @@ exports.doSchedule = onSchedule({
     await Promise.all(waitFor);
 });
 
-// async function remindVolunteersToRegister() {
-//     await addNotificationToQueue("התחלנו שיבוצים!",
-//         "הכנסו לאפליקציה לבחור למי תתנו חיבוק החודש. ניתן להרשם בלשונית השיבוצים", NotificationChannels.Registrations, [], "all");
-// }
+async function remindVolunteersToRegister() {
+    await addNotificationToQueue("תזכורת לשיבוצים!",
+        "הכנסו לאפליקציה לבחור למי תתנו חיבוק החודש. ניתן להרשם בלשונית השיבוצים", NotificationChannels.Registrations, [], "all");
+}
 
 async function greetingsToBirthdays() {
     const today = dayjs().format(DATE_BIRTHDAY);

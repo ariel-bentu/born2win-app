@@ -2,6 +2,7 @@
 
 # firebase
 .firebase
+creds.json
 .env*
 #service-worker js - generated
 public/firebase-messaging-sw.js

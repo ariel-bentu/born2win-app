@@ -10,7 +10,7 @@ import dayjs from "dayjs";
 import { NotificationChannelsName } from "./types";
 
 export function InProgress() {
-    return <ProgressBar mode="indeterminate" style={{ height: '6px', width:"100%" }}></ProgressBar>;
+    return <ProgressBar mode="indeterminate" style={{ height: '6px', width: "100%" }}></ProgressBar>;
 }
 
 interface RegisterToNotificationProps {
@@ -45,10 +45,10 @@ export function NewAppVersion({ onClick }: RegisterToNotificationProps) {
     );
 }
 
-export function PhoneNumber({ phone , hideText}: { phone: string, hideText?:boolean }) {
+export function PhoneNumber({ phone, hideText }: { phone: string, hideText?: boolean }) {
     return <div className="flex flex-row align-items-center">
         {!hideText && <strong className="ml-2">טלפון:</strong>}
-        {!hideText ?nicePhone(phone):""}
+        {!hideText ? nicePhone(phone) : ""}
         <Button
             icon="pi pi-whatsapp"
             className="p-button-rounded p-button-info m-2"
@@ -70,13 +70,13 @@ const weeksFromToday = (weeks: number) => {
     return today.add(weeks, 'week').format('DD-MMM');
 };
 interface WeekSelectorSliderProps {
-    selectedWeeks: number[];
-    setSelectedWeeks: (newVal: number[]) => void;
+    selectedWeeks: [number, number];
+    setSelectedWeeks: (newVal: [number, number] | ((prev: [number, number]) => [number, number])) => void;
 }
 
 export function WeekSelectorSlider({ selectedWeeks, setSelectedWeeks }: WeekSelectorSliderProps) {
 
-    const handleWeekChange = (newRange: number[]) => {
+    const handleWeekChange = (newRange: [number, number]) => {
         setSelectedWeeks(newRange);
     };
     const min = -4;
@@ -85,27 +85,39 @@ export function WeekSelectorSlider({ selectedWeeks, setSelectedWeeks }: WeekSele
     return (
         // <div style={{ width: '400px', margin: '50px auto', direction: 'rtl' }}>
         <div className="slider-container">
-            <Slider
-                value={selectedWeeks}
-                onChange={handleWeekChange}
-                min={min}
-                max={max}
-                step={1}
+            <div className="slider">
+                <Button unstyled className="icon-btn ml-2" icon="pi pi-minus" onClick={() => {
+                    setSelectedWeeks((prev: [number, number]) => {
+                        return [prev[0] - 1, prev[1]];
+                    });
+                }} />
+                <Slider
+                    value={selectedWeeks}
+                    onChange={handleWeekChange}
+                    min={min}
+                    max={max}
+                    step={1}
 
-                marks={[6, 5, 4, 3, 2, 1, 0, -1, -2, -3, -4]}
-                markClassName="mark"
-                renderMark={(props) => {
-                    const weekNumber = parseInt(props.key + "");
-                    return (
-                        <span {...props} key={props.key}  className={`tick-mark ${weekNumber === 0 ? 'today-mark' : ''}`}>
-                            {weekNumber === 0 ? 'היום' : weekNumber > 0 ? `+${weekNumber}` : `${weekNumber}`}
-                        </span>
-                    );
-                }}
-                withTracks
-                invert={true}
-                className="react-slider"
-            />
+                    marks={[6, 5, 4, 3, 2, 1, 0, -1, -2, -3, -4]}
+                    markClassName="mark"
+                    renderMark={(props) => {
+                        const weekNumber = parseInt(props.key + "");
+                        return (
+                            <span {...props} key={props.key} className={`tick-mark ${weekNumber === 0 ? 'today-mark' : ''}`}>
+                                {weekNumber === 0 ? 'היום' : weekNumber > 0 ? `+${weekNumber}` : `${weekNumber}`}
+                            </span>
+                        );
+                    }}
+                    withTracks
+                    invert={true}
+                    className="react-slider"
+                />
+                <Button unstyled className="icon-btn mr-2" icon="pi pi-plus" onClick={() => {
+                    setSelectedWeeks((prev: [number, number]) => {
+                        return [prev[0], prev[1] + 1];
+                    });
+                }} />
+            </div>
             <div className="range-text">{weeksFromToday(selectedWeeks[0])} עד {weeksFromToday(selectedWeeks[1])}</div>
         </div>
         // <div style={{ marginTop: '20px' }}>

@@ -63,6 +63,12 @@
     padding: 10px 0;
     /* Adds space for the marks below the slider */
 }
+.slider {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+
+}
 
 
 

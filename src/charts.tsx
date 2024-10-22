@@ -71,7 +71,7 @@ const filterOnlyFulfilled = (f: FamilyDemand) => f.status === "תפוס";
 export function Stats({ userInfo, appServices }: StatsProps) {
     const [loading, setLoading] = useState<boolean>(false);
     const [data, setData] = useState<FamilyDemand[]>([]);
-    const [selectedWeeks, setSelectedWeeks] = useState<number[]>([0, 4]);
+    const [selectedWeeks, setSelectedWeeks] = useState<[number,number]>([0, 4]);
     const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
     //const calendar = useRef<Calendar>(null);
     const [mode, setMode] = useState(Modes.Open);

@@ -1,5 +1,5 @@
 import axios from "axios";
-import dayjs from "dayjs";
+import dayjs, { Dayjs } from "dayjs";
 
 import { AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilyDemand, FamilyDetails, LoginInfo, NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord, FamilityDetailsPayload, NotificationChannels, GenerateLinkPayload, OpenFamilyDemands, VolunteerInfo, VolunteerInfoPayload, GetDemandsPayload, Errors, Status } from "../src/types";
 export const DATE_AT = "YYYY-MM-DD";
@@ -18,7 +18,8 @@ const os = require('os');
 const path = require('path');
 
 const homeDirectory = os.homedir();
-const serviceAccountPath = path.join(homeDirectory, 'Library', 'CloudStorage', 'OneDrive-SAPSE', 'Documents', 'born2win', 'firebase', 'born2win-prod-firebase-adminsdk-dltch-7d0cd3c9f4.json');
+const serviceAccountPath = "../creds.json";
+//path.join(homeDirectory, 'Library', 'CloudStorage', 'OneDrive-SAPSE', 'Documents', 'born2win', 'firebase', 'born2win-prod-firebase-adminsdk-dltch-7d0cd3c9f4.json');
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccountPath),
@@ -331,23 +332,25 @@ const cities = new CachedAirTable<City>("ערים", (city => {
     }
 }), ["{כמות משפחות פעילות בעיר}>0"], 60 * 24);
 
+function getCities() {
+    return cities.get();
+}
 
 const holidays = new CachedAirTable<Holiday>("חגים וחריגים", holidayAirtable2Holiday, ["AND(IS_AFTER({תאריך}, DATEADD(TODAY(), -1, 'days')))"], 1);
 
 
 
-async function getDemands2(
-    district: string | string[],
+export async function getDemands2(
+    district: string | string[] | undefined,
     status: Status.Occupied | Status.Available | undefined,
     dateStart: string,
     dateEnd: string,
     volunteerId?: string
 ): Promise<FamilyDemand[]> {
-
-    const checkDistrict = ((districtId: string) => Array.isArray(district) ? district.some(d => d == districtId) : district == districtId);
+    const checkDistrict = ((districtId: string) => Array.isArray(district) ? district.some(d => d == districtId) : !district || district == districtId);
 
     const families = await activeFamilies.get((f => checkDistrict(f.district)));
-    const _cities = await cities.get();
+    const _cities = await getCities();
     const getCityName = (id: string) => _cities.find(c => c.id == id)?.name || "";
 
     const mealsQuery = new AirTableQuery<FamilyDemand>("ארוחות", (m) => {
@@ -371,7 +374,7 @@ async function getDemands2(
     }
 
     const meals = await mealsQuery.execute(filters);
-    const filteredMeals = meals.filter(m => checkDistrict(m.district)); // && (volunteerId == undefined || m.volunteerId == volunteerId));
+    const filteredMeals = meals.filter(m => checkDistrict(m.district));
 
     if (status === Status.Occupied) {
         // no need to calculate dates
@@ -379,12 +382,12 @@ async function getDemands2(
     }
 
     // calculate dates
-    const relevantHolidays = await holidays.get();
+    const relevantHolidays = await holidays.get(h => dateInRange(h.date, dateStart, dateEnd));
 
-
-    const endDate = dayjs().add(45, "days");
+    const endDate = dayjs(dateEnd);
     const addedOpenDemands: FamilyDemand[] = [];
-    for (let date = dayjs(); endDate.isAfter(date); date = date.add(1, "day")) {
+    const startVacant = dayjs(dateStart);
+    for (let date = startVacant; endDate.isAfter(date); date = date.add(1, "day")) {
         if (date.format(DATE_AT) < startDateParam) continue;
         if (date.format(DATE_AT) > endDateParam) break;
         const holidays = relevantHolidays.filter(h => dayjs(h.date).format(DATE_AT) == date.format(DATE_AT));
@@ -392,15 +395,10 @@ async function getDemands2(
         // Skip if this date is blocked for all and no alternate exists
         if (holidays.length && holidays.some(h => !h.familyId && !h.alternateDate)) continue;
 
-        const day = date.day()
+        const day = date.day();
         const familiesInDay = families.filter(f => f.days.some(d => d == day));
         // Now check if this date for this family does not exist
         for (const family of familiesInDay) {
-
-            if (family.name.indexOf("בירנ") > 0) {
-                console.log("a")
-            }
-
             // skip if this family is blocked for this date with no alternate
             if (holidays.length && holidays.some(h => h.familyId == family.id && !h.addAvailability && !h.alternateDate)) continue;
             const alternate = holidays.length > 0 ? holidays.find(h => (!h.familyId || h.familyId == family.id) && h.alternateDate) : undefined;
@@ -408,10 +406,11 @@ async function getDemands2(
                 dayjs(alternate.alternateDate).format(DATE_AT) :
                 date.format(DATE_AT);
 
-            if (!meals.find(m => dayjs(m.date).format(DATE_AT) == actualDate && m.mainBaseFamilyId == family.id)) {
+            if (!dateInRange(actualDate, startVacant, endDate)) continue;
 
+            if (!meals.find(m => dayjs(m.date).format(DATE_AT) == actualDate && m.mainBaseFamilyId == family.id)) {
                 addedOpenDemands.push({
-                    id: family.id + actualDate,
+                    id: getCalcDemandID(family.id, actualDate, family.cityId),
                     date: actualDate,
                     city: getCityName(family.cityId),
                     district: family.district,
@@ -425,37 +424,66 @@ async function getDemands2(
             }
         }
 
-
         // Add special added holidays:
-        relevantHolidays.filter(h => h.date == date.format(DATE_AT)).forEach(holiday => {
-            if (holiday.addAvailability && holiday.familyId) {
-                // find family
-                const family = families.find(f => f.id == holiday.familyId)
-                if (family) {
-                    const holidayDate = dayjs(holiday.date).format(DATE_AT);
-                    if (!meals.find(m => dayjs(m.date).format(DATE_AT) == holidayDate && m.mainBaseFamilyId == family.id)) {
-                        addedOpenDemands.push({
-                            id: family.id + holidayDate,
-                            date: holidayDate,
-                            city: getCityName(family.cityId),
-                            district: family.district,
-                            status: Status.Available,
-                            familyLastName: family.name,
-                            mainBaseFamilyId: family.id,
-                            districtBaseFamilyId: "N/A",
-                            volunteerId: "",
-                            isFamilyActive: family.active,
-                        });
+        relevantHolidays.filter(h => dayjs(h.date).format(DATE_AT) == date.format(DATE_AT))
+            .forEach(holiday => {
+                if (holiday.addAvailability && holiday.familyId) {
+                    // find family
+                    const family = families.find(f => f.id == holiday.familyId);
+                    if (family) {
+                        const holidayDate = dayjs(holiday.date).format(DATE_AT);
+                        if (!meals.find(m => dayjs(m.date).format(DATE_AT) == holidayDate && m.mainBaseFamilyId == family.id)) {
+                            addedOpenDemands.push({
+                                id: family.id + holidayDate,
+                                date: holidayDate,
+                                city: getCityName(family.cityId),
+                                district: family.district,
+                                status: Status.Available,
+                                familyLastName: family.name,
+                                mainBaseFamilyId: family.id,
+                                districtBaseFamilyId: "N/A",
+                                volunteerId: "",
+                                isFamilyActive: family.active,
+                            });
+                        }
                     }
                 }
-            }
-        });
+            });
     }
 
     if (status == Status.Available) {
         return addedOpenDemands;
     }
     return filteredMeals.concat(addedOpenDemands);
+}
+
+export function dateInRange(date: string | Dayjs, start: string | Dayjs, end: string | Dayjs) {
+    const dateS = dayjs(date).format(DATE_AT);
+    const startS = dayjs(start).format(DATE_AT);
+    const endS = dayjs(end).format(DATE_AT);
+
+    return dateS >= startS && dateS <= endS;
+}
+const seperator = "$$";
+
+function getCalcDemandID(familyId: string, date: string, cityId: string) {
+    return familyId + seperator + date + seperator + cityId;
+}
+
+function isCalcDemandId(id: string): boolean {
+    return id.indexOf(seperator) > 0;
+}
+
+function parseDemandID(id: string): { familyId: string, date: string, cityId: string } {
+    const parts = id.split(seperator);
+    if (parts.length < 3) {
+        return { familyId: "", date: "", cityId: "" };
+    }
+    return {
+        familyId: parts[0],
+        date: parts[1],
+        cityId: parts[2],
+    };
 }
 
 function airtableArrayCondition(fieldName: string, value: string): string {
@@ -512,6 +540,7 @@ async function GetFamilyDetails2(familyId: string, includeContacts: boolean): Pr
 
 
 // יהודה ושומרון recxuE1Cwav0kfA7g
+// צפון recLbwpPC80SdRmPO
 // שרון recmLo9MWRxmrLEsM
 // מרכז recP17rsfOseG3Frx
 // getDemands2(["recP17rsfOseG3Frx"], Status.Available, "2024-11-11", "2024-11-14", undefined).then(demands => {
@@ -520,8 +549,10 @@ async function GetFamilyDetails2(familyId: string, includeContacts: boolean): Pr
 // });
 
 
-// getDemands2(["recxuE1Cwav0kfA7g"], Status.Available, "2024-10-31", "2024-10-31").then(demands=>{
-//     demands.filter(d=>d.mainBaseFamilyId == "recwVL742srgkzO0u$$2024").forEach(d=>console.log(d.date, d.status))
+// getDemands2(["recLbwpPC80SdRmPO"], Status.Occupied, "2024-10-22", "2024-11-12").then(demands=>{
+//     demands
+//     //.filter(d=>d.mainBaseFamilyId == "recwVL742srgkzO0u$$2024")
+//     .forEach(d=>console.log(d.date, d.status))
 // })
 
 async function syncBorn2WinFamilies() {
@@ -722,7 +753,7 @@ async function syncAllBorn2WinUsers() {
     let countActive = 0;
     const airTableMainBase = mainBase.value();
     const apiKey = born2winApiKey.value();
-   
+
     const now = dayjs().format("YYYY-MM-DD HH:mm:ss[z]");
     const newLinksToAdmin = [] as {
         name: string,
@@ -829,7 +860,7 @@ async function syncAllBorn2WinUsers() {
 
                 batch.create(docRef, userRecord);
             }
-           
+
         }
     } while (offset);
 
@@ -861,3 +892,27 @@ function generateSignConfidentialityURL(firstName: string, identificationId: str
 
 
 //syncAllBorn2WinUsers()
+import { HebrewCalendar, HDate, Location, Event, CalOptions } from '@hebcal/core';
+
+
+function getHolidays() {
+
+    const options: CalOptions = {
+        year: 2024,
+        isHebrewYear: false,
+        candlelighting: false,
+        //location: Location.lookup('Tel Aviv'),
+        sedrot: false,
+        omer: false,
+        noRoshChodesh:true
+    };
+    const events = HebrewCalendar.calendar(options);
+
+    for (const ev of events) {
+        const hd = ev.getDate();
+        const date = hd.greg();
+        console.log(date.toLocaleDateString(), ev.render('he'), hd.toString());
+    }
+}
+
+getHolidays()

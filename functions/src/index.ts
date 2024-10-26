@@ -27,6 +27,12 @@ import {
     Errors,
     Status,
     UpdateDemandTransportationPayload,
+    FamilyCompact,
+    SearchFamilyPayload,
+    Holiday,
+    UpsertHolidayPayload,
+    GetRegisteredHolidaysPayload,
+    AdminAuthorities,
 } from "../../src/types";
 import axios from "axios";
 import express = require("express");
@@ -37,8 +43,9 @@ import localeData = require("dayjs/plugin/localeData");
 import { SendLinkOrInstall, weeklyNotifyFamilies } from "./scheduled-functions";
 import { AirTableUpdate, CachedAirTable } from "./airtable";
 import { getDemands2, updateFamilityDemand } from "./demands";
-import { getFamilyDetails2 } from "./families";
+import { getFamilyDetails2, searchFamilies } from "./families";
 import { Lock } from "./lock";
+import { deleteHoliday, getHolidays, upsertHoliday } from "./holidays";
 
 // [END Imports]
 
@@ -472,6 +479,7 @@ async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
         phone: data.phone,
         userDistrict: { id: data.mahoz, name: userDistrict?.name || "" },
         isAdmin: (data.isAdmin == true),
+        adminAuthorities: data.adminAuthorities,
         districts: adminDistricts,
         needToSignConfidentiality: data.needToSignConfidentiality,
         active: data.active,
@@ -633,9 +641,11 @@ exports.OnAdminChange = onDocumentWritten(`${Collections.Admins}/{docId}`, async
         if (docAfter.exists && docAfter.data()?.suspended !== true) {
             updateUser.isAdmin = true;
             updateUser.adminDistricts = docAfter.data()?.districts || [];
+            updateUser.adminAuthorities = docAfter.data()?.authorities;
         } else {
             updateUser.isAdmin = false;
             updateUser.adminDistricts = FieldValue.delete();
+            updateUser.adminAuthorities = FieldValue.delete();
         }
 
         const doc = await db.collection(Collections.Users).doc(event.params.docId).get();
@@ -1063,6 +1073,49 @@ exports.GetFamilyDetailsNew = onCall({ cors: true }, async (request): Promise<Fa
     throw new HttpsError("not-found", "Family not found");
 });
 
+exports.SearchFamilies = onCall({ cors: true }, async (request): Promise<FamilyCompact[]> => {
+    const userInfo = await getUserInfo(request);
+    const sfp = request.data as SearchFamilyPayload;
+
+    if (!userInfo.isAdmin) {
+        throw new HttpsError("permission-denied", "Only Admin may search families");
+    }
+
+    return searchFamilies(sfp.searchStr);
+});
+
+exports.GetRegisteredHolidays = onCall({ cors: true }, async (request): Promise<Holiday[]> => {
+    const userInfo = await getUserInfo(request);
+    const grhp = request.data as GetRegisteredHolidaysPayload;
+    if (userInfo.isAdmin && userInfo.adminAuthorities?.includes(AdminAuthorities.ManageHoliday)) {
+        return getHolidays(grhp.from, grhp.to);
+    }
+
+    throw new HttpsError("permission-denied", "Only Admin may read holidays");
+});
+
+exports.UpsertHoliday = onCall({ cors: true }, async (request) => {
+    const userInfo = await getUserInfo(request);
+    const uhp = request.data as UpsertHolidayPayload;
+
+    if (userInfo.isAdmin && userInfo.adminAuthorities?.includes(AdminAuthorities.ManageHoliday)) {
+        return upsertHoliday(uhp.holiday);
+    }
+
+    throw new HttpsError("permission-denied", "Only Holiday Admins may update holidays");
+});
+
+exports.DeleteHoliday = onCall({ cors: true }, async (request) => {
+    const userInfo = await getUserInfo(request);
+
+    if (userInfo.isAdmin && userInfo.adminAuthorities?.includes(AdminAuthorities.ManageHoliday)) {
+        return deleteHoliday(request.data);
+    }
+
+    throw new HttpsError("permission-denied", "Only Holiday Admin may delete holidays");
+});
+
+
 exports.GetVolunteerInfo = onCall({ cors: true }, async (request): Promise<VolunteerInfo | undefined> => {
     const userInfo = await getUserInfo(request);
 
@@ -1079,7 +1132,7 @@ exports.GetVolunteerInfo = onCall({ cors: true }, async (request): Promise<Volun
                     id: volunteerDoc.id,
                     firstName: data.firstName,
                     lastName: data.lastName,
-                    city: cities.find(c=>c.id == data.cityId)?.district || "N/A",
+                    city: cities.find(c => c.id == data.cityId)?.district || "N/A",
                     district: { id: data.mahoz, name: volunteerDistrict ? volunteerDistrict.name : "" },
                     phone: data.phone,
                     active: data.active,

@@ -1,8 +1,8 @@
 import {
-    AirTableRecord, FamilyDetails,
+    AirTableRecord, FamilyCompact, FamilyDetails,
     Status,
 } from "../../src/types";
-import { AirTableGet, CachedAirTable } from "./airtable";
+import { AirTableGet, AirTableQuery, CachedAirTable } from "./airtable";
 import { getSafeFirstArrayElement } from "../../src/utils";
 import { getCities } from ".";
 
@@ -59,6 +59,7 @@ function familyAirtable2FamilyDetails(rec: AirTableRecord, cityName: string, inc
         favoriteFood: rec.fields["אוהבים לאכול"],
 
         alergies: getSafeFirstArrayElement(rec.fields["רגישויות ואלרגיות"], ""),
+        importantNotice: rec.fields["נא לשים לב"] || "",
         adultsCount: getSafeFirstArrayElement(rec.fields["מספר נפשות הגרים בבית"], 1), // todo fix name of field
         familyStructure: getSafeFirstArrayElement(rec.fields["הרכב הורים"], ""),
         familyMembersAge: getSafeFirstArrayElement(rec.fields["גילאים של הרכב המשפחה"], ""),
@@ -87,4 +88,24 @@ export async function getFamilyDetails2(familyId: string, includeContacts: boole
     // eslint-disable-next-line new-cap
     return AirTableGet<FamilyDetails>("משפחות רשומות", familyId, (rec) =>
         familyAirtable2FamilyDetails(rec, getCityName(getSafeFirstArrayElement(rec.fields["עיר"], "")), includeContacts));
+}
+
+
+export async function searchFamilies(searchStr: string): Promise<FamilyCompact[]> {
+    const familyQuery = new AirTableQuery<FamilyCompact>("משפחות רשומות", (m) => {
+        return {
+            districtBaseFamilyId: "N/A",
+            mainBaseFamilyId: m.id,
+            district: getSafeFirstArrayElement(m.fields["מחוז"], ""),
+            familyLastName: m.fields.Name,
+            city: getSafeFirstArrayElement(m.fields["עיר"], ""), // todo it is ID
+            active: true,
+        };
+    });
+    const prefix = "משפחת ";
+
+    return familyQuery.execute([
+        `LEFT({Name}, ${searchStr.length + prefix.length}) = "${prefix + searchStr}"`,
+        "{סטטוס בעמותה}='פעיל'",
+    ]);
 }

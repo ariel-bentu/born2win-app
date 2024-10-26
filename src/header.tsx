@@ -100,7 +100,7 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
                     onHide={() => setSidebarVisible(false)}
                     className="settings-sidebar"
                     position={"right"}
-                    style={{ width: 300 }}
+                    style={{ width: 350 }}
                 >
                     <div className="p-mt-3 w-full flex flex-row justify-content-evenly">
                         <Button

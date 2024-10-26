@@ -72,15 +72,17 @@ const weeksFromToday = (weeks: number) => {
 interface WeekSelectorSliderProps {
     selectedWeeks: [number, number];
     setSelectedWeeks: (newVal: [number, number] | ((prev: [number, number]) => [number, number])) => void;
+    min: number;
+    max: number;
 }
 
-export function WeekSelectorSlider({ selectedWeeks, setSelectedWeeks }: WeekSelectorSliderProps) {
+export function WeekSelectorSlider({ selectedWeeks, setSelectedWeeks , min, max}: WeekSelectorSliderProps) {
+
+    const marks = Array.from({ length: max - min + 1 }, (_, i) => max - i);
 
     const handleWeekChange = (newRange: [number, number]) => {
         setSelectedWeeks(newRange);
     };
-    const min = -4;
-    const max = 6;
 
     return (
         // <div style={{ width: '400px', margin: '50px auto', direction: 'rtl' }}>
@@ -98,7 +100,7 @@ export function WeekSelectorSlider({ selectedWeeks, setSelectedWeeks }: WeekSele
                     max={max}
                     step={1}
 
-                    marks={[6, 5, 4, 3, 2, 1, 0, -1, -2, -3, -4]}
+                    marks={marks}
                     markClassName="mark"
                     renderMark={(props) => {
                         const weekNumber = parseInt(props.key + "");

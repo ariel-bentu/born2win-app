@@ -1,0 +1,21 @@
+.holiday-table-title {
+    font-size: 20px;
+    font-weight: bold;
+    text-align: right;
+    margin: 3px;
+}
+
+.p-datepicker-prev,
+.p-datepicker-next {
+    display: flex;
+}
+
+/* Hide month and year dropdowns */
+.p-datepicker-month,
+.p-datepicker-year {
+    display: inline-block;
+}
+
+.p-datepicker-header {
+    display: flex;
+}

@@ -14,10 +14,10 @@ import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
 import {
-    FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyDemand,
-    FamilyDetails, GenerateLinkPayload, GetDemandsPayload, NotificationChannels,
-    NotificationUpdatePayload, OpenFamilyDemands, Recipient, SearchUsersPayload,
-    SendMessagePayload, UpdateDemandTransportationPayload, UpdateUserLoginPayload, UserInfo, VolunteerInfo, VolunteerInfoPayload
+    FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyCompact, FamilyDemand,
+    FamilyDetails, GenerateLinkPayload, GetDemandsPayload, GetRegisteredHolidaysPayload, Holiday, IdName, NotificationChannels,
+    NotificationUpdatePayload, OpenFamilyDemands, Recipient, SearchFamilyPayload, SearchUsersPayload,
+    SendMessagePayload, UpdateDemandTransportationPayload, UpdateUserLoginPayload, UpsertHolidayPayload, UserInfo, VolunteerInfo, VolunteerInfoPayload
 } from "./types";
 import { readAllNotifications } from "./notifications";
 import { getDB } from "./db";
@@ -216,7 +216,7 @@ export function updateFamilityDemand(demandId: string, mainBaseFamilyId: string,
 }
 
 
-export function updateDemandTransportation(demandId: string, transpotingVolunteerId:string) {
+export function updateDemandTransportation(demandId: string, transpotingVolunteerId: string) {
     const payload = {
         demandId,
         transpotingVolunteerId,
@@ -270,6 +270,28 @@ export async function getDemands(dateRange: [string, string], districts: string[
         districts
     } as GetDemandsPayload;
     return getDemandsFunc(payload).then(res => res.data as FamilyDemand[]);
+}
+
+
+export async function getRegisteredHolidays(from: string, to: string): Promise<Holiday[]> {
+    const payload = {
+        from,
+        to,
+    } as GetRegisteredHolidaysPayload;
+
+    return httpsCallable(functions, 'GetRegisteredHolidays')(payload).then(res => res.data as Holiday[]);
+}
+
+export async function upsertHoliday(holiday: Holiday) {
+    const payload = {
+        holiday,
+    } as UpsertHolidayPayload;
+
+    return httpsCallable(functions, 'UpsertHoliday')(payload);
+}
+
+export async function deleteHoliday(id: string) {
+    return httpsCallable(functions, 'DeleteHoliday')(id);
 }
 
 export async function sendMessage(districts: string[], recipient: Recipient[] | undefined, title: string, body: string) {
@@ -363,6 +385,43 @@ export const handleSearchUsers = async (userInfo: UserInfo, query: string) => {
             id: r.id,
             phone: r.phone,
         });
+    });
+
+    return Array.from(districts.values());
+}
+
+export async function searchFamilies(searchStr: string): Promise<FamilyCompact[]> {
+    // no impersonation
+    const searchFamiliesFunc = httpsCallable(functions, 'SearchFamilies');
+    const payload = {
+        searchStr
+    } as SearchFamilyPayload;
+
+    return searchFamiliesFunc(payload).then(res => res.data as FamilyCompact[]);
+}
+
+
+export const handleSearchFamilies = async (userInfo: UserInfo, query: string) => {
+    const families = await searchFamilies(query);
+    const districts = new Map();
+    families.forEach(r => {
+        let familiyDistrict = r.district || "";
+
+        let mahoz = districts.get(familiyDistrict);
+        if (!mahoz) {
+            mahoz = {
+                districtName: userInfo.districts?.find(d => d.id === familiyDistrict)?.name || "אחר",
+                id: familiyDistrict,
+                families: [],
+            }
+            districts.set(familiyDistrict, mahoz);
+        }
+
+        mahoz.families.push({
+            name: r.familyLastName,
+            id: r.mainBaseFamilyId,
+            // phone: r.phone,
+        } as IdName);
     });
 
     return Array.from(districts.values());

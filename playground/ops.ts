@@ -914,5 +914,36 @@ function getHolidays() {
         console.log(date.toLocaleDateString(), ev.render('he'), hd.toString());
     }
 }
+export interface FamilyCompact {
+    districtBaseFamilyId: string;
+    mainBaseFamilyId:string;
+    district: string;
+    familyLastName: string;
+    city: string;
+    active: boolean;
+}
 
-getHolidays()
+export async function searchFamilies(searchStr: string): Promise<FamilyCompact[]> {
+    const familyQuery = new AirTableQuery<FamilyCompact>("משפחות רשומות", (m) => {
+        return {
+            districtBaseFamilyId: "N/A",
+            mainBaseFamilyId: m.id,
+            district: getSafeFirstArrayElement(m.fields["מחוז"], ""),
+            familyLastName: m.fields.Name,
+            city: getSafeFirstArrayElement(m.fields["עיר"], ""), // todo it is ID
+            active: true,
+        }
+    });
+    const prefix = "משפחת ";
+
+    return familyQuery.execute([
+        `LEFT({Name}, ${searchStr.length + prefix.length}) = "${prefix + searchStr}"`,
+        "{סטטוס בעמותה}='פעיל'",
+    ])
+}
+
+// getHolidays()
+
+searchFamilies("עמ").then(f=>{
+    f.forEach(family=>console.log(family.familyLastName));
+})

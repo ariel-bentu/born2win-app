@@ -35,5 +35,6 @@ module.exports = {
     "require-jsdoc": "off",
     "@typescript-eslint/no-explicit-any": "off",
     "import/no-unresolved": "off",
+    "new-cap": "off",
   },
 };

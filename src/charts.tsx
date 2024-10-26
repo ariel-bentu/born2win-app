@@ -164,7 +164,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
                     locale="he"
                 /> */}
 
-                <WeekSelectorSlider setSelectedWeeks={setSelectedWeeks} selectedWeeks={selectedWeeks} />
+                <WeekSelectorSlider min={-4} max={6} setSelectedWeeks={setSelectedWeeks} selectedWeeks={selectedWeeks} />
                 <Button label="חודש קדימה" unstyled icon="pi pi-calendar" className="icon-btn icon-btn-withLabel text-xs mr-3"
                     onClick={() => {
                         setSelectedWeeks([0, 4]);

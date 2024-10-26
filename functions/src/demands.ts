@@ -5,31 +5,13 @@ import {
     AirTableRecord, Collections, FamilyDemand, NotificationChannels, Status,
 } from "../../src/types";
 import { airtableArrayCondition, dateInRange, getSafeFirstArrayElement } from "../../src/utils";
-import { AirTableGet, AirTableInsert, AirTableQuery, AirTableUpdate, CachedAirTable } from "./airtable";
+import { AirTableGet, AirTableInsert, AirTableQuery, AirTableUpdate } from "./airtable";
 import { activeFamilies } from "./families";
 import { Lock } from "./lock";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
+import { holidays } from "./holidays";
 
-interface Holiday {
-    id: string;
-    date: string;
-    name: string;
-    familyId?: string;
-    alternateDate?: string
-    addAvailability: boolean; // when true, it means the main "date" should be added to family
-}
-
-function holidayAirtable2Holiday(holiday: AirTableRecord): Holiday {
-    return {
-        id: holiday.id,
-        name: holiday.fields.Name,
-        date: holiday.fields["תאריך"],
-        alternateDate: holiday.fields["תאריך חלופי"],
-        addAvailability: holiday.fields["זמין"],
-        familyId: holiday.fields["משפחה"],
-    };
-}
 function mealAirtable2FamilyDemand(demand: AirTableRecord, cityName: string, active: boolean): FamilyDemand {
     return {
         id: demand.id,
@@ -46,8 +28,6 @@ function mealAirtable2FamilyDemand(demand: AirTableRecord, cityName: string, act
     };
 }
 
-// Holidays cache - 5 min
-const holidays = new CachedAirTable<Holiday>("חגים וחריגים", holidayAirtable2Holiday, ["AND(IS_AFTER({תאריך}, DATEADD(TODAY(), -1, 'days')))"], 5);
 
 export async function getDemands2(
     district: string | string[] | undefined,

@@ -52,6 +52,21 @@ export async function AirTableUpdate(tableName: string, id: string, updates: any
     });
 }
 
+export async function AirTableDelete(tableName: string, id: string) {
+    const url = `https://api.airtable.com/v0/${mainBase.value()}/${encodeURIComponent(tableName)}/${id}`;
+
+    const apiKey = born2winApiKey.value();
+
+    const headers = {
+        "Authorization": "Bearer " + apiKey,
+        "Content-Type": "application/json",
+    };
+
+    return axios.delete(url, {
+        headers,
+    }).then(res => res.data);
+}
+
 export class AirTableQuery<T> {
     private tableName: string;
     private mapper: (record: AirTableRecord) => T;

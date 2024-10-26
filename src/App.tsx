@@ -9,7 +9,7 @@ import 'primeflex/primeflex.css';
 import './App.css';
 import * as api from './api';
 import { NextOrObserver, User } from 'firebase/auth';
-import { AppServices, Cached, Errors, NavigationState, NavigationStep, OpenFamilyDemands, UserInfo } from './types';
+import { AdminAuthorities, AppServices, Cached, Errors, NavigationState, NavigationStep, OpenFamilyDemands, UserInfo } from './types';
 import { ClientJS } from 'clientjs';
 import NotificationsComponent from './notifications-component';
 import { countUnreadNotifications } from './notifications';
@@ -29,6 +29,7 @@ import { DisposeNavigationRequester, initializeNavigationRequester, openAppUrl }
 import PhoneRegistration from './phone-registration';
 import { Gallery } from './gallery';
 import { Button } from 'primereact/button';
+import { HolidaysAdmin } from './holidays';
 
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
 const UNSUPPORTED_PWA = "born2win_pwa";
@@ -566,6 +567,7 @@ function App() {
 
 
     const isAdmin = userInfo?.isAdmin && userInfo?.districts?.length;
+    const holidayAdmin = userInfo?.adminAuthorities?.includes(AdminAuthorities.ManageHoliday);
 
     /*
     header = 65
@@ -614,7 +616,8 @@ function App() {
         <div>Admin: {userInfo?.isAdmin ? "yes" : "no"} TokenAdmin: {isTokenAdmin ? "yes" : "no"}</div>
         <div>isChrome: {isChrome ? "Yes" : "No: "}</div>
         <div>Finger Print: {fingerprint}</div>
-        <div>Login Status: {user ? "uid:" + user.uid : "Not logged in"}</div>
+        <div>Login Status: {user ? user.uid : "Not logged in"}</div>
+        <div>Login Info: {userInfo?userInfo.firstName:"null"}</div>
         <div>VolunteerID: {volunteerId ? volunteerId : "Missing"}</div>
         <div>Notification Permission: {notificationPermission}</div>
         <div>Notification Token: {userInfo?.notificationToken ? "Exists: " + userInfo.notificationToken.token.substring(0, 5) + "..." : "Missing"}</div>
@@ -693,6 +696,12 @@ function App() {
                         {activeIndex === 5 &&
                             <Gallery storagePath={"/gallery"} userInfo={userInfo} appServices={appServices} topPosition={tabContentsTop} />}
                     </TabPanel>
+                    {userInfo && holidayAdmin && 
+                     <TabPanel headerStyle={{ fontSize: 20 }} header="חגים">
+                     {activeIndex === 6 &&
+                         <HolidaysAdmin userInfo={userInfo} appServices={appServices} topPosition={tabContentsTop} />}
+                 </TabPanel>
+                    }
                 </TabView>}
         </div >
     );

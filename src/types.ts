@@ -110,6 +110,7 @@ export interface UserInfo {
     phone: string,
     userDistrict: { id: string, name: string },
     isAdmin: boolean,
+    adminAuthorities?:AdminAuthorities[],
     needToSignConfidentiality?: string;
     districts?: { id: string, name: string }[],
     active: boolean;
@@ -234,6 +235,10 @@ export type AppServices = {
     popNavigationStep: () => void;
 }
 
+export interface IdName {
+    id:string;
+    name:string;
+}
 
 
 export interface FamilyCompact {
@@ -243,6 +248,10 @@ export interface FamilyCompact {
     familyLastName: string;
     city: string;
     active: boolean;
+}
+
+export interface SearchFamilyPayload {
+    searchStr:string;
 }
 
 
@@ -261,6 +270,7 @@ export interface FamilyDetails {
     kosherLevel: string;
     favoriteFood: string;
     alergies: string;
+    importantNotice:string;
     adultsCount: number;
     familyStructure: string[];
     familyMembersAge: string;
@@ -286,4 +296,27 @@ export enum Status {
     Occupied = "תפוס",
     Available = "זמין",
     Active = "פעיל",
+}
+
+export interface Holiday {
+    id: string;
+    date: string;
+    name: string;
+    familyId?: string;
+    familyName?:string;
+    alternateDate?: string
+    addAvailability: boolean; // when true, it means the main "date" should be added to family
+}
+
+export interface UpsertHolidayPayload {
+    holiday: Holiday,
+}
+
+export interface GetRegisteredHolidaysPayload {
+    from: string;
+    to:string;
+}
+
+export enum AdminAuthorities {
+    ManageHoliday= 1,  
 }

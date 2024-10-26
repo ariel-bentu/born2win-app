@@ -231,6 +231,9 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                         {isNotEmpty(alergies) ? <div className="alergies">נא לשים לב לאלרגיה! {alergies}</div> :
                             <div><strong>אלרגיות:</strong> אין</div>}
                     </li>
+                    {isNotEmpty(familyDetails.importantNotice) && <li>
+                        <div className="alergies"><strong>נא לשים לב:</strong> {familyDetails.importantNotice}</div>
+                    </li>}
                     <li><strong>שימו לב! ימי הבישול הם:</strong> {familyDetails.cookingDays?.join(", ") || ""}</li>
                     {includeContacts && <>
                         <li><strong>כתובת:</strong>{getAddress(familyDetails)}</li>

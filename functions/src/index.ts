@@ -41,7 +41,7 @@ import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/fire
 import { getSafeFirstArrayElement, IL_DATE, replaceAll, simplifyFamilyName } from "../../src/utils";
 import localeData = require("dayjs/plugin/localeData");
 import { SendLinkOrInstall, weeklyNotifyFamilies } from "./scheduled-functions";
-import { AirTableUpdate, CachedAirTable } from "./airtable";
+import { AirTableQuery, AirTableUpdate, CachedAirTable } from "./airtable";
 import { getDemands2, updateFamilityDemand } from "./demands";
 import { getFamilyDetails2, searchFamilies } from "./families";
 import { Lock } from "./lock";
@@ -1246,8 +1246,14 @@ exports.doSchedule = onSchedule({
 });
 
 async function remindVolunteersToRegister() {
+    const query = new AirTableQuery<{ id: string, familyCount: number }>("מחוז", (rec) => ({
+        id: rec.id,
+        familyCount: rec.fields["כמות משפחות פעילות במחוז"],
+    }));
+    const districtsIdsWithFamilies = (await query.execute()).filter(d => d.familyCount > 0).map(d => d.id);
+
     await addNotificationToQueue("תזכורת לשיבוצים!",
-        "הכנסו לאפליקציה לבחור למי תתנו חיבוק החודש. ניתן להרשם בלשונית השיבוצים", NotificationChannels.Registrations, [], "all");
+        "הכנסו לאפליקציה לבחור למי תתנו חיבוק החודש. ניתן להרשם בלשונית השיבוצים", NotificationChannels.Registrations, districtsIdsWithFamilies, []);
 }
 
 async function greetingsToBirthdays() {

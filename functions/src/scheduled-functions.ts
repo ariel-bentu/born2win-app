@@ -174,7 +174,7 @@ export async function SendLinkOrInstall() {
     const query = new AirTableQuery<{ id: string, familyCount: number }>("מחוז", (rec) => ({
         id: rec.id,
         familyCount: rec.fields["כמות משפחות פעילות במחוז"],
-    }))
+    }));
     const districtsIdsWithFamilies = (await query.execute()).filter(d => d.familyCount > 0).map(d => d.id);
 
     const users = await db.collection(Collections.Users).where("active", "==", true).get();

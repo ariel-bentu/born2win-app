@@ -507,7 +507,7 @@ function familyAirtable2FamilyDetails(rec: AirTableRecord, cityName: string, inc
         sideDishes: getSafeFirstArrayElement(rec.fields["תוספות"], ""),
         kosherLevel: rec.fields["כשרות מטבח"],
         favoriteFood: rec.fields["אוהבים לאכול"],
-
+        importantNotice: rec.fields["נא לשים לב"],
         alergies: getSafeFirstArrayElement(rec.fields["רגישויות ואלרגיות"], ""),
         adultsCount: getSafeFirstArrayElement(rec.fields["מספר נפשות הגרים בבית"], 1), // todo fix name of field
         familyStructure: getSafeFirstArrayElement(rec.fields["הרכב הורים"], ""),
@@ -692,21 +692,31 @@ enum ManyChatFlows {
 export async function SendLinkOrInstall() {
     const date = dayjs().format(DATE_AT);
 
-    const users = await db.collection(Collections.Users).where("active", "==", true).get();
-    const relevantUsers = users.docs.filter(u => u.data().uid == undefined && u.data().manychat_id !== undefined && u.data().sendWeeklyMessage !== date);
+    const query = new AirTableQuery<any>("מחוז", (rec)=>({
+        id: rec.id,
+        familyCount: rec.fields["כמות משפחות פעילות במחוז"],
+    }))
 
-    const usersForInstallMsg = relevantUsers.filter(u => u.data().mahoz === "recmLo9MWRxmrLEsM");
-    const usersForLink = relevantUsers.filter(u => u.data().mahoz !== "recmLo9MWRxmrLEsM");
+    const districtsIdsWithFamilies = (await query.execute()).filter(d=>d.familyCount > 0).map(d=>d.id);
+
+
+    const users = await db.collection(Collections.Users).where("active", "==", true).get();
+    const relevantUsers = users.docs.filter(u => 
+        u.data().uid == undefined && 
+        u.data().manychat_id !== undefined && 
+        u.data().sendWeeklyMessage !== date &&
+        districtsIdsWithFamilies.includes(u.data().mahoz)
+    );
 
 
     let bulk: Promise<any>[] = [];
     let totalInstall = 0;
     let totalLinks = 0;
     let errCount = 0;
-    for (const user of usersForInstallMsg) {
+    for (const user of relevantUsers) {
         if (bulk.length == 10) {
             await Promise.all(bulk);
-            console.log("10 more send", totalInstall, "of", usersForInstallMsg.length);
+            console.log("10 more send", totalInstall, "of", relevantUsers.length);
             await delay(1000);
             bulk = [];
         }
@@ -722,23 +732,23 @@ export async function SendLinkOrInstall() {
     }
     await Promise.all(bulk);
     bulk = [];
-    for (const user of usersForLink) {
-        if (bulk.length == 10) {
-            await Promise.all(bulk);
-            await delay(1000);
-            console.log("10 more send", totalLinks, "of", usersForLink.length);
-            bulk = [];
-        }
-        bulk.push(sendToManychat(user.data().manychat_id, ManyChatFlows.SendOldLink, {})
-            .then(() => user.ref.update({ sendWeeklyMessage: date }))
-            .catch(error => {
-                console.log("Error sending old link", error.message, "man_id", user.data().manychat_id);
-                errCount++;
-                return { user, error };
-            }));
+    // for (const user of usersForLink) {
+    //     if (bulk.length == 10) {
+    //         await Promise.all(bulk);
+    //         await delay(1000);
+    //         console.log("10 more send", totalLinks, "of", usersForLink.length);
+    //         bulk = [];
+    //     }
+    //     bulk.push(sendToManychat(user.data().manychat_id, ManyChatFlows.SendOldLink, {})
+    //         .then(() => user.ref.update({ sendWeeklyMessage: date }))
+    //         .catch(error => {
+    //             console.log("Error sending old link", error.message, "man_id", user.data().manychat_id);
+    //             errCount++;
+    //             return { user, error };
+    //         }));
 
-        totalLinks++;
-    }
+    //     totalLinks++;
+    // }
     await Promise.all(bulk);
 
     console.log("Finish running. err", errCount, "install", totalInstall, "links", totalLinks);
@@ -944,6 +954,6 @@ export async function searchFamilies(searchStr: string): Promise<FamilyCompact[]
 
 // getHolidays()
 
-searchFamilies("עמ").then(f=>{
-    f.forEach(family=>console.log(family.familyLastName));
-})
+// searchFamilies("עמ").then(f=>{
+//     f.forEach(family=>console.log(family.familyLastName));
+// })

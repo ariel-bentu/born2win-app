@@ -267,7 +267,7 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
         doc = await findUserByFingerprint(uulp.fingerprint);
 
         if (!doc) {
-            logger.error("Fingerprint not found", uulp);
+            logger.info("Fingerprint not found", uulp);
             throw new HttpsError("not-found", "Fingerprint not found");
         }
         const devOtp = doc.data()?.devOtp;
@@ -970,7 +970,7 @@ interface City {
 const cities = new CachedAirTable<City>("ערים", (city => {
     return {
         id: city.id,
-        name: city.fields["שם"].replaceAll("\n", ""),
+        name: city.fields["שם"].replaceAll("\n", "").replaceAll("\"", "").trim(),
         district: city.fields["מחוז"][0],
     };
 }), ["{כמות משפחות פעילות בעיר}>0"], 60 * 24);
@@ -1132,7 +1132,7 @@ exports.GetVolunteerInfo = onCall({ cors: true }, async (request): Promise<Volun
                     id: volunteerDoc.id,
                     firstName: data.firstName,
                     lastName: data.lastName,
-                    city: cities.find(c => c.id == data.cityId)?.district || "N/A",
+                    city: cities.find(c => c.id == data.cityId)?.name || "N/A",
                     district: { id: data.mahoz, name: volunteerDistrict ? volunteerDistrict.name : "" },
                     phone: data.phone,
                     active: data.active,

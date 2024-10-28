@@ -6,6 +6,7 @@ import { FieldPath } from "firebase-admin/firestore";
 import localeData = require("dayjs/plugin/localeData");
 import { Collections, NotificationChannels } from "../../src/types";
 import { getDemands2 } from "./demands";
+import { AirTableQuery } from "./airtable";
 
 require("dayjs/locale/he");
 dayjs.extend(localeData);
@@ -170,8 +171,19 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export async function SendLinkOrInstall() {
     const date = dayjs().format(DATE_AT);
 
+    const query = new AirTableQuery<{ id: string, familyCount: number }>("מחוז", (rec) => ({
+        id: rec.id,
+        familyCount: rec.fields["כמות משפחות פעילות במחוז"],
+    }))
+    const districtsIdsWithFamilies = (await query.execute()).filter(d => d.familyCount > 0).map(d => d.id);
+
     const users = await db.collection(Collections.Users).where("active", "==", true).get();
-    const relevantUsers = users.docs.filter(u => u.data().uid == undefined && u.data().manychat_id !== undefined && u.data().sendWeeklyMessage !== date);
+    const relevantUsers = users.docs.filter(u =>
+        u.data().uid == undefined &&
+        u.data().manychat_id !== undefined &&
+        u.data().sendWeeklyMessage !== date &&
+        districtsIdsWithFamilies.includes(u.data().mahoz)
+    );
 
     let bulk: Promise<any>[] = [];
     let totalInstall = 0;

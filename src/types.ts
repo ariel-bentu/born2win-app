@@ -289,6 +289,7 @@ export interface FamilyDetails {
 export const Errors = {
     UserAlreadyOnboardedToApp: "User is already onboarded to the app",
     InactiveUser: "Inactive user",
+    OldLinkBlocked: "גישה דרך הלינק חסומה - יש להתקין את האפליקציה",
 }
 
 export enum Status {

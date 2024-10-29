@@ -893,19 +893,22 @@ async function authenticate(request: CallableRequest<any>): Promise<QueryDocumen
 
     // TEMP anonymous access - remove after app-adoption
     if (impersonateUser && impersonateUser.startsWith("OLD:")) {
-        const oldAccessUserID = impersonateUser.substring(4);
-        const impersonateDoc = await getUserByID(oldAccessUserID);
-        if (!impersonateDoc) {
-            throw new HttpsError("not-found", "impersonated user not found");
-        }
+        logger.warn("Old link access blocked", impersonateUser);
+        throw new HttpsError("permission-denied", Errors.OldLinkBlocked);
 
-        if (impersonateDoc.data()?.loginInfo && impersonateDoc.data()?.loginInfo.length > 0) {
-            // user is already onboarded to app - reject old access
-            logger.warn(Errors.UserAlreadyOnboardedToApp, oldAccessUserID);
-            throw new HttpsError("permission-denied", Errors.UserAlreadyOnboardedToApp);
-        }
+        // const oldAccessUserID = impersonateUser.substring(4);
+        // const impersonateDoc = await getUserByID(oldAccessUserID);
+        // if (!impersonateDoc) {
+        //     throw new HttpsError("not-found", "impersonated user not found");
+        // }
 
-        return impersonateDoc as QueryDocumentSnapshot;
+        // if (impersonateDoc.data()?.loginInfo && impersonateDoc.data()?.loginInfo.length > 0) {
+        //     // user is already onboarded to app - reject old access
+        //     logger.warn(Errors.UserAlreadyOnboardedToApp, oldAccessUserID);
+        //     throw new HttpsError("permission-denied", Errors.UserAlreadyOnboardedToApp);
+        // }
+
+        // return impersonateDoc as QueryDocumentSnapshot;
     }
 
     const doc = await findUserByUID(uid);

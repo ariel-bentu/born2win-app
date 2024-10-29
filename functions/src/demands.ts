@@ -59,7 +59,7 @@ export async function getDemands2(
     filters.push(`IS_BEFORE({DATE}, '${dayjs(dateEnd).add(1, "day").format(DATE_AT)}')`);
 
     if (volunteerId) {
-        filters.push(airtableArrayCondition("vol_id", volunteerId));
+        filters.push(`OR(${airtableArrayCondition("vol_id", volunteerId)}, ${airtableArrayCondition("transport_vol_id", volunteerId)})`);
     }
 
     const meals = await mealsQuery.execute(filters);

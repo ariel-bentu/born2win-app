@@ -3,12 +3,12 @@ import { Calendar, CalendarDateTemplateEvent, CalendarMonthChangeEvent } from "p
 import "./registration.css";
 
 
-import { analyticLog, getFamilyDetails, impersonateUser, updateFamilityDemand } from "./api";
+import {analyticLog, getFamilyDetails, getVolunteerInfo, impersonateUser, updateFamilityDemand} from "./api";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
 import { ChannelHeader, InProgress, PhoneNumber } from "./common-ui";
-import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails } from "./types";
+import {AppServices, FamilyCompact, FamilyDemand, FamilyDetails, VolunteerInfo} from "./types";
 import { isNotEmpty, nicePhone } from "./utils";
 import { ProgressSpinner } from "primereact/progressspinner";
 import { SelectButton } from "primereact/selectbutton";
@@ -27,6 +27,7 @@ interface FamilyDetailsComponentProps {
     includeContacts: boolean;
     date?: string //used to include it in the message to impersonated users
     analyticComponent: string;
+    actualUserId: string;
 }
 
 function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
@@ -39,12 +40,14 @@ function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
 
 
 export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandId,
-    onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts, date, analyticComponent }: FamilyDetailsComponentProps) {
+    onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts, date, analyticComponent, actualUserId, }: FamilyDetailsComponentProps) {
     const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
     const [selectedDate, setSelectedDate] = useState<Nullable<Date>>(null);
     const [error, setError] = useState<any>(undefined);
     const [loading, setLoading] = useState<boolean>(false);
     const [reload, setReload] = useState<number>(0);
+    const [transportingVolunteer, setTranspotingVolunteer] = useState<VolunteerInfo|undefined>(undefined);
+    const [volunteerInfo, setVolunteerInfo] = useState<VolunteerInfo | undefined>();
     const [saving, setSaving] = useState<boolean>(false);
     const [viewDate, setViewDate] = useState(new Date());
 
@@ -85,9 +88,24 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                 .then(res => setFamilyDetails(res))
                 .catch(err => setError(err))
                 .finally(() => setLoading(false));
+            const demand = demands.find(d => d.id === familyDemandId);
+            if (demand && demand.transpotingVolunteerId) {
+                getVolunteerInfo(demand.transpotingVolunteerId).then(v => {
+                    setTranspotingVolunteer(v);
+                })
+            } else {
+                setTranspotingVolunteer(undefined);
+            }
+            if (demand && demand.volunteerId) {
+                getVolunteerInfo(demand.volunteerId).then(info => {
+                    setVolunteerInfo(info);
+                });
+            } else {
+                setVolunteerInfo(undefined);
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [mainBaseFamilyId, detailsOnly, reload]);
+    }, [mainBaseFamilyId, familyDemandId, detailsOnly, reload]);
 
     const availableDates = demands.map(demand => new Date(demand.date));
     const isDateAvailable = (event: CalendarDateTemplateEvent) => {
@@ -238,11 +256,31 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                     {includeContacts && <>
                         <li><strong>כתובת:</strong>{getAddress(familyDetails)}</li>
                         {isNotEmpty(familyDetails.contactName) && (
-                            <li><strong>איש קשר:</strong> {familyDetails.contactName}</li>
+                            <li><strong>איש קשר משפחה:</strong> {familyDetails.contactName}</li>
                         )}
                         {isNotEmpty(familyDetails.phone) && (<li>
-                            <PhoneNumber phone={familyDetails.phone} />
+                            <PhoneNumber phone={familyDetails.phone} label="טלפון איש קשר משפחה"/>
                         </li>)}
+                        {volunteerInfo && transportingVolunteer && transportingVolunteer.id == actualUserId &&(
+                            <>
+                                <li><strong>שם מבשל:</strong> {volunteerInfo.firstName+ " " + volunteerInfo.lastName}</li>
+                                {volunteerInfo?.phone && (
+                                    <li>
+                                        <PhoneNumber phone={volunteerInfo.phone} label="טלפון מבשל"/>
+                                    </li>
+                                )}
+                            </>
+                        )}
+                        {transportingVolunteer && volunteerInfo && volunteerInfo.id == actualUserId &&(
+                            <>
+                                <li><strong>שם משנע:</strong> {transportingVolunteer.firstName+ " " + transportingVolunteer.lastName}</li>
+                                {transportingVolunteer?.phone && (
+                                    <li>
+                                        <PhoneNumber phone={transportingVolunteer.phone} label="טלפון משנע"/>
+                                    </li>
+                                )}
+                            </>
+                        )}
                         {impersonateUser && impersonateUser.phone && (<li className="flex align-items-center">
                             <strong>שלח פרטים ל{impersonateUser.name}</strong>
                             <Button
@@ -253,7 +291,6 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                             />
                         </li>)}
                     </>}
-
                 </ul>}
         </div>
     );

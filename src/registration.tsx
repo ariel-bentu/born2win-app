@@ -135,7 +135,8 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
                                 appServices.popNavigationStep();
                             }}
                             appServices={appServices} demands={selectedFamilyDemand || []}
-                            reloadOpenDemands={reloadOpenDemands} includeContacts={false} /> :
+                            reloadOpenDemands={reloadOpenDemands} includeContacts={false}
+                            actualUserId={actualUserId}/> :
                         <>
                             {standalone && <span className='standalone-text-title'>אלו הערים שבהן ניתן לחבק משפחות החודש</span>}
                             <MultiSelect

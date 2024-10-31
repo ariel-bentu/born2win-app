@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
-import { getUserRegistrations } from './api';
+import {getUserRegistrations, getVolunteerInfo} from './api';
 import { SelectButton } from 'primereact/selectbutton';
-import { AppServices, FamilyCompact, FamilyDemand, NavigationStep, UserInfo } from './types';
+import {AppServices, FamilyCompact, FamilyDemand, NavigationStep, UserInfo, VolunteerInfo} from './types';
+import { FaUtensils, FaTruck } from 'react-icons/fa'; // Import cooking and transporting icons
+import { GiCookingPot } from 'react-icons/gi';
 
 import { InProgress } from './common-ui';
 import OneLine from './one-line';
@@ -33,6 +35,8 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
     const [loading, setLoading] = useState<boolean>(false);
     const [reload, setReload] = useState<number>(0);
     const [showCancellationDialog, setShowCancellationDialog] = useState<FamilyDemand | null>(null);
+    const [volunteerInfo, setVolunteerInfo] = useState<VolunteerInfo | undefined>();
+
 
     useEffect(() => {
         setLoading(true);
@@ -73,6 +77,14 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                 const navTo = regs.find(reg => reg.id);
                 setCurrentRegistration(navTo);
                 appServices.pushNavigationStep("registration", () => setCurrentRegistration(undefined));
+            }
+            // Fetch volunteer info if a valid registration is selected
+            if (regs.length > 0 && regs[0].volunteerId) {
+                getVolunteerInfo(regs[0].volunteerId).then(info => {
+                    setVolunteerInfo(info);
+                }).catch(err => {
+                    console.error("Failed to fetch volunteer info:", err);
+                });
             }
         })
             .catch(err => setError(err))
@@ -115,7 +127,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                 setCurrentRegistration(undefined)
                 appServices.popNavigationStep();
             }}
-            appServices={appServices} demands={registrations} reloadOpenDemands={() => { }} includeContacts={true} />
+            appServices={appServices} demands={registrations} reloadOpenDemands={() => { }} includeContacts={true}  actualUserId={actualUserId}/>
     }
 
     if (showCancellationDialog) {
@@ -153,33 +165,105 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
             {loading && <InProgress />}
             <div className="surface-ground px-4 py-5 md:px-6 lg:px-8">
                 <div className="grid">
-                    {registrationsToShow?.length ?
-                        registrationsToShow.map(reg => (
-                            <OneLine
-                                key={reg.id}
-                                hideIcon={true}
-                                title={reg.familyLastName}
-                                body={`עיר: ${reg.city}\nמתי: ${getReferenceDays(reg.date)}`}
-                                footer={dayjs(reg.date).format(NICE_DATE)}
-                                unread={isInFuture(reg.date)}
-                                onRead={() => {
-                                    setCurrentRegistration(reg);
-                                    appServices.pushNavigationStep("family-details-existing-reg", () => setCurrentRegistration(undefined));
-                                }}
-                                onDelete={dayjs(reg.date).isBefore(dayjs()) ?
-                                    undefined : // only allow deleting future commitments
-                                    () => {
-                                        setShowCancellationDialog(reg)
-                                        appServices.pushNavigationStep("cancel-reg", () => setCurrentRegistration(undefined));
-                                    }}
-                                deleteLabel={"ביטול שיבוץ"}
-                            />
-                        )) :
+                    {registrationsToShow?.length ? (
+                        registrationsToShow.flatMap((reg) => {
+                            const lines = [];
+                            // Cooking line (if volunteerId is present and current user is the volunteer)
+                            if (reg.volunteerId === actualUserId) {
+                                lines.push(
+                                    <OneLine
+                                        key={`cooking-${reg.id}`}
+                                        hideIcon={false}
+                                        icon={
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    backgroundColor: 'inherit',
+                                                    padding: '0.2rem 0.5rem',
+                                                    borderRadius: '0.5rem',
+                                                    gap: '0.5rem', // Space between icon and text
+                                                    flexDirection: 'row-reverse', // Ensures text is on the right of the icon in RTL
+                                                    marginLeft: '1cm', // Moves both icon and text to the right
+                                                }}
+                                            >
+                                                <GiCookingPot style={{ fontSize: '2.5rem' }} />
+                                                <span>בישול</span>
+                                            </div>
+                                        }
+                                        title={reg.familyLastName}
+                                        body={`עיר: ${reg.city}\nמתי: ${getReferenceDays(reg.date)}`}
+                                        footer={dayjs(reg.date).format(NICE_DATE)}
+                                        unread={isInFuture(reg.date)}
+                                        className="cooking-color" // Apply specific color for cooking
+                                        onRead={() => {
+                                            setCurrentRegistration(reg);
+                                            appServices.pushNavigationStep("family-details-existing-reg", () => setCurrentRegistration(undefined));
+                                        }}
+                                        onDelete={
+                                            dayjs(reg.date).isBefore(dayjs())
+                                                ? undefined
+                                                : () => {
+                                                    setShowCancellationDialog(reg);
+                                                    appServices.pushNavigationStep("cancel-reg", () => setCurrentRegistration(undefined));
+                                                }
+                                        }
+                                        deleteLabel={"ביטול שיבוץ"}
+                                    />
+                                );
+                            }
+                            const cookingVolunteerCity = volunteerInfo ? volunteerInfo.city : ""; // Assuming volunteerInfo has the city of the cooking volunteer
+                            const transportingDestinationCity = reg.city; // Assuming reg.city is the target city for transportation
+
+                            // Transporting line (if transpotingVolunteerId is present and current user is the transporting volunteer)
+                            if (reg.transpotingVolunteerId === actualUserId) {
+                                lines.push(
+                                    <OneLine
+                                        key={`transport-${reg.id}`}
+                                        hideIcon={false}
+                                        icon={
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    backgroundColor: 'inherit',
+                                                    padding: '0.2rem 0.5rem',
+                                                    borderRadius: '0.5rem',
+                                                    gap: '0.5rem', // Space between icon and text
+                                                    flexDirection: 'row-reverse', // Ensures text is on the right of the icon in RTL
+                                                    marginLeft: '1cm', // Moves both icon and text to the right
+                                                }}
+                                            >
+                                                <FaTruck style={{ fontSize: '2.5rem' }} />
+                                                <span>שינוע</span>
+                                            </div>
+                                        }
+                                        title={reg.familyLastName}
+                                        body={`מעיר: ${transportingDestinationCity}\n לעיר: ${transportingDestinationCity}\nמתי: ${getReferenceDays(reg.date)}`}
+                                        footer={dayjs(reg.date).format(NICE_DATE)}
+                                        unread={isInFuture(reg.date)}
+                                        className="transporting-color"
+                                        onRead={() => {
+                                            setCurrentRegistration(reg);
+                                            appServices.pushNavigationStep("family-details-existing-reg", () => {
+                                                setCurrentRegistration(undefined);
+                                            });
+                                        }}
+                                    />
+                                );
+
+
+
+                            }
+
+                            return lines;
+                        })
+                    ) : (
                         <div className='no-messages'>אין רישומים</div>
-                    }
+                    )}
                 </div>
             </div>
         </div>
-    );
+            );
 };
 

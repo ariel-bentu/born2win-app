@@ -1030,8 +1030,11 @@ exports.UpdateDemandTransportation = onCall({ cors: true }, async (request) => {
         },
     };
     // eslint-disable-next-line new-cap
-    await AirTableUpdate("ארוחות", udtp.demandId, updateTransportationFields);
-    logger.info("Transporating volunteer is added", udtp.demandId, "transport-vid", transpotingVolunteerId);
+    await AirTableUpdate("ארוחות", udtp.demandId, updateTransportationFields)
+        .then(() => logger.info("Transporating volunteer is added", udtp.demandId, "transport-vid", transpotingVolunteerId))
+        .finally(() => {
+            lock.release();
+        });
 });
 
 

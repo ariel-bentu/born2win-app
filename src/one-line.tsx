@@ -133,7 +133,7 @@ export default function OneLine({
                     </div>
                     {unread && <div className="red-dot" />}
                     {!hideIcon && (
-                        <div className="flex relative align-items-center justify-content-center bg-purple-100 border-round" style={{ width: '2.5rem', height: '2.5rem' }}>
+                        <div className="flex absolute  border-round" style={{ left: 50, top: 50, width: '2.5rem', height: '2.5rem' }}>
                             {icon || <i className="pi pi-comment text-purple-500 text-xl"></i>}
                         </div>
                     )}

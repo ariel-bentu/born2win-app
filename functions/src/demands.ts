@@ -90,7 +90,8 @@ export async function getDemands2(
         if (holidays.length && holidays.some(h => !h.familyId && !h.alternateDate)) continue;
 
         const day = date.day();
-        const familiesInDay = families.filter(f => f.days.some(d => d == day));
+        const familiesInDay = families.filter(f => f.days.length > 0 && f.days[0] == day); // ignore more than one day of cooking - take the first
+
         // Now check if this date for this family does not exist
         for (const family of familiesInDay) {
             // skip if this family is blocked for this date with no alternate
@@ -102,7 +103,11 @@ export async function getDemands2(
 
             if (!dateInRange(actualDate, startVacant, endDate)) continue;
 
-            if (!meals.find(m => dayjs(m.date).format(DATE_AT) == actualDate && m.mainBaseFamilyId == family.id)) {
+            // Find meals in this day, or any other day in the same week.
+            // The reason for the week range, is that when a family's cooking days change, and a meal is already scheduled, we
+            // do not want another day to be openned
+
+            if (!meals.find(m => dayjs(m.date).locale("he").isSame(actualDate, "week") && m.mainBaseFamilyId == family.id)) {
                 addedOpenDemands.push({
                     id: getCalcDemandID(family.id, actualDate, family.cityId),
                     date: actualDate,

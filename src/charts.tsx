@@ -327,6 +327,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
     if (showFamilyDetails) {
         return <FamilyDetailsComponent
             analyticComponent="Management"
+            showInactiveFamilyLabel={true}
             appServices={appServices} demands={demands}
             mainBaseFamilyId={showFamilyDetails.mainBaseFamilyId}
             family={showFamilyDetails}

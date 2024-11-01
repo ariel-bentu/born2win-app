@@ -28,6 +28,7 @@ interface FamilyDetailsComponentProps {
     date?: string //used to include it in the message to impersonated users
     analyticComponent: string;
     actualUserId: string;
+    showInactiveFamilyLabel?: boolean;
 }
 
 function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
@@ -40,7 +41,8 @@ function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
 
 
 export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandId,
-    onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts, date, analyticComponent, actualUserId, }: FamilyDetailsComponentProps) {
+    onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts,
+     date, analyticComponent, actualUserId, showInactiveFamilyLabel}: FamilyDetailsComponentProps) {
     const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
     const [selectedDate, setSelectedDate] = useState<Nullable<Date>>(null);
     const [error, setError] = useState<any>(undefined);
@@ -150,7 +152,7 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
 
     return (
         <div className="flex flex-column relative justify-content-center w-full p-3" style={{ maxWidth: 700 }}>
-            <ChannelHeader name={family.familyLastName + (family.active ? "" : " - לא פעילה")} onBack={onClose} />
+            <ChannelHeader name={family.familyLastName + (family.active || !showInactiveFamilyLabel ? "" : " - לא פעילה")} onBack={onClose} />
             <div className="flex flex-row w-12 justify-content-end mb-2">
                 {!detailsOnly &&
                     <div className="flex flex-column justify-content-start align-items-start w-12 pr-3">

@@ -6,6 +6,7 @@ export const Collections = {
     Notifications: "notifications",
     Cancellations: "cancellations",
     Locks: "locks",
+    DeferredNotifications: "deferredNotifications"
 };
 
 export const NotificationActions = {

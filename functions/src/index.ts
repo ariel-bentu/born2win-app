@@ -574,7 +574,8 @@ exports.SearchUsers = onCall({ cors: true }, async (request): Promise<Recipient[
  * @returns
  */
 
-export async function addNotificationToQueue(title: string, body: string, channel: NotificationChannels, toDistricts: string[], toRecipients: string[] | string, data?: { [key: string]: string }) {
+export async function addNotificationToQueue(title: string, body: string, channel: NotificationChannels,
+    toDistricts: string[], toRecipients: string[] | string, data?: { [key: string]: string }, delayInMin?: number) {
     const docRef = db.collection(Collections.Notifications).doc();
     if (data) {
         data.channel = channel;
@@ -588,14 +589,23 @@ export async function addNotificationToQueue(title: string, body: string, channe
         toDistricts,
         toRecipients,
         created: dayjs().format(DATE_TIME),
+        ...(delayInMin && delayInMin > 0 ? { delayInMin } : {}),
     }).then(() => docRef.id);
 }
 
 exports.OnNotificationAdded = onDocumentCreated(`${Collections.Notifications}/{docId}`, async (event) => {
     if (event.data) {
         const payloadData = event.data.data();
-        const { title, body, toRecipients, toDistricts } = payloadData;
+        const { title, body, toRecipients, toDistricts, delayInMin } = payloadData;
         const data = payloadData.data ? JSON.parse(payloadData.data) : undefined;
+
+        if (delayInMin > 0) {
+            await db.collection(Collections.DeferredNotifications).doc().create({
+                notificationDocId: event.params.docId,
+                notBefore: dayjs().add(delayInMin, "minutes").format(DATE_TIME),
+            });
+            return;
+        }
 
         const waitFor = [];
         if (toRecipients && toRecipients.length > 0) {
@@ -1202,7 +1212,7 @@ exports.httpApp = onRequest(app);
  * desc: for logs
  * min: the minute in the hour, or * for every minute
  * hour: a number or an array of numbers - the hour in the day to run the scheduled task, * for every hour
- * weekday: day in the week 0-Sat, 1-Sun,..., * for every day
+ * weekday: day in the week 0-Sun, 2-Mon,...6-Sat, * for every day
  * callback: an async function to call at the scheduled time
 */
 
@@ -1213,9 +1223,10 @@ const schedules = [
     { desc: "Alert 5 days ahead open demand", min: 40, hour: [13], weekDay: "*", callback: alertOpenDemands },
     { desc: "Alert 72 hours before cooking", min: 0, hour: [10], weekDay: "*", callback: alertUpcomingCooking },
     { desc: "Birthdays greeting", min: 0, hour: [10], weekDay: "*", callback: greetingsToBirthdays },
-    { desc: "Weekly Message to Families", min: 0, hour: [20], weekDay: "0", callback: weeklyNotifyFamilies },
+    { desc: "Weekly Message to Families", min: 0, hour: [20], weekDay: "6", callback: weeklyNotifyFamilies },
     { desc: "Links to install or old-link on Sunday at 09:00", min: 0, hour: [9], weekDay: 0, callback: SendLinkOrInstall },
     { desc: "Reminder to all volunteers via app", min: 0, hour: [10], weekDay: 0, callback: remindVolunteersToRegister },
+    { desc: "Deffered Notifications", min: [0, 30], hour: "*", weekDay: "*", callback: checkDeferredNotifications },
     // todo - archive notifications
 ];
 
@@ -1250,6 +1261,29 @@ exports.doSchedule = onSchedule({
 
     await Promise.all(waitFor);
 });
+
+async function checkDeferredNotifications() {
+    const now = dayjs().format(DATE_TIME);
+    const deferredNotifications = await db.collection(Collections.DeferredNotifications).where("notBefore", "<", now).get();
+    if (!deferredNotifications.empty) {
+        const batch = db.batch();
+        for (const deferedNotif of deferredNotifications.docs) {
+            const notificationDocId = deferedNotif.data().notificationDocId;
+            const notifDoc = await db.collection(Collections.Notifications).doc(notificationDocId).get();
+            if (notifDoc.exists) {
+                // create new record without delay
+                const notifData = notifDoc.data();
+                if (notifData) {
+                    delete notifData.delayInMin;
+                    batch.create(db.collection(Collections.Notifications).doc(), notifData);
+                }
+            }
+            // remove the deferred delay record
+            batch.delete(deferedNotif.ref);
+        }
+        batch.commit();
+    }
+}
 
 async function remindVolunteersToRegister() {
     const query = new AirTableQuery<{ id: string, familyCount: number }>("מחוז", (rec) => ({
@@ -1608,7 +1642,15 @@ async function syncBorn2WinFamilies() {
         await addNotificationToQueue("משפחה חדשה", becameActive.map(nf => `
 משפחה: ${nf.name}
 מחוז: ${nf.district}
-עיר: ${nf.city}`).join("\n---\n"), NotificationChannels.Alerts, [], adminsIds);
+עיר: ${nf.city}
+`).join("\n---\n") + "\nבשעה הקרובה תשלח הודעה למתנדבי המחוז.", NotificationChannels.Alerts, [], adminsIds);
+
+        // send a delayed message to the families' districts:
+        for (const family of becameActive) {
+            await addNotificationToQueue("הצטרפה משפחה חדשה", `
+                משפחה: ${family.name}
+                עיר: ${family.city}`, NotificationChannels.Alerts, [family.district], [], {}, 65);
+        }
     }
 }
 

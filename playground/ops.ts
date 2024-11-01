@@ -312,6 +312,7 @@ function mealAirtable2FamilyDemand(demand: AirTableRecord, cityName: string, act
         districtBaseFamilyId: "N/A",
         volunteerId: getSafeFirstArrayElement(demand.fields["מתנדב"], undefined),
         isFamilyActive: active,
+        transpotingVolunteerId: getSafeFirstArrayElement(demand.fields["מתנדב משנע"], undefined),
     };
     // return {
     //     id: holiday.id,
@@ -370,7 +371,8 @@ export async function getDemands2(
     filters.push(`IS_BEFORE({DATE}, '${dayjs(dateEnd).add(1, "day").format(DATE_AT)}')`);
 
     if (volunteerId) {
-        filters.push(airtableArrayCondition("vol_id", volunteerId));
+        //filters.push(airtableArrayCondition("vol_id", volunteerId));
+        filters.push(`OR(${airtableArrayCondition("vol_id", volunteerId)}, ${airtableArrayCondition("transport_vol_id", volunteerId)})`);
     }
 
     const meals = await mealsQuery.execute(filters);
@@ -543,10 +545,10 @@ async function GetFamilyDetails2(familyId: string, includeContacts: boolean): Pr
 // צפון recLbwpPC80SdRmPO
 // שרון recmLo9MWRxmrLEsM
 // מרכז recP17rsfOseG3Frx
-// getDemands2(["recP17rsfOseG3Frx"], Status.Available, "2024-11-11", "2024-11-14", undefined).then(demands => {
-//     demands.forEach(d => console.log(d.date, d.status))
+getDemands2(["recP17rsfOseG3Frx", "recmLo9MWRxmrLEsM"], Status.Occupied, "2024-10-11", "2024-12-14", "rec2YAetKYmqRwO2k").then(demands => {
+    demands.forEach(d => console.log(d.date, d.status))
 
-// });
+});
 
 
 // getDemands2(["recLbwpPC80SdRmPO"], Status.Occupied, "2024-10-22", "2024-11-12").then(demands=>{
@@ -692,18 +694,18 @@ enum ManyChatFlows {
 export async function SendLinkOrInstall() {
     const date = dayjs().format(DATE_AT);
 
-    const query = new AirTableQuery<any>("מחוז", (rec)=>({
+    const query = new AirTableQuery<any>("מחוז", (rec) => ({
         id: rec.id,
         familyCount: rec.fields["כמות משפחות פעילות במחוז"],
     }))
 
-    const districtsIdsWithFamilies = (await query.execute()).filter(d=>d.familyCount > 0).map(d=>d.id);
+    const districtsIdsWithFamilies = (await query.execute()).filter(d => d.familyCount > 0).map(d => d.id);
 
 
     const users = await db.collection(Collections.Users).where("active", "==", true).get();
-    const relevantUsers = users.docs.filter(u => 
-        u.data().uid == undefined && 
-        u.data().manychat_id !== undefined && 
+    const relevantUsers = users.docs.filter(u =>
+        u.data().uid == undefined &&
+        u.data().manychat_id !== undefined &&
         u.data().sendWeeklyMessage !== date &&
         districtsIdsWithFamilies.includes(u.data().mahoz)
     );
@@ -914,7 +916,7 @@ function getHolidays() {
         //location: Location.lookup('Tel Aviv'),
         sedrot: false,
         omer: false,
-        noRoshChodesh:true
+        noRoshChodesh: true
     };
     const events = HebrewCalendar.calendar(options);
 
@@ -926,7 +928,7 @@ function getHolidays() {
 }
 export interface FamilyCompact {
     districtBaseFamilyId: string;
-    mainBaseFamilyId:string;
+    mainBaseFamilyId: string;
     district: string;
     familyLastName: string;
     city: string;

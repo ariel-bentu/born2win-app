@@ -61,6 +61,19 @@ export function getReferenceDays(date: string) {
 }
 
 export const sortByDate = (a: string, b: string) => dayjs(a).isBefore(b) ? -1 : 1;
+export const sortByStringField = (a: any, b: any, field: string) => {
+    const d1 = a[field];
+    const d2 = b[field];
+    if (d1 && !d2) return 1;
+    if (d2 && !d1) return -1;
+    if (d1 && d2) {
+        if (d1 > d2) return 1;
+        if (d1 < d2) return -1;
+    }
+    return 0
+}
+
+
 export const sortByDateDesc = (a: string, b: string) => dayjs(a).isBefore(b) ? 1 : -1;
 
 export function replaceAll(str: string, find: string, replace: string) {

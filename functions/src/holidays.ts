@@ -1,11 +1,11 @@
 import dayjs = require("dayjs");
-import { DATE_AT } from ".";
+import { DATE_AT, getCities } from ".";
 import { AirTableRecord, Holiday } from "../../src/types";
 import { AirTableDelete, AirTableInsert, AirTableQuery, AirTableUpdate, CachedAirTable } from "./airtable";
 import { getSafeFirstArrayElement } from "../../src/utils";
 
 
-function holidayAirtable2Holiday(holiday: AirTableRecord): Holiday {
+function holidayAirtable2Holiday(holiday: AirTableRecord, cityName?: string, district?: string): Holiday {
     return {
         id: holiday.id,
         name: holiday.fields.Name,
@@ -14,11 +14,15 @@ function holidayAirtable2Holiday(holiday: AirTableRecord): Holiday {
         addAvailability: holiday.fields["זמין"] == true,
         familyId: getSafeFirstArrayElement(holiday.fields["משפחה"], undefined),
         familyName: getSafeFirstArrayElement(holiday.fields["שם משפחה"], undefined),
+        cityName,
+        district,
     };
 }
 
 // Holidays cache - 5 min
-export const holidays = new CachedAirTable<Holiday>("חגים וחריגים", holidayAirtable2Holiday, ["AND(IS_AFTER({תאריך}, DATEADD(TODAY(), -1, 'days')))"], 5);
+export const holidays = new CachedAirTable<Holiday>("חגים וחריגים", (rec) => {
+    return holidayAirtable2Holiday(rec);
+}, ["AND(IS_AFTER({תאריך}, DATEADD(TODAY(), -1, 'days')))"], 5);
 
 
 export async function upsertHoliday(holiday: Holiday) {
@@ -48,7 +52,12 @@ export async function upsertHoliday(holiday: Holiday) {
 }
 
 export async function getHolidays(from: string, to: string): Promise<Holiday[]> {
-    const holidayQuery = new AirTableQuery<Holiday>("חגים וחריגים", holidayAirtable2Holiday);
+    const cities = await getCities();
+
+    const holidayQuery = new AirTableQuery<Holiday>("חגים וחריגים", rec => {
+        const city = cities.find(c => c.id === getSafeFirstArrayElement(rec.fields["עיר"], ""));
+        return holidayAirtable2Holiday(rec, city?.name, city?.district);
+    });
     return holidayQuery.execute([
         `{תאריך}>='${dayjs(from).format(DATE_AT)}'`,
         `IS_BEFORE({תאריך}, '${dayjs(to).add(1, "day").format(DATE_AT)}')`,

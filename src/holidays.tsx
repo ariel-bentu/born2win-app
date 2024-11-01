@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { DataTable } from 'primereact/datatable';
+import { DataTable, DataTableRowGroupHeaderTemplateOptions } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { deleteHoliday, getRegisteredHolidays, handleSearchFamilies, upsertHoliday } from './api';
 import { AppServices, FamilyCompact, Holiday, IdName, UserInfo } from './types';
 import './holidays.css'
 
 import { CalOptions, HebrewCalendar } from '@hebcal/core'
-import { DATE_AT, sortByDate } from './utils';
+import { DATE_AT, sortByDate, sortByStringField } from './utils';
 import dayjs, { Dayjs } from 'dayjs';
 import { Button } from 'primereact/button';
 import { InProgress, WeekSelectorSlider } from './common-ui';
@@ -17,6 +17,7 @@ import { SelectButton } from 'primereact/selectbutton';
 import { Calendar } from 'primereact/calendar';
 import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete';
 import { confirmPopup } from 'primereact/confirmpopup';
+import { MultiSelect } from 'primereact/multiselect';
 export const getPotentialHolidays = ({ from, to }: { from: Dayjs, to: Dayjs }): Holiday[] => {
     const options: CalOptions = {
         start: from.toDate(),
@@ -49,13 +50,18 @@ interface HolidaysAdminProps {
     topPosition: number;
 }
 
+const noDistrict = { label: "חגים", value: null };
 
 export const HolidaysAdmin = ({ userInfo, appServices }: HolidaysAdminProps) => {
+    const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
     const [registeredHolidays, setRegisteredHolidays] = useState<Holiday[] | undefined>();
     const [potentialHolidays, setPotentialHolidays] = useState<Holiday[]>([]);
     const [selectedWeeks, setSelectedWeeks] = useState<[number, number]>([-1, 6]);
     const [reload, setReload] = useState<number>(0);
     const [loading, setLoading] = useState<boolean>(false);
+
+    const listOfDistricts = [noDistrict, ...(userInfo?.districts?.map(d => ({ label: d.name, value: d.id })) || [])];
+
 
     const [editingHoliday, setEditingHoliday] = useState<Holiday | undefined>();
 
@@ -78,7 +84,17 @@ export const HolidaysAdmin = ({ userInfo, appServices }: HolidaysAdminProps) => 
         const { from, to } = getRange(selectedWeeks);
         setLoading(true);
         getRegisteredHolidays(from.format(DATE_AT), to.format(DATE_AT)).then(list => {
-            list.sort((a, b) => sortByDate(a.date, b.date));
+            // sort by district, then family name then date
+            list.sort((a, b) => {
+                let ret = sortByStringField(a,b, "district");
+                if (ret != 0) return ret;
+
+                // same district
+                ret = sortByStringField(a,b, "familyName");
+                if (ret != 0) return ret;
+
+                return sortByDate(a.date, b.date);
+            });
             setRegisteredHolidays(list);
         }).finally(() => setLoading(false));
     }, [selectedWeeks, reload]);
@@ -98,6 +114,26 @@ export const HolidaysAdmin = ({ userInfo, appServices }: HolidaysAdminProps) => 
             }
         });
 
+    }
+
+    const rowGroupHeaderTemplate = (data: Holiday) => {
+        const { district } = data;
+        const name = district && userInfo.districts?.find(d => d.id == district)?.name;
+        return (
+            <tr style={{ display: "flex" }}>
+                <td colSpan={6}>
+                    {!!district ? <strong>{`מחוז: ${name}`}</strong> : <strong>חגים</strong>}
+                </td>
+            </tr>
+        );
+    };
+
+    const today = dayjs()
+    const formatData = (date:string | undefined) => {
+        if (!date) return "";
+        const d = dayjs(date);
+        if (today.year() != d.year()) return d.format("DD/MM/YY")
+        return  d.format("DD/MM");
     }
 
     return (<div>
@@ -122,9 +158,25 @@ export const HolidaysAdmin = ({ userInfo, appServices }: HolidaysAdminProps) => 
         </div>
         {loading && <InProgress />}
 
+        <MultiSelect
+            value={selectedDistricts}
+            options={listOfDistricts}
+            onChange={e => setSelectedDistricts(e.value)}
+            placeholder="בחר מחוזות"
+            display="chip"
+            className="w-full md:w-20rem mt-3"
+        />
+
         <div className='holiday-table-title'>חגים וחריגים רשומים</div>
-        <DataTable dir='rtl' value={registeredHolidays} style={{ textAlign: 'right' }}>
-            <Column field="date" header="תאריך" style={{ textAlign: 'right' }} />
+        <DataTable
+            dir='rtl'
+            value={registeredHolidays?.filter(rh=> selectedDistricts.length == 0 || selectedDistricts.some(sd=>sd == rh.district) )}
+            style={{ textAlign: 'right' }}
+            rowGroupMode="subheader"
+            groupRowsBy={'district'}
+            rowGroupHeaderTemplate={rowGroupHeaderTemplate}
+        >
+            <Column body={(h: Holiday) => formatData(h.date)}  header="תאריך" style={{ textAlign: 'right' }} />
             <Column body={(rowData: Holiday) => {
                 if (!rowData.familyId) return Modes.array[Modes.Holiday - 1].name;
                 if (rowData.addAvailability) return Modes.array[Modes.Add - 1].name;
@@ -132,7 +184,7 @@ export const HolidaysAdmin = ({ userInfo, appServices }: HolidaysAdminProps) => 
             }} header="סוג" style={{ textAlign: 'right' }} />
             <Column field="name" header="תיאור" style={{ textAlign: 'right' }} />
             <Column field="familyName" header="משפחה" style={{ textAlign: 'right' }} />
-            <Column field="alternateDate" header="תאריך חלופי" style={{ textAlign: 'right' }} />
+            <Column body={(h: Holiday) => formatData(h.alternateDate)} header="תאריך חלופי" style={{ textAlign: 'right' }} />
             <Column headerStyle={{ display: "flex", justifyContent: "flex-end" }}
                 header={() => (<Button
                     icon="pi pi-plus"

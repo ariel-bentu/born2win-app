@@ -44,7 +44,7 @@ export interface NotificationUpdatePayload {
 
 export interface FamilityDetailsPayload {
     districtBaseFamilyId: string;
-    mainBaseFamilyId?:string;
+    mainBaseFamilyId?: string;
     district: string;
     includeContacts: boolean;
     familyDemandId: string;
@@ -110,7 +110,7 @@ export interface UserInfo {
     phone: string,
     userDistrict: { id: string, name: string },
     isAdmin: boolean,
-    adminAuthorities?:AdminAuthorities[],
+    adminAuthorities?: AdminAuthorities[],
     needToSignConfidentiality?: string;
     districts?: { id: string, name: string }[],
     active: boolean;
@@ -236,14 +236,14 @@ export type AppServices = {
 }
 
 export interface IdName {
-    id:string;
-    name:string;
+    id: string;
+    name: string;
 }
 
 
 export interface FamilyCompact {
     districtBaseFamilyId: string;
-    mainBaseFamilyId:string;
+    mainBaseFamilyId: string;
     district: string;
     familyLastName: string;
     city: string;
@@ -251,7 +251,7 @@ export interface FamilyCompact {
 }
 
 export interface SearchFamilyPayload {
-    searchStr:string;
+    searchStr: string;
 }
 
 
@@ -270,7 +270,7 @@ export interface FamilyDetails {
     kosherLevel: string;
     favoriteFood: string;
     alergies: string;
-    importantNotice:string;
+    importantNotice: string;
     adultsCount: number;
     familyStructure: string[];
     familyMembersAge: string;
@@ -304,9 +304,11 @@ export interface Holiday {
     date: string;
     name: string;
     familyId?: string;
-    familyName?:string;
+    familyName?: string;
     alternateDate?: string
     addAvailability: boolean; // when true, it means the main "date" should be added to family
+    cityName?: string;
+    district?: string;
 }
 
 export interface UpsertHolidayPayload {
@@ -315,9 +317,9 @@ export interface UpsertHolidayPayload {
 
 export interface GetRegisteredHolidaysPayload {
     from: string;
-    to:string;
+    to: string;
 }
 
 export enum AdminAuthorities {
-    ManageHoliday= 1,  
+    ManageHoliday = 1,
 }

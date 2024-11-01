@@ -3,7 +3,7 @@ import { Chart } from 'primereact/chart';
 import { MultiSelect } from 'primereact/multiselect';
 import dayjs from 'dayjs';
 import { AppServices, FamilyCompact, FamilyDemand, UserInfo, VolunteerInfo } from './types';
-import { getDemands, getVolunteerInfo, handleSearchUsers, updateFamilityDemand } from './api';
+import { getDemands, getVolunteerInfo, handleSearchUsers, updateDemandTransportation, updateFamilityDemand } from './api';
 
 import { InProgress, PhoneNumber, WeekSelectorSlider } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
@@ -16,6 +16,8 @@ import { OverlayPanel } from 'primereact/overlaypanel';
 import { ProgressSpinner } from 'primereact/progressspinner';
 import { ProgressBar } from 'primereact/progressbar';
 import { confirmPopup } from 'primereact/confirmpopup';
+import { Recipient } from './types';
+import { Dialog } from "primereact/dialog";
 
 interface DemandChartProps {
     data: FamilyDemand[];
@@ -25,6 +27,8 @@ interface DemandChartProps {
     showFilterByVolunteer?: boolean;
     onCancellationPerformed?: () => void;
     onSelectFamily?: (family: GroupedFamily | undefined) => void,
+    setLoading: (isLoading: boolean) => void;
+    setReload: (reload: number | ((prev: number) => number)) => void;
 }
 
 const Modes = {
@@ -51,6 +55,7 @@ interface DateInfo {
     mainBaseFamilyId: string;
     districtBaseFamilyId: string;
     district: string;
+    parentFamily: GroupedFamily;
 }
 
 interface GroupedFamily extends FamilyCompact {
@@ -71,7 +76,7 @@ const filterOnlyFulfilled = (f: FamilyDemand) => f.status === "תפוס";
 export function Stats({ userInfo, appServices }: StatsProps) {
     const [loading, setLoading] = useState<boolean>(false);
     const [data, setData] = useState<FamilyDemand[]>([]);
-    const [selectedWeeks, setSelectedWeeks] = useState<[number,number]>([0, 4]);
+    const [selectedWeeks, setSelectedWeeks] = useState<[number, number]>([0, 4]);
     const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
     //const calendar = useRef<Calendar>(null);
     const [mode, setMode] = useState(Modes.Open);
@@ -115,7 +120,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
 מי יכול.ה לסייע בבישול בחודש הקרוב 🙏
     
 `;
-        for (const city of sortedCities){
+        for (const city of sortedCities) {
             // Sort families alphabetically within each city
             const sortedFamilies = sortFamilies(groupedData[city]);
 
@@ -204,7 +209,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
             {/* {error && <small style={{ color: 'red' }}>{error}</small>} */}
 
             {mode === Modes.Open || mode === Modes.Fulfilled ?
-                <DemandList data={data} isShowOpen={mode === Modes.Open} appServices={appServices} userInfo={userInfo}
+                <DemandList setReload={setReload} setLoading={setLoading} data={data} isShowOpen={mode === Modes.Open} appServices={appServices} userInfo={userInfo}
                     onSelectFamily={family => setSelectedFamily(family)}
                     showFilterByVolunteer={showFilterByVolunteer}
                     onCancellationPerformed={() => {
@@ -212,30 +217,102 @@ export function Stats({ userInfo, appServices }: StatsProps) {
                         setReload(prev => prev + 1)
                     }
                     } /> :
-                <DemandChart data={data} appServices={appServices} userInfo={userInfo} />
+                <DemandChart setReload={setReload} setLoading={setLoading} data={data} appServices={appServices} userInfo={userInfo} />
             }
         </div>
     );
 }
 
-export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appServices, userInfo, showFilterByVolunteer, 
-    onCancellationPerformed, onSelectFamily }) => {
+export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appServices, userInfo, showFilterByVolunteer,
+    onCancellationPerformed, onSelectFamily, setLoading, setReload }) => {
     let demands = data.filter(isShowOpen ? filterOnlyOpen : filterOnlyFulfilled);
     const [showFamilyDetails, setShowFamilyDetails] = useState<GroupedFamily | undefined>();
     const [filterByVolunteer, setFilterByVolunteer] = useState<any | undefined>();
-    const [filteredUsers, setFilteredUsers] = useState<any | undefined>();
     const [cancelInProgress, setCancelInProgress] = useState<boolean>(false);
 
     const overlayPanelRef = useRef<any>(null);
 
     const [selectedDateInfo, setSelectedDateInfo] = useState<DateInfo | undefined>();
     const [volunteerInfo, setVolunteerInfo] = useState<VolunteerInfo | undefined>();
+    // Existing state declarations...
+    const [showRecipientModal, setShowRecipientModal] = useState(false);
+    const [recipients, setRecipients] = useState<Recipient[]>([]);
+    const [filteredUsers, setFilteredUsers] = useState<any[]>([]); // Adjust the type as needed
+    const [transportingVolunteer, setTransportingVolunteer] = useState<VolunteerInfo | undefined>(undefined);
+
+    const openRecipientModal = () => {
+        setShowRecipientModal(true);
+    };
+
+    const closeRecipientModal = () => {
+        setShowRecipientModal(false);
+        setRecipients([]); // Clear selection on close if needed
+    };
+
+    const handleApprove = async (selectedDateInfo: DateInfo | undefined, recipients: Recipient[] | undefined) => {
+        try {
+            // Example IDs (replace these with actual IDs)
+            const demandId = selectedDateInfo?.demandId; // Replace with your actual demand ID
+            const transpotingVolunteerId = recipients && recipients.length > 0 ? recipients[0].id : ""; // Replace with your actual transporting volunteer ID
+
+            // Call the updateDemandTransportation function
+            if (demandId != null && transpotingVolunteerId != null) {
+                setLoading(true);
+                await updateDemandTransportation(demandId, transpotingVolunteerId)
+                    .then(response => {
+                        setReload(prev => prev + 1); // Reload the data after success
+                        appServices.showMessage("success", "נשמר בהצלחה ", "");
+                        // Handle success response
+                        console.log("Transportation updated successfully:", response);
+                    })
+                    .catch(error => {
+                        // Handle error response
+                        appServices.showMessage("error", "שמירה נכשלה", error.message);
+                        console.error("Error updating transportation:", error);
+                    })
+                    .finally(() => setLoading(false));
+            }
+            closeRecipientModal(); // Close the modal after success
+        } catch (error) {
+            console.error("Error in handleApprove:", error);
+            // appServices.showMessage("error", "Failed to update recipients", error.message);
+        }
+    };
+
+    const handlePrepareTransportMessage = (
+        selectedDateInfo: DateInfo | undefined,
+        volunteerInfo: VolunteerInfo | undefined
+    ) => {
+        const message = `דרוש שינוע🚙
+        
+מי יכול.ה לעזור בשינוע?
+        
+בתאריך ${selectedDateInfo ? selectedDateInfo.date : ""}
+        
+מ${volunteerInfo ? volunteerInfo.city : ""}
+ל${selectedDateInfo && selectedDateInfo.parentFamily ? `${selectedDateInfo.parentFamily.city}` : ""}
+למשפחת${selectedDateInfo && selectedDateInfo.parentFamily ? ` ${selectedDateInfo.parentFamily.familyLastName}` : ""}`;
+
+        // Handle the message, e.g., displaying it in a modal or copying to clipboard
+        console.log(message); // Or whatever logic you need to use the message
+        navigator.clipboard.writeText(message);
+        appServices.showMessage("success", "הודעה הוכנה והועתקה - הדבקו היכן שתרצו", "");
+    };
+
 
     useEffect(() => {
         if (selectedDateInfo) {
             getVolunteerInfo(selectedDateInfo.volunteerId).then(info => {
                 setVolunteerInfo(info);
             });
+        }
+        const demand = demands.find(d => d.id === selectedDateInfo?.demandId);
+        if (demand && demand.transpotingVolunteerId) {
+            getVolunteerInfo(demand.transpotingVolunteerId).then(v => {
+                setTransportingVolunteer(v);
+            })
+        } else {
+            setTransportingVolunteer(undefined);
         }
     }, [selectedDateInfo]);
 
@@ -259,7 +336,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                 if (onSelectFamily) onSelectFamily(undefined);
 
                 // todo push nav state
-            }} reloadOpenDemands={() => { }} detailsOnly={true} />;
+            }} reloadOpenDemands={() => { }} detailsOnly={true} actualUserId={""} />;
     }
 
     const handleDateClick = (e: any, dateInfo: DateInfo) => {
@@ -331,8 +408,11 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                 }}>
                     {selectedDateInfo && (volunteerInfo ?
                         <>
-                            <div><strong>שם</strong>: {volunteerInfo.firstName + " " + volunteerInfo.lastName}</div>
-                            <PhoneNumber phone={volunteerInfo.phone} />
+                            <div><strong>שם מבשל</strong>: {volunteerInfo.firstName + " " + volunteerInfo.lastName}</div>
+                            <PhoneNumber phone={volunteerInfo.phone} label="טלפון מבשל" />
+                            {transportingVolunteer &&
+                                <div><strong>שם משנע</strong>: {transportingVolunteer ? transportingVolunteer.firstName + " " + transportingVolunteer.lastName : undefined}</div>}
+                            {transportingVolunteer && <PhoneNumber phone={transportingVolunteer.phone} label="טלפון משנע" />}
                             <Button label="מחק התנדבות" onClick={() => {
                                 confirmPopup({
                                     message: 'האם למחוק התנדבות זו?',
@@ -350,6 +430,59 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                         </> :
                         <div><ProgressSpinner style={{ height: 50 }} /> טוען...</div>
                     )}
+                </div>
+                <div dir="rtl" style={{
+                    width: 280, display: "flex",
+                    flexDirection: "column",
+
+                }}>
+                    <Button label="הכן הודעה לבקשת שינוע" onClick={() => handlePrepareTransportMessage(selectedDateInfo, volunteerInfo)} />
+                    <Button
+                        label={transportingVolunteer ? "הסר משנע מהתנדבות" : "הוסף משנע להתנדבות"}
+                        onClick={() => {
+                            if (transportingVolunteer) {
+                                // If transportingVolunteer exists, call handleApprove with empty string
+                                handleApprove(selectedDateInfo, undefined); // Call with undefined or your logic for removing
+                            } else {
+                                // Open modal to add a new volunteer
+                                openRecipientModal();
+                            }
+                        }}
+                    />
+
+                    {/* Modal for selecting recipients */}
+                    <Dialog header={<div style={{ textAlign: 'right', width: '100%' }}>בחר משנע</div>} visible={showRecipientModal}
+                        onHide={closeRecipientModal}
+                        style={{ width: '300px', position: 'absolute', right: '10%', top: '20%' }}
+
+                    >
+                        <div className="flex justify-content-end">
+                            <AutoComplete
+                                inputClassName="w-17rem md:w-15rem"
+                                multiple
+                                placeholder={!recipients || recipients.length < 1 ? "חיפוש לפי שם פרטי, משפחה או טלפון" : undefined}
+                                delay={500}
+                                value={recipients}
+                                field="name"
+                                optionGroupLabel="districtName"
+                                optionGroupChildren="users"
+                                suggestions={filteredUsers}
+                                completeMethod={async (event: AutoCompleteCompleteEvent) => {
+                                    const newFilter = await handleSearchUsers(userInfo, event.query);
+                                    setFilteredUsers(newFilter);
+                                }}
+                                onChange={(e) => setRecipients(e.value)}
+                                inputStyle={{ textAlign: 'right' }} // Align input text to the right
+                                itemTemplate={(item) => (
+                                    <div style={{ textAlign: 'right' }}>{item.name}</div> // Align suggestion items to the right
+                                )}
+                            />
+                        </div>
+                        <div className="flex justify-content-end mt-2">
+                            <Button label="ביטול" onClick={closeRecipientModal} className="p-button-secondary ml-2" />
+                            <Button label="אשר" onClick={() => handleApprove(selectedDateInfo, recipients)} /> {/* Pass the data as arguments */}
+                        </div>
+                    </Dialog>
                 </div>
             </OverlayPanel>
         </div>
@@ -430,7 +563,7 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
     const groupedByCityAndFamily: GroupedData = {};
 
     familyDemands.forEach((family) => {
-        const city = family.city.replaceAll("\"", "");
+        const city = family.familyCityName.replaceAll("\"", "");
         const familyName = simplifyFamilyName(family.familyLastName);
 
         // Initialize city if not exists
@@ -445,7 +578,7 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
                 familyLastName: familyName,
                 districtBaseFamilyId: family.districtBaseFamilyId,
                 mainBaseFamilyId: family.mainBaseFamilyId,
-                city: family.city,
+                city,
                 district: family.district,
                 active: family.isFamilyActive,
             };
@@ -459,6 +592,7 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
             mainBaseFamilyId: family.mainBaseFamilyId,
             date: family.date,
             volunteerId: family.volunteerId,
+            parentFamily: groupedByCityAndFamily[city][family.mainBaseFamilyId]
         });
     });
 

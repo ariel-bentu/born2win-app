@@ -12,17 +12,19 @@ import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
 import { holidays } from "./holidays";
 
-function mealAirtable2FamilyDemand(demand: AirTableRecord, cityName: string, active: boolean): FamilyDemand {
+function mealAirtable2FamilyDemand(demand: AirTableRecord, familyCityName: string, volunteerCityName: string, active: boolean): FamilyDemand {
     return {
         id: demand.id,
         date: demand.fields["DATE"],
-        city: cityName, // id and needs to be name
+        familyCityName,
+        city: familyCityName,
         familyLastName: demand.fields.Name,
         district: getSafeFirstArrayElement(demand.fields["מחוז"], ""),
         status: Status.Occupied,
         mainBaseFamilyId: getSafeFirstArrayElement(demand.fields["משפחה"], ""),
         districtBaseFamilyId: "N/A",
         volunteerId: getSafeFirstArrayElement(demand.fields["מתנדב"], undefined),
+        volunteerCityName,
         isFamilyActive: active,
         transpotingVolunteerId: getSafeFirstArrayElement(demand.fields["מתנדב משנע"], undefined),
     };
@@ -44,7 +46,10 @@ export async function getDemands2(
 
     const mealsQuery = new AirTableQuery<FamilyDemand>("ארוחות", (m) => {
         const family = families.find(f => f.id == getSafeFirstArrayElement(m.fields["משפחה"], ""));
-        return mealAirtable2FamilyDemand(m, getCityName(getSafeFirstArrayElement(m.fields["עיר"], "")), family ? family.active : false);
+        return mealAirtable2FamilyDemand(m,
+            getCityName(getSafeFirstArrayElement(m.fields["עיר"], "")),
+            getCityName(getSafeFirstArrayElement(m.fields["עיר מתנדב"], "")),
+            family ? family.active : false);
     });
 
     const filters: string[] = [];
@@ -101,13 +106,14 @@ export async function getDemands2(
                 addedOpenDemands.push({
                     id: getCalcDemandID(family.id, actualDate, family.cityId),
                     date: actualDate,
-                    city: getCityName(family.cityId),
+                    familyCityName: getCityName(family.cityId),
                     district: family.district,
                     status: Status.Available,
                     familyLastName: family.name,
                     mainBaseFamilyId: family.id,
                     districtBaseFamilyId: "N/A",
                     volunteerId: "",
+                    volunteerCityName: "",
                     isFamilyActive: family.active,
                 });
             }
@@ -125,13 +131,14 @@ export async function getDemands2(
                             addedOpenDemands.push({
                                 id: family.id + holidayDate,
                                 date: holidayDate,
-                                city: getCityName(family.cityId),
+                                familyCityName: getCityName(family.cityId),
                                 district: family.district,
                                 status: Status.Available,
                                 familyLastName: family.name,
                                 mainBaseFamilyId: family.id,
                                 districtBaseFamilyId: "N/A",
                                 volunteerId: "",
+                                volunteerCityName: "",
                                 isFamilyActive: family.active,
                             });
                         }
@@ -183,13 +190,15 @@ export async function updateFamilityDemand(demandId: string, demandDistrict: str
         const possibleDemands = await getDemands2(demandDistrict, Status.Occupied, date, date);
         demand = possibleDemands.find(d => d.mainBaseFamilyId == familyId && d.date == date);
     } else {
-        const cities = await getCities();
+        const _cities = await getCities();
+        const getCityName = (id: string) => _cities.find(c => c.id == id)?.name || "";
 
         // eslint-disable-next-line new-cap
-        demand = await AirTableGet<FamilyDemand>("ארוחות", demandId, (rec) => {
-            const city = cities.find(c => c.id == getSafeFirstArrayElement(rec.fields["עיר"], ""));
-            return mealAirtable2FamilyDemand(rec, city?.name || "N/A", true);
-        });
+        demand = await AirTableGet<FamilyDemand>("ארוחות", demandId, (m) => mealAirtable2FamilyDemand(m,
+            getCityName(getSafeFirstArrayElement(m.fields["עיר"], "")),
+            getCityName(getSafeFirstArrayElement(m.fields["עיר מתנדב"], "")),
+            true)
+        );
     }
 
     if ((!demand && !isRegistering) || demand && isRegistering) {
@@ -250,7 +259,7 @@ export async function updateFamilityDemand(demandId: string, demandDistrict: str
             await addNotificationToQueue("שיבוץ בוטל!", `תאריך: ${demand.date}
 משפחה: ${demand.familyLastName}
 בוטל ע״י: ${performingUser}
-עיר: ${demand.city}
+עיר: ${demand.familyCityName}
 `, NotificationChannels.Registrations, [], adminsIds);
         }
     } else {

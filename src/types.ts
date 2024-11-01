@@ -152,13 +152,15 @@ export interface AirTableRecord {
 export interface FamilyDemand {
     id: string;
     date: string;
-    city: string;
+    familyCityName: string;
+    city?: string; // for backwards compatability remove in a week
     district: string;
     status: string;
     familyLastName: string;
     mainBaseFamilyId: string;
     districtBaseFamilyId: string;
     volunteerId: string;
+    volunteerCityName:string;
     transpotingVolunteerId?: string
     isFamilyActive: boolean;
 }

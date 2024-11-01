@@ -64,7 +64,7 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
             // calculate the cities' availability
             // const cities = getUniqueCities(demands.demands).map(city => ({ ...city, available: true }));
             // console.log("cities", demands.allDistrictCities)
-            const cities = demands.allDistrictCities.map(city => ({ ...city, available: (demands.demands.some(d => compareCities(d.city, city.name))) } as CityAvailability));
+            const cities = demands.allDistrictCities.map(city => ({ ...city, available: (demands.demands.some(d => compareCities(d.familyCityName, city.name))) } as CityAvailability));
             setCities(cities);
             if (cities.length == 1) {
                 console.log("cities", cities)

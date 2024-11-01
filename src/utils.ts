@@ -17,7 +17,7 @@ export const getUniqueFamilies = (records: FamilyDemand[]): FamilyCompact[] => {
                 districtBaseFamilyId: fd.districtBaseFamilyId,
                 mainBaseFamilyId: fd.mainBaseFamilyId,
                 familyLastName: fd.familyLastName,
-                city: fd.city,
+                city: fd.familyCityName,
                 district: fd.district,
                 active: fd.isFamilyActive,
             })

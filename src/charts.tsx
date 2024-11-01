@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Chart } from 'primereact/chart';
 import { MultiSelect } from 'primereact/multiselect';
 import dayjs from 'dayjs';
-import {AppServices, FamilyCompact, FamilyDemand, UserInfo, VolunteerInfo} from './types';
-import {getDemands, getVolunteerInfo, handleSearchUsers, updateDemandTransportation, updateFamilityDemand} from './api';
+import { AppServices, FamilyCompact, FamilyDemand, UserInfo, VolunteerInfo } from './types';
+import { getDemands, getVolunteerInfo, handleSearchUsers, updateDemandTransportation, updateFamilityDemand } from './api';
 
 import { InProgress, PhoneNumber, WeekSelectorSlider } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
@@ -17,7 +17,7 @@ import { ProgressSpinner } from 'primereact/progressspinner';
 import { ProgressBar } from 'primereact/progressbar';
 import { confirmPopup } from 'primereact/confirmpopup';
 import { Recipient } from './types';
-import {Dialog} from "primereact/dialog";
+import { Dialog } from "primereact/dialog";
 
 interface DemandChartProps {
     data: FamilyDemand[];
@@ -27,7 +27,7 @@ interface DemandChartProps {
     showFilterByVolunteer?: boolean;
     onCancellationPerformed?: () => void;
     onSelectFamily?: (family: GroupedFamily | undefined) => void,
-    setLoading:(isLoading:boolean)=>void;
+    setLoading: (isLoading: boolean) => void;
     setReload: (reload: number | ((prev: number) => number)) => void;
 }
 
@@ -76,7 +76,7 @@ const filterOnlyFulfilled = (f: FamilyDemand) => f.status === "תפוס";
 export function Stats({ userInfo, appServices }: StatsProps) {
     const [loading, setLoading] = useState<boolean>(false);
     const [data, setData] = useState<FamilyDemand[]>([]);
-    const [selectedWeeks, setSelectedWeeks] = useState<[number,number]>([0, 4]);
+    const [selectedWeeks, setSelectedWeeks] = useState<[number, number]>([0, 4]);
     const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
     //const calendar = useRef<Calendar>(null);
     const [mode, setMode] = useState(Modes.Open);
@@ -120,7 +120,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
 מי יכול.ה לסייע בבישול בחודש הקרוב 🙏
     
 `;
-        for (const city of sortedCities){
+        for (const city of sortedCities) {
             // Sort families alphabetically within each city
             const sortedFamilies = sortFamilies(groupedData[city]);
 
@@ -209,7 +209,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
             {/* {error && <small style={{ color: 'red' }}>{error}</small>} */}
 
             {mode === Modes.Open || mode === Modes.Fulfilled ?
-                <DemandList setReload={setReload}  setLoading={setLoading} data={data} isShowOpen={mode === Modes.Open} appServices={appServices} userInfo={userInfo}
+                <DemandList setReload={setReload} setLoading={setLoading} data={data} isShowOpen={mode === Modes.Open} appServices={appServices} userInfo={userInfo}
                     onSelectFamily={family => setSelectedFamily(family)}
                     showFilterByVolunteer={showFilterByVolunteer}
                     onCancellationPerformed={() => {
@@ -217,13 +217,13 @@ export function Stats({ userInfo, appServices }: StatsProps) {
                         setReload(prev => prev + 1)
                     }
                     } /> :
-                <DemandChart setReload={setReload}  setLoading={setLoading} data={data} appServices={appServices} userInfo={userInfo} />
+                <DemandChart setReload={setReload} setLoading={setLoading} data={data} appServices={appServices} userInfo={userInfo} />
             }
         </div>
     );
 }
 
-export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appServices, userInfo, showFilterByVolunteer, 
+export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appServices, userInfo, showFilterByVolunteer,
     onCancellationPerformed, onSelectFamily, setLoading, setReload }) => {
     let demands = data.filter(isShowOpen ? filterOnlyOpen : filterOnlyFulfilled);
     const [showFamilyDetails, setShowFamilyDetails] = useState<GroupedFamily | undefined>();
@@ -238,7 +238,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
     const [showRecipientModal, setShowRecipientModal] = useState(false);
     const [recipients, setRecipients] = useState<Recipient[]>([]);
     const [filteredUsers, setFilteredUsers] = useState<any[]>([]); // Adjust the type as needed
-    const [transportingVolunteer, setTransportingVolunteer] = useState<VolunteerInfo|undefined>(undefined);
+    const [transportingVolunteer, setTransportingVolunteer] = useState<VolunteerInfo | undefined>(undefined);
 
     const openRecipientModal = () => {
         setShowRecipientModal(true);
@@ -270,7 +270,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                         appServices.showMessage("error", "שמירה נכשלה", error.message);
                         console.error("Error updating transportation:", error);
                     })
-                    .finally(()=>setLoading(false));
+                    .finally(() => setLoading(false));
             }
             closeRecipientModal(); // Close the modal after success
         } catch (error) {
@@ -283,17 +283,16 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
         selectedDateInfo: DateInfo | undefined,
         volunteerInfo: VolunteerInfo | undefined
     ) => {
-        const message = `
-        דרוש שינוע🚙
+        const message = `דרוש שינוע🚙
         
-        מי יכול.ה לעזור בשינוע?
+מי יכול.ה לעזור בשינוע?
         
-        בתאריך ${selectedDateInfo ? selectedDateInfo.date : ""}
+בתאריך ${selectedDateInfo ? selectedDateInfo.date : ""}
         
-        מ${volunteerInfo ? volunteerInfo.city : ""}
-        ל${selectedDateInfo && selectedDateInfo.parentFamily ? `${selectedDateInfo.parentFamily.city}` : ""}
-        למשפחת${selectedDateInfo && selectedDateInfo.parentFamily ? ` ${selectedDateInfo.parentFamily.familyLastName}` : ""}
-    `;
+מ${volunteerInfo ? volunteerInfo.city : ""}
+ל${selectedDateInfo && selectedDateInfo.parentFamily ? `${selectedDateInfo.parentFamily.city}` : ""}
+למשפחת${selectedDateInfo && selectedDateInfo.parentFamily ? ` ${selectedDateInfo.parentFamily.familyLastName}` : ""}`;
+
         // Handle the message, e.g., displaying it in a modal or copying to clipboard
         console.log(message); // Or whatever logic you need to use the message
         navigator.clipboard.writeText(message);
@@ -337,7 +336,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                 if (onSelectFamily) onSelectFamily(undefined);
 
                 // todo push nav state
-            }} reloadOpenDemands={() => { }} detailsOnly={true} actualUserId={""}/>;
+            }} reloadOpenDemands={() => { }} detailsOnly={true} actualUserId={""} />;
     }
 
     const handleDateClick = (e: any, dateInfo: DateInfo) => {
@@ -410,10 +409,10 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                     {selectedDateInfo && (volunteerInfo ?
                         <>
                             <div><strong>שם מבשל</strong>: {volunteerInfo.firstName + " " + volunteerInfo.lastName}</div>
-                            <PhoneNumber phone={volunteerInfo.phone} label="טלפון מבשל"/>
+                            <PhoneNumber phone={volunteerInfo.phone} label="טלפון מבשל" />
                             {transportingVolunteer &&
-                            <div><strong>שם משנע</strong>: {transportingVolunteer ? transportingVolunteer.firstName + " " + transportingVolunteer.lastName : undefined}</div>}
-                            {transportingVolunteer && <PhoneNumber phone={transportingVolunteer.phone} label="טלפון משנע"/>}
+                                <div><strong>שם משנע</strong>: {transportingVolunteer ? transportingVolunteer.firstName + " " + transportingVolunteer.lastName : undefined}</div>}
+                            {transportingVolunteer && <PhoneNumber phone={transportingVolunteer.phone} label="טלפון משנע" />}
                             <Button label="מחק התנדבות" onClick={() => {
                                 confirmPopup({
                                     message: 'האם למחוק התנדבות זו?',
@@ -452,9 +451,9 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                     />
 
                     {/* Modal for selecting recipients */}
-                    <Dialog  header={<div style={{ textAlign: 'right', width: '100%' }}>בחר משנע</div>} visible={showRecipientModal}
-                            onHide={closeRecipientModal}
-                            style={{ width: '300px', position: 'absolute', right: '10%', top: '20%' }}
+                    <Dialog header={<div style={{ textAlign: 'right', width: '100%' }}>בחר משנע</div>} visible={showRecipientModal}
+                        onHide={closeRecipientModal}
+                        style={{ width: '300px', position: 'absolute', right: '10%', top: '20%' }}
 
                     >
                         <div className="flex justify-content-end">
@@ -564,7 +563,7 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
     const groupedByCityAndFamily: GroupedData = {};
 
     familyDemands.forEach((family) => {
-        const city = family.city.replaceAll("\"", "");
+        const city = family.familyCityName.replaceAll("\"", "");
         const familyName = simplifyFamilyName(family.familyLastName);
 
         // Initialize city if not exists
@@ -579,7 +578,7 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
                 familyLastName: familyName,
                 districtBaseFamilyId: family.districtBaseFamilyId,
                 mainBaseFamilyId: family.mainBaseFamilyId,
-                city: family.city,
+                city,
                 district: family.district,
                 active: family.isFamilyActive,
             };

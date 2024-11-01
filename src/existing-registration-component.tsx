@@ -112,7 +112,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
 
     if (currentRegistration) {
         const currentFamily = {
-            city: currentRegistration.city,
+            city: currentRegistration.familyCityName,
             districtBaseFamilyId: currentRegistration.districtBaseFamilyId,
             mainBaseFamilyId: currentRegistration.mainBaseFamilyId,
             familyLastName: currentRegistration.familyLastName,
@@ -192,7 +192,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                                             </div>
                                         }
                                         title={reg.familyLastName}
-                                        body={`עיר: ${reg.city}\nמתי: ${getReferenceDays(reg.date)}`}
+                                        body={`עיר: ${reg.familyCityName}\nמתי: ${getReferenceDays(reg.date)}`}
                                         footer={dayjs(reg.date).format(NICE_DATE)}
                                         unread={isInFuture(reg.date)}
                                         className="cooking-color" // Apply specific color for cooking
@@ -213,7 +213,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                                 );
                             }
                             const cookingVolunteerCity = volunteerInfo ? volunteerInfo.city : ""; // Assuming volunteerInfo has the city of the cooking volunteer
-                            const transportingDestinationCity = reg.city; // Assuming reg.city is the target city for transportation
+                            const transportingDestinationCity = reg.familyCityName; // Assuming reg.city is the target city for transportation
 
                             // Transporting line (if transpotingVolunteerId is present and current user is the transporting volunteer)
                             if (reg.transpotingVolunteerId === actualUserId) {
@@ -239,7 +239,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                                             </div>
                                         }
                                         title={reg.familyLastName}
-                                        body={`מעיר: ${transportingDestinationCity}\n לעיר: ${transportingDestinationCity}\nמתי: ${getReferenceDays(reg.date)}`}
+                                        body={`מעיר: ${cookingVolunteerCity}\n לעיר: ${transportingDestinationCity}\nמתי: ${getReferenceDays(reg.date)}`}
                                         footer={dayjs(reg.date).format(NICE_DATE)}
                                         unread={isInFuture(reg.date)}
                                         className="transporting-color"
@@ -251,11 +251,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                                         }}
                                     />
                                 );
-
-
-
                             }
-
                             return lines;
                         })
                     ) : (

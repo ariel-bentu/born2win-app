@@ -33,6 +33,7 @@ import {
     UpsertHolidayPayload,
     GetRegisteredHolidaysPayload,
     AdminAuthorities,
+    District,
 } from "../../src/types";
 import axios from "axios";
 import express = require("express");
@@ -452,22 +453,22 @@ async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
     const doc = await authenticate(request);
     const data = doc.data();
     const allDistricts = await getDestricts();
-    const userDistrict = allDistricts.find(d => d.id === data.mahoz);
-    let adminDistricts = undefined;
+    let availableDistricts: District[] = [];
 
     // Calculate the admin's districts
     if (data.adminDistricts && data.adminDistricts.length > 0) {
         if (data.adminDistricts[0] == "all") {
-            adminDistricts = allDistricts.map(district => ({ id: district.id, name: district.name }));
+            availableDistricts = allDistricts.map(district => ({ id: district.id, name: district.name }));
         } else {
-            adminDistricts = [];
             data.adminDistricts.forEach((ad: string) => {
                 const district = allDistricts.find(d => d.id === ad);
                 if (district) {
-                    adminDistricts.push({ id: district.id, name: district.name });
+                    availableDistricts.push({ id: district.id, name: district.name });
                 }
             });
         }
+    } else {
+        availableDistricts = data.districts.map((district: string) => allDistricts.find(d => d.id === district));
     }
 
     return {
@@ -477,10 +478,11 @@ async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
         firstName: data.firstName,
         lastName: data.lastName,
         phone: data.phone,
-        userDistrict: { id: data.mahoz, name: userDistrict?.name || "" },
+        userDistrict: data.districts.length > 0 ? data.districts[0] : { id: "N/A", name: "N/A" }, // Deprecetated
+        userDistricts: data.districts, // holds ID of all districts the user volunteers in
         isAdmin: (data.isAdmin == true),
         adminAuthorities: data.adminAuthorities,
-        districts: adminDistricts,
+        districts: availableDistricts, // holds District id/name of all districts the user volunteers in, or relevant for admin
         needToSignConfidentiality: data.needToSignConfidentiality,
         active: data.active,
     } as UserInfo;
@@ -557,7 +559,7 @@ exports.SearchUsers = onCall({ cors: true }, async (request): Promise<Recipient[
                 name: u.data().firstName + " " + u.data().lastName,
                 id: u.id,
                 phone: u.data().phone,
-                mahoz: u.data().mahoz,
+                districts: u.data().districts,
             }));
     }
     throw new HttpsError("unauthenticated", "Only admin can send message.");
@@ -676,16 +678,20 @@ function updateAdminClaim(uid: string, isAdmin: boolean) {
 
 exports.LoadExistingNotifications = onCall({ cors: true }, async (request) => {
     const doc = await authenticate(request);
-    const mahoz = doc.data().mahoz;
+    const districts = doc.data().districts;
 
     const NotificationsRef = db.collection(Collections.Notifications);
 
-    return Promise.all([
-        // Personal messages
+    const waitFor = [
         NotificationsRef.where("toRecipients", "array-contains", doc.id).get(),
-        NotificationsRef.where("toDistricts", "array-contains", mahoz).get(),
         NotificationsRef.where("toDistricts", "array-contains", "all").get(),
-    ]).then(all => {
+    ];
+
+    districts.forEach((d: string) => {
+        waitFor.push(NotificationsRef.where("toDistricts", "array-contains", d).get());
+    });
+
+    return Promise.all(waitFor).then(all => {
         // Unite and filter to 2 weeks old:
         const notifications: any[] = [];
         all.forEach(result => {
@@ -757,7 +763,7 @@ async function getWebTokens(to: string | string[]): Promise<DeviceInfo[]> {
             // Case 2: district:xyz - select users based on district
         } else if (to.startsWith("district:")) {
             const districtId = to.split(":")[1];
-            const districtUsersSnapshot = await usersRef.where("mahoz", "==", districtId).get();
+            const districtUsersSnapshot = await usersRef.where("districts", "array-contains", districtId).get();
             districtUsersSnapshot.forEach(user => {
                 user.data().notificationTokens?.forEach((nt: TokenInfo) => {
                     webPushDevices.push({
@@ -954,13 +960,6 @@ async function authenticate(request: CallableRequest<any>): Promise<QueryDocumen
     return doc;
 }
 
-interface District {
-    id: string;
-    name: string;
-    // base_id: string;
-    // demandsTable: string;
-    // familiesTable: string;
-}
 
 const districts = new CachedAirTable<District>("מחוז", (district => {
     return {
@@ -997,10 +996,10 @@ export async function getCities(): Promise<City[]> {
 exports.GetOpenDemands2 = onCall({ cors: true }, async (request): Promise<OpenFamilyDemands> => {
     const doc = await authenticate(request);
 
-    const district = doc.data().mahoz;
+    const districts = doc.data().districts;
     const cities = await getCities();
-    const demands = await getDemands2(district, Status.Available, dayjs().add(1, "day").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT));
-    return { demands, allDistrictCities: cities.filter(city => city.district === district) };
+    const demands = await getDemands2(districts, Status.Available, dayjs().add(1, "day").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT));
+    return { demands, allDistrictCities: cities.filter(city => districts.some((d: string) => city.district === d)) };
 });
 
 
@@ -1015,9 +1014,9 @@ exports.GetDemandsNew = onCall({ cors: true }, async (request): Promise<FamilyDe
 
 exports.GetUserRegistrationsNew = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
     const doc = await authenticate(request);
-    const district = doc.data().mahoz;
+    const districts = doc.data().districts;
     const volunteerId = doc.id;
-    return getDemands2(district, Status.Occupied, dayjs().startOf("month").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT), volunteerId);
+    return getDemands2(districts, Status.Occupied, dayjs().startOf("month").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT), volunteerId);
 });
 
 exports.UpdateDemandTransportation = onCall({ cors: true }, async (request) => {
@@ -1049,35 +1048,31 @@ exports.UpdateDemandTransportation = onCall({ cors: true }, async (request) => {
 
 
 exports.UpdateFamilityDemandNew = onCall({ cors: true }, async (request) => {
-    const doc = await authenticate(request);
-    const mahoz = doc.data().mahoz;
+    const userInfo = await getUserInfo(request);
     const fdup = request.data as FamilityDemandUpdatePayload;
 
-    const districts = await getDestricts();
+    const demandDistrictId = (fdup.district);
+    const volunteerId = (fdup.volunteerId || userInfo.id);
 
-    const demandDistrictId = (fdup.district || mahoz);
-    const volunteerId = (fdup.volunteerId || doc.id);
-
-    const demandDistrict = districts.find(d => d.id == demandDistrictId);
-    if (!demandDistrict) throw new HttpsError("not-found", "District " + demandDistrictId + " not found");
+    const demandDistrict = userInfo.districts.find(d => d.id == demandDistrictId);
+    if (!demandDistrict) throw new HttpsError("not-found", "District " + demandDistrictId + " not in scope of the user");
 
     if (!fdup.isRegistering && !(fdup.reason && fdup.reason.trim().length > 0)) {
         throw new HttpsError("invalid-argument", "Missing cancellation reason");
     }
-    return updateFamilityDemand(fdup.demandId, demandDistrictId, fdup.isRegistering, volunteerId, doc.data().firstName + " " + doc.data().lastName, fdup.reason);
+    return updateFamilityDemand(fdup.demandId, demandDistrictId, fdup.isRegistering, volunteerId, userInfo.firstName + " " + userInfo.lastName, fdup.reason);
 });
 
 exports.GetFamilyDetailsNew = onCall({ cors: true }, async (request): Promise<FamilyDetails> => {
     const userInfo = await getUserInfo(request);
     const gfp = request.data as FamilityDetailsPayload;
-    const district = userInfo.userDistrict.id;
 
     if (!gfp.mainBaseFamilyId) {
         throw new HttpsError("invalid-argument", "Family ID is missing");
     }
 
-    if (gfp.district !== district &&
-        (!userInfo.isAdmin || !userInfo.districts?.find(d => d.id === gfp.district))) {
+    const demandDistrict = userInfo.districts.find(d => d.id == gfp.district);
+    if (!demandDistrict) {
         logger.error("Permission denied to read family details", userInfo.id, userInfo.userDistrict, userInfo.isAdmin, gfp.district, "admin regions:", userInfo.districts);
         throw new HttpsError("permission-denied", "Unauthorized to read family details from this district");
     }
@@ -1142,14 +1137,14 @@ exports.GetVolunteerInfo = onCall({ cors: true }, async (request): Promise<Volun
         if (volunteerDoc && volunteerDoc.exists) {
             const data = volunteerDoc.data();
             if (data) {
-                const districts = await getDestricts();
-                const volunteerDistrict = districts.find(d => d.id === data.mahoz);
+                const allDistricts = await getDestricts();
+                const volunteerDistricts = data.districts.flatMap((id: string) => allDistricts.find(dist => dist.id === id));
                 return {
                     id: volunteerDoc.id,
                     firstName: data.firstName,
                     lastName: data.lastName,
                     city: cities.find(c => c.id == data.cityId)?.name || "N/A",
-                    district: { id: data.mahoz, name: volunteerDistrict ? volunteerDistrict.name : "" },
+                    districts: volunteerDistricts,
                     phone: data.phone,
                     active: data.active,
                 };
@@ -1311,7 +1306,7 @@ async function greetingsToBirthdays() {
     const districts = await getDestricts();
 
     // Notify Managers
-    const usersList = users.map(user => `- ${user.data().firstName} ${user.data().lastName} (${districts.find(d => d.id === user.data().mahoz)?.name || ""}) tel:+${user.data().phone}`);
+    const usersList = users.map(user => `- ${user.data().firstName} ${user.data().lastName} (${districts.find(d => (user.data().districts?.length > 0 && d.id === user.data().districts[0]))?.name || ""}) tel:+${user.data().phone}`);
     if (usersList.length > 0) {
         return addNotificationToQueue("ימי הולדת היום 💜", `הנה רשימת המתנדבים שהיום יום הולדתם:\n${usersList.join("\n")}`, NotificationChannels.Alerts,
             [], "admins");
@@ -1475,7 +1470,8 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                 lastName: user.fields["שם משפחה"] || "missing",
                 lastModified: now,
                 phone: user.fields.phone_e164 || "",
-                mahoz: getSafeFirstArrayElement(user.fields["מחוז"], ""),
+                mahoz: getSafeFirstArrayElement(user.fields["מחוז"], ""), // deprecated
+                districts: user.fields["מחוז"],
                 birthDate: user.fields["תאריך לידה"] ? dayjs(user.fields["תאריך לידה"]).format(DATE_BIRTHDAY) : "",
                 gender: (user.fields["מגדר"] || "לא ידוע"),
                 volId: user.id,

@@ -79,7 +79,7 @@ export default function RegistrationCancellation({ onClose, onCancellationPerfor
                                     className="p-button-danger p-mr-2"
                                     onClick={() => {
                                         setSaving(true);
-                                        updateFamilityDemand(registration.id, registration.mainBaseFamilyId, "cityId(unknown)", false, reason)
+                                        updateFamilityDemand(registration.id, registration.mainBaseFamilyId, "cityId(unknown)", false, reason, registration.district)
                                             .then(onCancellationPerformed)
                                             .catch(onError)
                                             .finally(() => setSaving(false));

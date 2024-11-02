@@ -201,7 +201,7 @@ export function getOpenDemands(): Promise<OpenFamilyDemands> {
     return callFunctionWithImpersonation('GetOpenDemands2').then((res: any) => res.data as OpenFamilyDemands);
 }
 
-export function updateFamilityDemand(demandId: string, mainBaseFamilyId: string, cityId: string, isRegistering: boolean, reason?: string, district?: string, volunteerId?: string) {
+export function updateFamilityDemand(demandId: string, mainBaseFamilyId: string, cityId: string, isRegistering: boolean, reason: string, district: string, volunteerId?: string) {
     const payload = {
         demandId,
         mainBaseFamilyId,
@@ -252,7 +252,7 @@ export async function getVolunteerInfo(volunteerId: string): Promise<VolunteerIn
         id: "",
         firstName: "אין",
         lastName: "",
-        district: { id: "", name: "אין" },
+        districts: [{ id: "", name: "אין" }],
         phone: "",
         active: false,
     } as VolunteerInfo)
@@ -368,7 +368,7 @@ export const handleSearchUsers = async (userInfo: UserInfo, query: string) => {
     const recipients = await searchUsers(query);
     const districts = new Map();
     recipients.forEach(r => {
-        let userMahuz = r.mahoz || "";
+        let userMahuz = r.districts.length > 0 ? r.districts[0] : "";
 
         let mahoz = districts.get(userMahuz);
         if (!mahoz) {

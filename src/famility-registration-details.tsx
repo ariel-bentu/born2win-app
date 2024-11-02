@@ -219,7 +219,7 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                             if (availabilityRecord && familyDetails) {
                                 setSaving(true);
                                 analyticLog(analyticComponent, "save new Registration");
-                                updateFamilityDemand(availabilityRecord.id, familyDetails.mainBaseFamilyId, familyDetails.cityId, true).then(() => {
+                                updateFamilityDemand(availabilityRecord.id, familyDetails.mainBaseFamilyId, familyDetails.cityId, true, "", availabilityRecord.district).then(() => {
                                     appServices.showMessage("success", "שיבוץ נקלט בהצלחה", "");
                                     reloadOpenDemands();
                                     setReload(prev => prev + 1);

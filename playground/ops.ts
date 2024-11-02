@@ -75,83 +75,6 @@ async function getDestricts(): Promise<District[]> {
     }));
 
 }
-function demandAirtable2FamilyDemand(demand: AirTableRecord, district: string): FamilyDemand {
-    return {
-        id: demand.id,
-        date: demand.fields["תאריך"],
-        city: getSafeFirstArrayElement(demand.fields["עיר"], ""),
-        familyLastName: demand.fields.Name,
-        district: district,
-        status: demand.fields["זמינות שיבוץ"],
-        mainBaseFamilyId: getSafeFirstArrayElement(demand.fields.Family_id, ""), // The record ID of the main base table משפחות רשומות
-        districtBaseFamilyId: getSafeFirstArrayElement(demand.fields["משפחה"], ""), // The record ID in the district table of משפחות במחוז
-        volunteerId: demand.fields.volunteer_id,
-        isFamilyActive: demand.fields["סטטוס בעמותה"] == Status.Active,
-    };
-}
-
-async function getDemands(
-    district: string,
-    status: Status.Occupied | Status.Available | undefined,
-    includeNonActiveFamily: boolean,
-    dateStart?: string,
-    dateEnd?: string,
-    volunteerId?: string,
-    districtBaseFamilyId?: string
-): Promise<FamilyDemand[]> {
-    const apiKey = born2winApiKey.value();
-    const headers = {
-        "Authorization": `Bearer ${apiKey}`,
-    };
-    const mahuzRec = (await getDestricts()).find((d: any) => d.id === district);
-    if (mahuzRec) {
-        let demantsResult: FamilyDemand[] = [];
-        const baseId = mahuzRec.base_id;
-        const demandsTable = mahuzRec.demandsTable;
-        const filters: string[] = [];
-
-        if (!includeNonActiveFamily) {
-            filters.push(`({סטטוס בעמותה} = '${Status.Active}')`);
-        }
-
-        if (districtBaseFamilyId) {
-            filters.push(`FIND("${districtBaseFamilyId}",  ARRAYJOIN({record_id (from משפחה)})) > 0`);
-        }
-        if (status) {
-            filters.push(`{זמינות שיבוץ}='${status}'`);
-        }
-        if (dateStart !== undefined) {
-            // eslint-disable-next-line quotes
-            filters.push(`{תאריך}>='${dateStart}'`);
-        }
-        if (dateEnd != undefined) {
-            filters.push(`{תאריך}<='${dateEnd}'`);
-        }
-        if (volunteerId) {
-            filters.push(`{volunteer_id}='${volunteerId}'`);
-        }
-
-        const formula = `AND(${filters.join(",")})`;
-        const query = `https://api.airtable.com/v0/${baseId}/${demandsTable}`;
-        let offset;
-        do {
-            const demandsRespose: any = await axios.get(query, {
-                headers,
-                params: {
-                    offset: offset,
-                    filterByFormula: formula,
-                },
-            });
-            offset = demandsRespose.data.offset;
-            if (demandsRespose.data.records) {
-                demantsResult = demantsResult.concat(demandsRespose.data.records.map((demand: AirTableRecord) => demandAirtable2FamilyDemand(demand, district)));
-            }
-        } while (offset);
-
-        return demantsResult;
-    }
-    throw new HttpsError("not-found", "District not found");
-}
 
 
 //------------
@@ -300,27 +223,22 @@ function holidayAirtable2Holiday(holiday: AirTableRecord): Holiday {
     }
 }
 
-function mealAirtable2FamilyDemand(demand: AirTableRecord, cityName: string, active: boolean): FamilyDemand {
+function mealAirtable2FamilyDemand(demand: AirTableRecord, familyCityName: string, volunteerCityName: string, active: boolean): FamilyDemand {
     return {
         id: demand.id,
         date: demand.fields["DATE"],
-        city: cityName, // id and needs to be name
+        familyCityName,
+        city: familyCityName,
         familyLastName: demand.fields.Name,
         district: getSafeFirstArrayElement(demand.fields["מחוז"], ""),
         status: Status.Occupied,
         mainBaseFamilyId: getSafeFirstArrayElement(demand.fields["משפחה"], ""),
         districtBaseFamilyId: "N/A",
         volunteerId: getSafeFirstArrayElement(demand.fields["מתנדב"], undefined),
+        volunteerCityName,
         isFamilyActive: active,
         transpotingVolunteerId: getSafeFirstArrayElement(demand.fields["מתנדב משנע"], undefined),
     };
-    // return {
-    //     id: holiday.id,
-    //     date: holiday.fields["DATE"],
-    //     status: holiday.fields["סטטוס"],
-    //     volunteerId: holiday.fields["מתנדב"],
-    //     district: getSafeFirstArrayElement(holiday.fields["מחוז"], ""),
-    // }
 }
 
 
@@ -356,7 +274,10 @@ export async function getDemands2(
 
     const mealsQuery = new AirTableQuery<FamilyDemand>("ארוחות", (m) => {
         const family = families.find(f => f.id == getSafeFirstArrayElement(m.fields["משפחה"], ""));
-        return mealAirtable2FamilyDemand(m, getCityName(getSafeFirstArrayElement(m.fields["עיר"], "")), family ? family.active : false);
+        return mealAirtable2FamilyDemand(m,
+            getCityName(getSafeFirstArrayElement(m.fields["עיר"], "")),
+            getCityName(getSafeFirstArrayElement(m.fields["עיר מתנדב"], "")),
+            family ? family.active : false);
     });
 
     const filters: string[] = [];
@@ -371,7 +292,6 @@ export async function getDemands2(
     filters.push(`IS_BEFORE({DATE}, '${dayjs(dateEnd).add(1, "day").format(DATE_AT)}')`);
 
     if (volunteerId) {
-        //filters.push(airtableArrayCondition("vol_id", volunteerId));
         filters.push(`OR(${airtableArrayCondition("vol_id", volunteerId)}, ${airtableArrayCondition("transport_vol_id", volunteerId)})`);
     }
 
@@ -398,7 +318,8 @@ export async function getDemands2(
         if (holidays.length && holidays.some(h => !h.familyId && !h.alternateDate)) continue;
 
         const day = date.day();
-        const familiesInDay = families.filter(f => f.days.some(d => d == day));
+        const familiesInDay = families.filter(f => f.days.length > 0 && f.days[0] == day); // ignore more than one day of cooking - take the first
+
         // Now check if this date for this family does not exist
         for (const family of familiesInDay) {
             // skip if this family is blocked for this date with no alternate
@@ -410,17 +331,22 @@ export async function getDemands2(
 
             if (!dateInRange(actualDate, startVacant, endDate)) continue;
 
-            if (!meals.find(m => dayjs(m.date).format(DATE_AT) == actualDate && m.mainBaseFamilyId == family.id)) {
+            // Find meals in this day, or any other day in the same week.
+            // The reason for the week range, is that when a family's cooking days change, and a meal is already scheduled, we
+            // do not want another day to be openned
+
+            if (!meals.find(m => dayjs(m.date).locale("he").isSame(actualDate, "week") && m.mainBaseFamilyId == family.id)) {
                 addedOpenDemands.push({
                     id: getCalcDemandID(family.id, actualDate, family.cityId),
                     date: actualDate,
-                    city: getCityName(family.cityId),
+                    familyCityName: getCityName(family.cityId),
                     district: family.district,
                     status: Status.Available,
                     familyLastName: family.name,
                     mainBaseFamilyId: family.id,
                     districtBaseFamilyId: "N/A",
                     volunteerId: "",
+                    volunteerCityName: "",
                     isFamilyActive: family.active,
                 });
             }
@@ -438,13 +364,14 @@ export async function getDemands2(
                             addedOpenDemands.push({
                                 id: family.id + holidayDate,
                                 date: holidayDate,
-                                city: getCityName(family.cityId),
+                                familyCityName: getCityName(family.cityId),
                                 district: family.district,
                                 status: Status.Available,
                                 familyLastName: family.name,
                                 mainBaseFamilyId: family.id,
                                 districtBaseFamilyId: "N/A",
                                 volunteerId: "",
+                                volunteerCityName: "",
                                 isFamilyActive: family.active,
                             });
                         }
@@ -545,10 +472,10 @@ async function GetFamilyDetails2(familyId: string, includeContacts: boolean): Pr
 // צפון recLbwpPC80SdRmPO
 // שרון recmLo9MWRxmrLEsM
 // מרכז recP17rsfOseG3Frx
-getDemands2(["recP17rsfOseG3Frx", "recmLo9MWRxmrLEsM"], Status.Occupied, "2024-10-11", "2024-12-14", "rec2YAetKYmqRwO2k").then(demands => {
-    demands.forEach(d => console.log(d.date, d.status))
+// getDemands2(["recP17rsfOseG3Frx", "recmLo9MWRxmrLEsM"], Status.Occupied, "2024-10-11", "2024-12-14", "rec2YAetKYmqRwO2k").then(demands => {
+//     demands.forEach(d => console.log(d.date, d.status))
 
-});
+// });
 
 
 // getDemands2(["recLbwpPC80SdRmPO"], Status.Occupied, "2024-10-22", "2024-11-12").then(demands=>{
@@ -959,3 +886,22 @@ export async function searchFamilies(searchStr: string): Promise<FamilyCompact[]
 // searchFamilies("עמ").then(f=>{
 //     f.forEach(family=>console.log(family.familyLastName));
 // })
+
+async function migrateUsers() {
+    db.collection(Collections.Users).get().then(res=>{
+        for (const doc of res.docs) {
+            if (!doc.data().mahoz) {
+                console.log("missing", doc.id)
+                doc.ref.update({
+                         districts: []
+                })
+                
+            }
+            // doc.ref.update({
+            //     districts: [doc.data().mahoz]
+            // })
+        }
+        console.log("Done migrating users")
+    })
+}
+migrateUsers()

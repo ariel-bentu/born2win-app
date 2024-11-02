@@ -182,7 +182,7 @@ export async function SendLinkOrInstall() {
         u.data().uid == undefined &&
         u.data().manychat_id !== undefined &&
         u.data().sendWeeklyMessage !== date &&
-        districtsIdsWithFamilies.includes(u.data().mahoz)
+        districtsIdsWithFamilies.some((did:string)=> u.data().districts.includes(did))
     );
 
     let bulk: Promise<any>[] = [];

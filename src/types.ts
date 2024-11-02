@@ -60,7 +60,7 @@ export interface VolunteerInfo {
     id: string;
     firstName: string;
     lastName: string;
-    district: { id: string, name: string }
+    districts: District[];
     phone: string;
     active: boolean;
     city: string;
@@ -77,7 +77,7 @@ export interface FamilityDemandUpdatePayload {
     cityId: string;
     isRegistering: boolean; // true means register, false mean unregister
     reason?: string;
-    district?: string; // defaults to the user's. for admin this is needed
+    district: string; // defaults to the user's. for admin this is needed
     volunteerId?: string // defaults to the user's. for admin this is needed
 }
 
@@ -102,6 +102,11 @@ export interface UpdateUserLoginPayload {
     isIOS: boolean;
 }
 
+export interface District {
+    id: string;
+    name: string;
+}
+
 export interface UserInfo {
     id: string;
     notificationToken: TokenInfo | undefined,
@@ -110,10 +115,11 @@ export interface UserInfo {
     notificationOn: boolean,
     phone: string,
     userDistrict: { id: string, name: string },
+    userDistricts: string[];
     isAdmin: boolean,
     adminAuthorities?: AdminAuthorities[],
     needToSignConfidentiality?: string;
-    districts?: { id: string, name: string }[],
+    districts: District[],
     active: boolean;
 }
 
@@ -161,7 +167,7 @@ export interface FamilyDemand {
     mainBaseFamilyId: string;
     districtBaseFamilyId: string;
     volunteerId: string;
-    volunteerCityName:string;
+    volunteerCityName: string;
     transpotingVolunteerId?: string
     isFamilyActive: boolean;
 }
@@ -209,7 +215,7 @@ export interface Recipient {
     name: string;
     id: string;
     phone: string;
-    mahoz: string;
+    districts: string[];
 }
 
 export interface SearchUsersPayload {

@@ -3,6 +3,7 @@ import dayjs, { Dayjs } from "dayjs";
 
 import { AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilyDemand, FamilyDetails, LoginInfo, NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord, FamilityDetailsPayload, NotificationChannels, GenerateLinkPayload, OpenFamilyDemands, VolunteerInfo, VolunteerInfoPayload, GetDemandsPayload, Errors, Status } from "../src/types";
 export const DATE_AT = "YYYY-MM-DD";
+const DATE_TIME = "YYYY-MM-DD HH:mm";
 
 import { getFirestore, FieldValue, QueryDocumentSnapshot, DocumentSnapshot, FieldPath } from "firebase-admin/firestore";
 var admin = require("firebase-admin");
@@ -228,7 +229,7 @@ function mealAirtable2FamilyDemand(demand: AirTableRecord, familyCityName: strin
         id: demand.id,
         date: demand.fields["DATE"],
         familyCityName,
-        city: familyCityName,
+        //city: familyCityName,
         familyLastName: demand.fields.Name,
         district: getSafeFirstArrayElement(demand.fields["מחוז"], ""),
         status: Status.Occupied,
@@ -881,6 +882,132 @@ export async function searchFamilies(searchStr: string): Promise<FamilyCompact[]
     ])
 }
 
+async function syncBorn2WinUsers(sinceDate?: any) {
+    let offset = null;
+    let count = 0;
+    let countActive = 0;
+    const airTableMainBase = mainBase.value();
+    const apiKey = born2winApiKey.value();
+    // let notifyForNewUsers = true;
+    if (!sinceDate) {
+        sinceDate = dayjs().subtract(25, "hour");
+        // notifyForNewUsers = false;
+    }
+    const now = dayjs().format("YYYY-MM-DD HH:mm:ss[z]");
+    const newLinksToAdmin = [] as {
+        name: string,
+        phone: string,
+        link: string,
+    }[];
+
+    const url = `https://api.airtable.com/v0/${airTableMainBase}/${encodeURIComponent("מתנדבים")}`;
+    const batch = db.batch();
+    const seenUsers: any = {};
+    const duplicates: any = [];
+    do {
+        const response: any = await axios.get(url, {
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+            },
+            params: {
+                filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
+                fields: ["record_id", "שם פרטי", "שם משפחה", "מחוז", "פעיל", "טלפון", "phone_e164", "manychat_id", "תאריך לידה", "מגדר", "חתם על שמירת סודיות", "תעודת זהות", "ערים"],
+                offset: offset,
+            },
+        });
+        offset = response.data.offset;
+        count += response.data.records.length;
+        countActive += response.data.records.filter((user: any) => user.fields["פעיל"] == "פעיל").length;
+        for (let i = 0; i < response.data.records.length; i++) {
+            const user = response.data.records[i];
+            const userId = user.fields.record_id;
+            if (seenUsers[userId]) {
+                duplicates.push(userId);
+                continue;
+            }
+
+            seenUsers[userId] = true;
+            const docRef = db.collection(Collections.Users).doc(userId);
+            const userDoc = await docRef.get();
+            const isNeedToSignConfidentiality = (user.fields["חתם על שמירת סודיות"] !== "חתם");
+
+            const userRecord = {
+                active: user.fields["פעיל"] == "פעיל",
+                firstName: user.fields["שם פרטי"] || "missing",
+                lastName: user.fields["שם משפחה"] || "missing",
+                lastModified: now,
+                phone: user.fields.phone_e164?.trim() || "",
+                mahoz: getSafeFirstArrayElement(user.fields["מחוז"], ""), // deprecated
+                districts: user.fields["מחוז"] || [],
+                birthDate: user.fields["תאריך לידה"] ? dayjs(user.fields["תאריך לידה"]).format(DATE_BIRTHDAY) : "",
+                gender: (user.fields["מגדר"] || "לא ידוע"),
+                volId: user.id,
+                manychat_id: user.fields.manychat_id || "",
+                cityId: getSafeFirstArrayElement(user.fields["ערים"], ""),
+            } as UserRecord;
+
+            if (userDoc && userDoc.exists) {
+                const prevUserRecord = userDoc.data();
+                if (prevUserRecord &&
+                    userRecord.active === prevUserRecord.active &&
+                    userRecord.firstName === prevUserRecord.firstName &&
+                    userRecord.lastName === prevUserRecord.lastName &&
+                    userRecord.phone === prevUserRecord.phone &&
+                    userRecord.birthDate === prevUserRecord.birthDate &&
+                    userRecord.gender === prevUserRecord.gender &&
+                    userRecord.cityId === prevUserRecord.cityId &&
+                    (isNeedToSignConfidentiality && prevUserRecord.needToSignConfidentiality ||
+                        (!isNeedToSignConfidentiality && !prevUserRecord.needToSignConfidentiality))
+                ) {
+                    // No change!
+                    continue;
+                }
+
+                // update it
+                if (prevUserRecord && userRecord.active !== prevUserRecord.active && userRecord.active) {
+                    // user has changed to active, add OTP and send it to admins
+                    userRecord.otp = crypto.randomUUID();
+                    userRecord.otpCreatedAt = dayjs().format(DATE_TIME);
+                }
+
+                if (prevUserRecord && prevUserRecord.needToSignConfidentiality && !isNeedToSignConfidentiality) {
+                    userRecord.needToSignConfidentiality = FieldValue.delete();
+                }
+
+                batch.update(userDoc.ref, userRecord as any);
+            } else {
+                // create new
+                if (userRecord.active) {
+                    userRecord.otp = crypto.randomUUID();
+                    userRecord.otpCreatedAt = dayjs().format(DATE_TIME);
+                }
+
+                if (isNeedToSignConfidentiality) {
+                    userRecord.needToSignConfidentiality = generateSignConfidentialityURL(user.fields["שם פרטי"], user.fields["תעודת זהות"], userId);
+                }
+
+                batch.create(docRef, userRecord);
+            }
+            
+        }
+    } while (offset);
+
+    return batch.commit().then(async () => {
+        //logger.info("Sync Users: obsered modified:", count, "observed Active", countActive, "registrationLinks", newLinksToAdmin, "duplicates:", duplicates);
+        // no need for now
+        //         if (notifyForNewUsers && newLinksToAdmin.length > 0) {
+        //             const admins = await db.collection(Collections.Admins).get();
+        //             const adminsIds = admins.docs.map(doc => doc.id);
+
+        //             await Promise.all(newLinksToAdmin.map(link => addNotificationToQueue("לינק למשתמש", `שם: ${link.name}
+        // טלפון: ${link.phone}
+        // לינק לשליחה למשתמש: ${link.link}
+        // `, NotificationChannels.Links, [], adminsIds)));
+        //         }
+        return;
+    });
+}
+
 // getHolidays()
 
 // searchFamilies("עמ").then(f=>{
@@ -904,4 +1031,6 @@ async function migrateUsers() {
         console.log("Done migrating users")
     })
 }
-migrateUsers()
+//migrateUsers()
+
+//syncBorn2WinUsers()

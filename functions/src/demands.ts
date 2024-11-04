@@ -17,7 +17,6 @@ function mealAirtable2FamilyDemand(demand: AirTableRecord, familyCityName: strin
         id: demand.id,
         date: demand.fields["DATE"],
         familyCityName,
-        city: familyCityName,
         familyLastName: demand.fields.Name,
         district: getSafeFirstArrayElement(demand.fields["מחוז"], ""),
         status: Status.Occupied,

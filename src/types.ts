@@ -160,7 +160,6 @@ export interface FamilyDemand {
     id: string;
     date: string;
     familyCityName: string;
-    city?: string; // for backwards compatability remove in a week
     district: string;
     status: string;
     familyLastName: string;

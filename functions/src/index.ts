@@ -1333,7 +1333,7 @@ async function alertOpenDemands() {
                 if (daysLeft > 0) {
                     found = true;
                     const simplifedName = simplifyFamilyName(od.familyLastName);
-                    msgBody += `- ${simplifedName} - ${od.city} (עוד ${daysLeft} ימים)` + "\n";
+                    msgBody += `- ${simplifedName} - ${od.familyCityName} (עוד ${daysLeft} ימים)` + "\n";
                 }
             });
             if (found) {
@@ -1370,7 +1370,7 @@ async function alertUpcomingCooking() {
             const msgBody = `תאריך הבישול: ${dayjs(demand.date).format(IL_DATE)}
 עוד: ${daysBefore} ימים
 משפחה: ${demand.familyLastName}
-עיר: ${demand.city}
+עיר: ${demand.familyCityName}
 לא לשכוח לתאם עוד היום בשיחה או הודעה את שעת מסירת האוכל.
 אם אין באפשרותך לבשל יש לבטל באפליקציה, או ליצור קשר.`;
             await addNotificationToQueue("תזכורת לבישול!", msgBody, NotificationChannels.Alerts, [], [demand.volunteerId], {
@@ -1469,9 +1469,9 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                 firstName: user.fields["שם פרטי"] || "missing",
                 lastName: user.fields["שם משפחה"] || "missing",
                 lastModified: now,
-                phone: user.fields.phone_e164 || "",
+                phone: user.fields.phone_e164?.trim() || "",
                 mahoz: getSafeFirstArrayElement(user.fields["מחוז"], ""), // deprecated
-                districts: user.fields["מחוז"],
+                districts: user.fields["מחוז"] || [],
                 birthDate: user.fields["תאריך לידה"] ? dayjs(user.fields["תאריך לידה"]).format(DATE_BIRTHDAY) : "",
                 gender: (user.fields["מגדר"] || "לא ידוע"),
                 volId: user.id,

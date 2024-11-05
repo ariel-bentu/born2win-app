@@ -16,7 +16,7 @@ import { generateDetailsForWhatapp } from './famility-registration-details';
 
 import { InProgress, PhoneNumber, WeekSelectorSlider } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
-import {isNotEmpty, nicePhone, simplifyFamilyName, sortByDate} from './utils';
+import {simplifyFamilyName, sortByDate} from './utils';
 import { Button } from 'primereact/button';
 import "./charts.css"
 import { FamilyDetailsComponent } from './famility-registration-details';

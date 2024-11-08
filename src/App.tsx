@@ -109,7 +109,7 @@ function App() {
     const [activeIndex, setActiveIndex] = useState(0);
     const [error, setError] = useState<string | undefined>();
     const [loggedOut, setLoggedOut] = useState<boolean>(false);
-    const [phoneFlow, setPhoneFlow] = useState<boolean>(false);
+    const [phoneFlow, setPhoneFlow] = useState<string | undefined>();
     const [latestVersion, setLatestVersion] = useState<string | undefined>();
     const [newVersionExists, setNewVersionExists] = useState<boolean>(false);
     const [blockUserWithMessage, setBlockUserWithMessage] = useState<ReactNode | undefined>();
@@ -305,7 +305,7 @@ function App() {
 
     useEffect(() => {
         if (user && user.uid) {
-
+            
             if (oldUrlParamID) {
                 console.log("Compatibility to old UI, vid=", oldUrlParamID);
                 setVolunteerId(oldUrlParamID);
@@ -318,7 +318,7 @@ function App() {
                 setVolunteerId(currentVolId);
                 return;
             }
-
+            
             if (!isPWA) {
                 // BROWSER flow
                 if (isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
@@ -327,6 +327,7 @@ function App() {
                         // Developer had localStorage for user1 and params for user2 - flow will restart
                         localStorage.removeItem(VOL_ID_STORAGE_KEY)
                         currentVolId = null;
+                        api.analyticLog("Logout", "dev logging out");
                         api.logout();
                         return;
                     }
@@ -351,6 +352,7 @@ function App() {
                                 }
                             } else if (!isDev) {
                                 // Logout from Firebase - to cleanup
+                                api.analyticLog("Logout", "iOS logging out");
                                 setLoggedOut(true);
                                 api.logout();
                             }
@@ -369,8 +371,7 @@ function App() {
                         return;
                     }
 
-
-                    setPhoneFlow(true);
+                    setPhoneFlow("");
                     return;
                 }
 
@@ -386,13 +387,13 @@ function App() {
                             localStorage.setItem(VOL_ID_STORAGE_KEY, retVolId);
                         })
                         .catch((err: Error) => {
-                            setPhoneFlow(true);
+                            setPhoneFlow("");
                             console.log("Failed to fetch volunteerId based on fingerprint", err);
                         })
                         .finally(() => setLoading(false));
 
                 } else {
-                    setPhoneFlow(true);
+                    setPhoneFlow("");
                 }
             }
         }
@@ -420,7 +421,7 @@ function App() {
     useEffect(() => {
         if (!offline && (isPWA || isDev || oldUrlParamID) && user && isNotEmpty(volunteerId)) {
             console.log("Loading UserInfo ");
-            api.getUserInfo().then((uInfo) => {
+            api.getUserInfo(volunteerId).then((uInfo) => {
                 console.log("UserInfo set to", uInfo.firstName);
                 setUserInfo(uInfo);
             }).catch(err => {
@@ -429,6 +430,10 @@ function App() {
                     setBlockUserWithMessage(<div>גישה מלינק זה נחסמה - יש לפתוח את האפליקציה</div>);
                 } else if (err.message === Errors.InactiveUser) {
                     setBlockUserWithMessage(<div>משתמש אינו פעיל - יש לפנות לעמותה</div>);
+                } else if (err.message == Errors.UserAuthenticationRequired) {
+                    setPhoneFlow("");
+                } else if (err.message.startsWith(Errors.UserAuthenticationRequiredCodeSent)) {
+                    setPhoneFlow(err.message.substring(Errors.UserAuthenticationRequiredCodeSent.length));
                 }
             });
         }
@@ -529,7 +534,7 @@ function App() {
                     appServices.showMessage('success', 'נשמר בהצלחה', 'הודעות אושרו בהצלחה');
                     setNotificationPermission("granted");
                     if (user && isNotEmpty(volunteerId)) {
-                        api.getUserInfo().then(uInfo => setUserInfo(uInfo));
+                        api.getUserInfo(volunteerId).then(uInfo => setUserInfo(uInfo));
                     }
                 });
             }
@@ -545,6 +550,7 @@ function App() {
             accept: async () => {
                 try {
                     setLoggedOut(true);
+                    api.analyticLog("Logout", "logging out");
                     await api.logout();
                     localStorage.removeItem(VOL_ID_STORAGE_KEY);
                 } catch (error) {
@@ -563,7 +569,7 @@ function App() {
             (isNotEmpty(currentVolId) && isNotificationTab) // inprocess of login, allow showing notification tab
         ) &&
         !readyToInstall &&
-        !phoneFlow;
+        phoneFlow == undefined;
 
 
     const isAdmin = userInfo?.isAdmin && userInfo?.districts?.length;
@@ -617,7 +623,7 @@ function App() {
         <div>isChrome: {isChrome ? "Yes" : "No: "}</div>
         <div>Finger Print: {fingerprint}</div>
         <div>Login Status: {user ? user.uid : "Not logged in"}</div>
-        <div>Login Info: {userInfo?userInfo.firstName:"null"}</div>
+        <div>Login Info: {userInfo ? userInfo.firstName : "null"}</div>
         <div>VolunteerID: {volunteerId ? volunteerId : "Missing"}</div>
         <div>Notification Permission: {notificationPermission}</div>
         <div>Notification Token: {userInfo?.notificationToken ? "Exists: " + userInfo.notificationToken.token.substring(0, 5) + "..." : "Missing"}</div>
@@ -649,12 +655,14 @@ function App() {
                 showLoading={loading && isNotificationTab}
             />
             {readyToInstall && !isDev && <PWAInstructions />}
-            {phoneFlow && <PhoneRegistration
+            {phoneFlow != undefined && <PhoneRegistration
+                initialPhone={phoneFlow}
                 appServices={appServices}
+                volunteerId={volunteerId}
                 onPhoneRegistrationComplete={(vid: string) => {
                     setVolunteerId(vid);
                     localStorage.setItem(VOL_ID_STORAGE_KEY, vid);
-                    setPhoneFlow(false);
+                    setPhoneFlow(undefined);
                 }}
             />}
 
@@ -696,11 +704,11 @@ function App() {
                         {activeIndex === 5 &&
                             <Gallery storagePath={"/gallery"} userInfo={userInfo} appServices={appServices} topPosition={tabContentsTop} />}
                     </TabPanel>
-                    {userInfo && holidayAdmin && 
-                     <TabPanel headerStyle={{ fontSize: 20 }} header="חגים">
-                     {activeIndex === 6 &&
-                         <HolidaysAdmin userInfo={userInfo} appServices={appServices} topPosition={tabContentsTop} />}
-                 </TabPanel>
+                    {userInfo && holidayAdmin &&
+                        <TabPanel headerStyle={{ fontSize: 20 }} header="חגים">
+                            {activeIndex === 6 &&
+                                <HolidaysAdmin userInfo={userInfo} appServices={appServices} topPosition={tabContentsTop} />}
+                        </TabPanel>
                     }
                 </TabView>}
         </div >

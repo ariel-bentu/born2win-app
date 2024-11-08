@@ -9,12 +9,14 @@ import { isIOS } from "./App";
 interface PhoneRegistrationProps {
     onPhoneRegistrationComplete: (vid: string) => void;
     appServices: AppServices;
+    initialPhone: string;
+    volunteerId: string | null | undefined;
 }
 
-export default function PhoneRegistration({ appServices, onPhoneRegistrationComplete }: PhoneRegistrationProps) {
+export default function PhoneRegistration({ appServices, onPhoneRegistrationComplete, initialPhone, volunteerId }: PhoneRegistrationProps) {
     const [phoneInput, setPhoneInput] = useState<string>("");
     const [verificationCodeInput, setVerificationCodeInput] = useState<string>("");
-    const [phonePhase, setPhonePhase] = useState<"phone" | "code">("phone");
+    const [phonePhase, setPhonePhase] = useState<"phone" | "code">(initialPhone.length > 0 ? "code" : "phone");
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | undefined>();
 
@@ -35,13 +37,15 @@ export default function PhoneRegistration({ appServices, onPhoneRegistrationComp
         } else {
             console.log("Sending verification code", phoneInput, verificationCodeInput);
             setLoading(true);
-            updateLoginInfo(undefined, verificationCodeInput, undefined, phoneInput, isIOS).then((retVolId: string) => {
-                onPhoneRegistrationComplete(retVolId);
-                appServices.showMessage("success", "אימות הושלם בהצלחה", "");
-            }).catch((err: Error) => {
-                setError("תקלת הזדהות באמצעות קוד האימות. " + err.message);
-                console.log("Failed to verify code in phone flow", err);
-            }).finally(() => setLoading(false));
+            updateLoginInfo((initialPhone.length > 0 ? volunteerId : undefined), verificationCodeInput, undefined,
+                phoneInput.length == 0 && initialPhone.length > 0 ? initialPhone : phoneInput,
+                isIOS).then((retVolId: string) => {
+                    onPhoneRegistrationComplete(retVolId);
+                    appServices.showMessage("success", "אימות הושלם בהצלחה", "");
+                }).catch((err: Error) => {
+                    setError("תקלת הזדהות באמצעות קוד האימות. " + err.message);
+                    console.log("Failed to verify code in phone flow", err);
+                }).finally(() => setLoading(false));
         }
     }, [phonePhase, phoneInput, verificationCodeInput]);
 
@@ -77,12 +81,23 @@ export default function PhoneRegistration({ appServices, onPhoneRegistrationComp
                         className="text-center text-3xl" onChange={(e) => setPhoneInput(e.currentTarget.value)} value={phoneInput} />
                 </> :
                 <>
-                    <div className="m-2">קוד שנשלח אליך בווטסאפ</div>
+                    <div dir="rtl" className="m-2">קוד שנשלח אליך בווטסאפ {phoneInput.length == 0 && initialPhone.length > 0 ? " ל " + initialPhone : ""}</div>
                     <InputText onKeyDown={handleKeyDownOnlyDigits} maxLength={4}
                         keyfilter="pint"  // Use "num" for decimal numbers
                         inputMode="numeric"
                         type="text"
                         className="text-center text-3xl" onChange={(e) => setVerificationCodeInput(e.currentTarget.value)} value={verificationCodeInput} />
+                    {phoneInput.length == 0 && initialPhone.length > 0 &&
+                        <a
+                            style={{
+                                color: "blue",
+                                cursor: "pointer",
+                                textDecoration: "underline",
+                            }}
+                            onClick={() => setPhonePhase("phone")}
+                        >
+                            לא מספר הטלפון שלך? לחץ.י כאן
+                        </a>}
                 </>
             }
             <Button disabled={!readyToSubmit} className="m-3" label="שלח" onClick={handlePhoneFlowSubmit} />

@@ -15,7 +15,7 @@ import dayjs from 'dayjs'
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
 import {
     FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyCompact, FamilyDemand,
-    FamilyDetails, GenerateLinkPayload, GetDemandsPayload, GetRegisteredHolidaysPayload, Holiday, IdName, NotificationChannels,
+    FamilyDetails, GenerateLinkPayload, GetDemandsPayload, GetRegisteredHolidaysPayload, GetUserInfoPayload, Holiday, IdName, NotificationChannels,
     NotificationUpdatePayload, OpenFamilyDemands, Recipient, SearchFamilyPayload, SearchUsersPayload,
     SendMessagePayload, UpdateDemandTransportationPayload, UpdateUserLoginPayload, UpsertHolidayPayload, UserInfo, VolunteerInfo, VolunteerInfoPayload
 } from "./types";
@@ -108,8 +108,13 @@ export function resetImpersonation() {
     impersonateUser = undefined;
 }
 
-export function getUserInfo(): Promise<UserInfo> {
-    return callFunctionWithImpersonation('GetUserInfo').then(res => res.data as UserInfo);
+export function getUserInfo(volunteerId: string): Promise<UserInfo> {
+    const payload: GetUserInfoPayload| undefined = impersonateUser ?
+        undefined :
+        {
+            volunteerId,
+        };
+    return callFunctionWithImpersonation('GetUserInfo', payload).then(res => res.data as UserInfo);
 }
 
 export function analyticLog(component: string, action: string) {
@@ -154,7 +159,7 @@ export async function sendTestNotification() {
     return testNotification();
 }
 
-export function updateLoginInfo(volunteerId: string | undefined, otp: string | undefined, fingerprint: string | undefined, phone: string | undefined, isIOS: boolean): any {
+export function updateLoginInfo(volunteerId: string | null | undefined, otp: string | undefined, fingerprint: string | undefined, phone: string | undefined, isIOS: boolean): any {
     // no impersonation
     const updateLoginInfoFunc = httpsCallable(functions, 'UpdateUserLogin');
     const uulp = { fingerprint, otp, volunteerId, phone, isIOS } as UpdateUserLoginPayload;

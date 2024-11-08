@@ -22,6 +22,7 @@ export function RegisterToNotification({ onClick }: RegisterToNotificationProps)
         <div className="notification-container">
             <div className="notification-content">
                 <div className="notification-text">לצורך שימוש יעיל באפליקציה יש לאשר הודעות</div>
+                <div className="notification-text mb-3">יש לשים לב: לאחר לחיצה על כפתור זה, תדרשו לאשר הודעות גם  בחלון נוסף שיוצג על ידי מכשיר הטלפון</div>
                 <div className="button-container">
                     <i className={`arrow-animation ${PrimeIcons.ANGLE_LEFT}`}></i>
                     <Button label="אישור קבלת הודעות" disabled={!onClick} onClick={onClick} className="notification-button" />
@@ -35,7 +36,7 @@ export function NewAppVersion({ onClick }: RegisterToNotificationProps) {
     return (
         <div className="notification-container">
             <div className="notification-content">
-                <div className="notification-text">קיימת גרסא חדשה של האפליקציה</div>
+                <div className="notification-text mb-3">קיימת גרסא חדשה של האפליקציה</div>
                 <div className="button-container">
                     <i className={`arrow-animation ${PrimeIcons.ANGLE_LEFT}`}></i>
                     <Button label="עדכן" icon="pi pi-refresh" disabled={!onClick} onClick={onClick} className="notification-button" style={{ gap: '8px', fontSize: 24 }} />

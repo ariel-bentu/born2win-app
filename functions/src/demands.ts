@@ -258,13 +258,19 @@ export async function updateFamilityDemand(demandId: string, demandDistrict: str
         const daysDiff = dayjs().diff(demand.date, "days");
         if (Math.abs(daysDiff) <= 10) {
             const admins = await db.collection(Collections.Admins).get();
-            const adminsIds = admins.docs.map(doc => doc.id);
+            const notifyTo = admins.docs.map(doc => doc.id);
+            if (demand.volunteerId) {
+                notifyTo.push(demand.volunteerId);
+            }
+            if (demand.transpotingVolunteerId) {
+                notifyTo.push(demand.transpotingVolunteerId);
+            }
 
             await addNotificationToQueue("שיבוץ בוטל!", `תאריך: ${demand.date}
 משפחה: ${demand.familyLastName}
 בוטל ע״י: ${performingUser}
 עיר: ${demand.familyCityName}
-`, NotificationChannels.Registrations, [], adminsIds);
+`, NotificationChannels.Registrations, [], notifyTo);
         }
     } else {
         logger.info("Unable to find registration in ארוחות table", demandId);

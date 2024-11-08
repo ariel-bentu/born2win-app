@@ -95,7 +95,7 @@ export interface TokenInfo {
 }
 
 export interface UpdateUserLoginPayload {
-    volunteerId?: string;
+    volunteerId: string | null | undefined;
     fingerprint?: string;
     phone?: string;
     otp?: string;
@@ -298,6 +298,11 @@ export const Errors = {
     UserAlreadyOnboardedToApp: "User is already onboarded to the app",
     InactiveUser: "Inactive user",
     OldLinkBlocked: "גישה דרך הלינק חסומה - יש להתקין את האפליקציה",
+    Unauthorized: "Unauthorized",
+    UserAuthenticationRequired: "נדרש אימות משתמש",
+    UserAuthenticationRequiredCodeSent: "נדרש אימות משתמש, קוד נשלח ל ",
+    WrongOtp: "קוד שגוי",
+    ExpiredOtp: "פג תוקף הקוד",
 }
 
 export enum Status {
@@ -326,6 +331,10 @@ export interface UpsertHolidayPayload {
 export interface GetRegisteredHolidaysPayload {
     from: string;
     to: string;
+}
+
+export interface GetUserInfoPayload {
+    volunteerId?:string;
 }
 
 export enum AdminAuthorities {

@@ -34,6 +34,7 @@ import {
     GetRegisteredHolidaysPayload,
     AdminAuthorities,
     District,
+    GetUserInfoPayload,
 } from "../../src/types";
 import axios from "axios";
 import express = require("express");
@@ -210,7 +211,7 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
 
     let doc;
 
-    if (uulp.volunteerId) {
+    if (uulp.volunteerId && !(uulp.phone && uulp.phone.length > 0)) {
         // Android or iOS phase 1
         // -----------------------
         doc = await getUserByID(uulp.volunteerId);
@@ -302,12 +303,16 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
         return doc.id;
     } else if (uulp.phone) {
         // Phone flow
-        doc = await findUserByPhone(uulp.phone);
-        if (!doc) {
-            logger.error("User with given phone is not known", uulp);
+        if (uulp.volunteerId && uulp.volunteerId.length > 0) {
+            doc = await getUserByID(uulp.volunteerId);
+        } else {
+            doc = await findUserByPhone(uulp.phone);
+        }
+        if (!doc || !doc.data()) {
+            logger.warn("User with given phone is not known", uulp);
             throw new HttpsError("not-found", "User with given phone is not known");
         }
-
+        const docData = doc.data() || {};
         if (!uulp.otp) {
             // Phone - Phase 1 (no otp)
             // Generate OTP:
@@ -319,12 +324,13 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
                 otpCreatedAt: now.format(DATE_TIME),
             });
 
-            await sendOTPViaManychat(doc.data().manychat_id, newOTP);
+            await sendOTPViaManychat(docData.manychat_id, newOTP);
         } else {
             // Phone - Phase 2 (with otp)
-            logger.log("phone flow", doc.data().otp, uulp.otp, Math.abs(now.diff(doc.data().otpCreatedAt, "seconds")));
-            if (doc.data().otp === uulp.otp &&
-                Math.abs(now.diff(dayjs.tz(doc.data().otpCreatedAt, JERUSALEM), "seconds")) < 300) {
+            logger.warn("phone flow", docData.otp, uulp.otp, Math.abs(now.diff(docData.otpCreatedAt, "seconds")));
+            const validOtp = Math.abs(now.diff(dayjs.tz(docData.otpCreatedAt, JERUSALEM), "seconds")) < 300;
+            if (docData.otp === uulp.otp &&
+                validOtp) {
                 // Update UID based on the verified phone (iOS Phase 2)
                 const update: any = {
                     uid: FieldValue.arrayUnion(uid),
@@ -334,7 +340,7 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
                 };
                 await doc.ref.update(update);
 
-                if (doc.data()?.isAdmin) {
+                if (docData?.isAdmin) {
                     // sets the isAdmin claim
                     await updateAdminClaim(uid, true);
                 }
@@ -344,10 +350,11 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
                 // All set
                 return doc.id;
             } else {
-                logger.error("Invalid or expired OTP - 2", uulp, doc.data().otp, doc.data().otpCreatedAt);
-                throw new HttpsError("invalid-argument", "Invalid or expired OTP");
+                logger.error("Invalid or expired OTP - 2", uulp, docData.otp, docData.otpCreatedAt, "validOtp", validOtp);
+                throw new HttpsError("invalid-argument", validOtp ? Errors.WrongOtp : Errors.ExpiredOtp);
             }
         }
+
         return ""; // not yet sending volunteer Id
     } else {
         logger.error("Missing volunteerID or fingerprint", uulp);
@@ -450,7 +457,41 @@ exports.UpdateNotification = onCall({ cors: true }, async (request) => {
 exports.GetUserInfo = onCall({ cors: true }, getUserInfo);
 
 async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
-    const doc = await authenticate(request);
+    const doc = await authenticate(request)
+        .catch(async (err) => {
+            if (err.message == Errors.Unauthorized) {
+                const guip = request.data as GetUserInfoPayload;
+                if (guip.volunteerId) {
+                    // send code to user
+                    // todo protect from ddos ?
+                    // Phone flow
+                    const doc = await getUserByID(guip.volunteerId);
+                    if (doc && doc?.data()?.manychat_id) {
+                        const phone = doc?.data()?.phone || "";
+                        if (phone.length > 0) {
+                            // Generate OTP:
+                            const now = dayjs().utc().tz(JERUSALEM);
+                            const newOTP = Math.floor(1000 + Math.random() * 9000) + "";
+                            await doc.ref.update({
+                                // Generate 4 digits otp
+                                otp: newOTP,
+                                // Renew date
+                                otpCreatedAt: now.format(DATE_TIME),
+                            });
+
+                            await sendOTPViaManychat(doc?.data()?.manychat_id, newOTP);
+                            const maskedPhone = `XXX-XXX${phone.slice(-3)}`;
+                            logger.warn("A lost uid started a phone flow with volunteerId:", guip.volunteerId, "code-sent", newOTP);
+                            throw new HttpsError("unauthenticated", Errors.UserAuthenticationRequiredCodeSent + maskedPhone);
+                        }
+                    }
+                } else {
+                    logger.warn("A lost uid started a phone flow without volunteerId:");
+                    throw new HttpsError("unauthenticated", Errors.UserAuthenticationRequired);
+                }
+            }
+            throw err;
+        });
     const data = doc.data();
     const allDistricts = await getDestricts();
     let availableDistricts: District[] = [];
@@ -930,7 +971,7 @@ async function authenticate(request: CallableRequest<any>): Promise<QueryDocumen
     const doc = await findUserByUID(uid);
     if (!doc) {
         logger.warn("unauthorized user - unknown uid", uid);
-        throw new HttpsError("unauthenticated", "unauthorized user");
+        throw new HttpsError("unauthenticated", Errors.Unauthorized);
     }
     if (!doc.data().active) {
         logger.warn("unauthorized user - user inactive", doc.id);
@@ -1128,27 +1169,26 @@ exports.DeleteHoliday = onCall({ cors: true }, async (request) => {
 
 
 exports.GetVolunteerInfo = onCall({ cors: true }, async (request): Promise<VolunteerInfo | undefined> => {
-    const userInfo = await getUserInfo(request);
+    await getUserInfo(request);
 
-    if (userInfo.isAdmin) {
-        const cities = await getCities();
-        const vip = request.data as VolunteerInfoPayload;
-        const volunteerDoc = await db.collection(Collections.Users).doc(vip.volunteerId).get();
-        if (volunteerDoc && volunteerDoc.exists) {
-            const data = volunteerDoc.data();
-            if (data) {
-                const allDistricts = await getDestricts();
-                const volunteerDistricts = data.districts.flatMap((id: string) => allDistricts.find(dist => dist.id === id));
-                return {
-                    id: volunteerDoc.id,
-                    firstName: data.firstName,
-                    lastName: data.lastName,
-                    city: cities.find(c => c.id == data.cityId)?.name || "N/A",
-                    districts: volunteerDistricts,
-                    phone: data.phone,
-                    active: data.active,
-                };
-            }
+    // todo consider if every user can call this
+    const cities = await getCities();
+    const vip = request.data as VolunteerInfoPayload;
+    const volunteerDoc = await db.collection(Collections.Users).doc(vip.volunteerId).get();
+    if (volunteerDoc && volunteerDoc.exists) {
+        const data = volunteerDoc.data();
+        if (data) {
+            const allDistricts = await getDestricts();
+            const volunteerDistricts = data.districts.flatMap((id: string) => allDistricts.find(dist => dist.id === id));
+            return {
+                id: volunteerDoc.id,
+                firstName: data.firstName,
+                lastName: data.lastName,
+                city: cities.find(c => c.id == data.cityId)?.name || "N/A",
+                districts: volunteerDistricts,
+                phone: data.phone,
+                active: data.active,
+            };
         }
     }
     return;

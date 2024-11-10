@@ -264,8 +264,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
     const handleApprove = async (selectedDateInfo: DateInfo | undefined, recipients: Recipient[] | undefined) => {
         const demandId = selectedDateInfo?.demandId;
         const transpotingVolunteerId = recipients && recipients.length > 0 ? recipients[0].id : "";
-
-        if (demandId && transpotingVolunteerId) {
+        if (demandId != null && transpotingVolunteerId != null) {
             setLoading(true);
             await updateDemandTransportation(demandId, transpotingVolunteerId)
                 .then(response => {
@@ -482,12 +481,10 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                     <Button label="הכן הודעה לבקשת שינוע" onClick={() => handlePrepareTransportMessage(selectedDateInfo, volunteerInfo)} />
                     <Button
                         label={transportingVolunteer ? "הסר משנע מהתנדבות" : "הוסף משנע להתנדבות"}
-                        onClick={() => {
+                        onClick={async () => {  // Use async here
                             if (transportingVolunteer) {
-                                // If transportingVolunteer exists, call handleApprove with empty string
-                                handleApprove(selectedDateInfo, undefined); // Call with undefined or your logic for removing
+                                await handleApprove(selectedDateInfo, undefined);
                             } else {
-                                // Open modal to add a new volunteer
                                 openRecipientModal();
                             }
                         }}

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Chart } from 'primereact/chart';
 import { MultiSelect } from 'primereact/multiselect';
 import dayjs from 'dayjs';
-import {AppServices, FamilyCompact, FamilyDemand, FamilyDetails, UserInfo, VolunteerInfo} from './types';
+import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails, UserInfo, VolunteerInfo } from './types';
 import {
     getDemands,
     getFamilyDetails,
@@ -16,7 +16,7 @@ import { generateDetailsForWhatapp } from './famility-registration-details';
 
 import { InProgress, PhoneNumber, WeekSelectorSlider } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
-import {simplifyFamilyName, sortByDate} from './utils';
+import { simplifyFamilyName, sortByDate } from './utils';
 import { Button } from 'primereact/button';
 import "./charts.css"
 import { FamilyDetailsComponent } from './famility-registration-details';
@@ -27,7 +27,7 @@ import { ProgressBar } from 'primereact/progressbar';
 import { confirmPopup } from 'primereact/confirmpopup';
 import { Recipient } from './types';
 import { Dialog } from "primereact/dialog";
-import {openWhatsApp} from "./notification-actions";
+import { openWhatsApp } from "./notification-actions";
 
 interface DemandChartProps {
     data: FamilyDemand[];
@@ -64,6 +64,7 @@ interface DateInfo {
     demandId: string;
     mainBaseFamilyId: string;
     districtBaseFamilyId: string;
+    transportingVolunteerId?: string;
     district: string;
     parentFamily: GroupedFamily;
 }
@@ -242,7 +243,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
 
     const overlayPanelRef = useRef<any>(null);
 
-    const [selectedDateInfo, setSelectedDateInfo] = useState<DateInfo | undefined>();
+    const [selectedMeal, setSelectedMeal] = useState<{ city: string, familyId: string, date: string } | undefined>();
     const [volunteerInfo, setVolunteerInfo] = useState<VolunteerInfo | undefined>();
     // Existing state declarations...
     const [showRecipientModal, setShowRecipientModal] = useState(false);
@@ -251,6 +252,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
     const [transportingVolunteer, setTransportingVolunteer] = useState<VolunteerInfo | undefined>(undefined);
     const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
     const [error, setError] = useState<any>(undefined);
+
 
     const openRecipientModal = () => {
         setShowRecipientModal(true);
@@ -303,26 +305,34 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
 
 
     useEffect(() => {
-        if (selectedDateInfo) {
-            getVolunteerInfo(selectedDateInfo.volunteerId).then(info => {
-                setVolunteerInfo(info);
-            });
-            getFamilyDetails(selectedDateInfo.districtBaseFamilyId, selectedDateInfo.district, selectedDateInfo.demandId, selectedDateInfo.mainBaseFamilyId, true)
-                .then(res => setFamilyDetails(res))
-                .catch(err => setError(err))
-                .finally(() => setLoading(false));
-        }
+        if (data && selectedMeal) {
+            // find demand
+            const demand = data.find(d => d.date == selectedMeal.date && d.mainBaseFamilyId == selectedMeal.familyId)
+            if (demand) {
+                getVolunteerInfo(demand.volunteerId).then(info => {
+                    setVolunteerInfo(info);
+                });
+                getFamilyDetails(demand.districtBaseFamilyId, demand.district, demand?.id, demand?.mainBaseFamilyId, true)
+                    .then(res => setFamilyDetails(res))
+                    .catch(err => setError(err))
+                    .finally(() => setLoading(false));
 
-        const demand = demands.find(d => d.id === selectedDateInfo?.demandId);
-        if (demand && demand.transpotingVolunteerId) {
-            getVolunteerInfo(demand.transpotingVolunteerId).then(v => {
-                setTransportingVolunteer(v);
-            })
+
+                if (demand.transpotingVolunteerId) {
+                    getVolunteerInfo(demand.transpotingVolunteerId).then(v => {
+                        setTransportingVolunteer(v);
+                    })
+                }
+            } else {
+                setTransportingVolunteer(undefined);
+                setVolunteerInfo(undefined);
+            }
         } else {
             setTransportingVolunteer(undefined);
+            setVolunteerInfo(undefined);
         }
+    }, [selectedMeal, data]);
 
-    }, [selectedDateInfo]);
 
 
     if (showFilterByVolunteer && filterByVolunteer?.id) {
@@ -331,6 +341,11 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
 
     const groupedData = groupByCityAndFamily(demands);
     const sortedCities = Object.keys(groupedData).sort();
+
+    let selectedDateInfo: DateInfo | undefined = undefined;
+    if (selectedMeal) {
+        selectedDateInfo = groupedData[selectedMeal.city][selectedMeal.familyId].dates.find(d => d.date == selectedMeal.date);
+    }
 
     if (showFamilyDetails) {
         return <FamilyDetailsComponent
@@ -348,9 +363,9 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
             }} reloadOpenDemands={() => { }} detailsOnly={true} actualUserId={""} />;
     }
 
-    const handleDateClick = (e: any, dateInfo: DateInfo) => {
+    const handleDateClick = (e: any, city: string, familyId: string, date: string) => {
         setVolunteerInfo(undefined);
-        setSelectedDateInfo(dateInfo); // Store the date info to render in the OverlayPanel
+        setSelectedMeal({ city, familyId, date }); // Store the date info to render in the OverlayPanel
         overlayPanelRef.current.toggle(e); // Open the OverlayPanel next to the clicked element
     };
 
@@ -394,7 +409,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                                                 family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map(d => dayjs(d.date).format("DD.MM")).join(" | ") :
                                                 family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map((d, k) => (
                                                     <span key={k}>
-                                                        <span className='clickable-span' onClick={(e) => handleDateClick(e, d)}>{dayjs(d.date).format("DD.MM")}</span>
+                                                        <span className='clickable-span' onClick={(e) => handleDateClick(e, city, family.mainBaseFamilyId, d.date)}>{dayjs(d.date).format("DD.MM")}</span>
                                                         <span className='m-1'>|</span>
                                                     </span>
                                                 ))
@@ -420,7 +435,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                             <div><strong>שם מבשל</strong>: {volunteerInfo.firstName + " " + volunteerInfo.lastName}</div>
                             <PhoneNumber phone={volunteerInfo.phone} label="טלפון מבשל" />
                             {volunteerInfo && volunteerInfo.phone && (<li className="flex align-items-center">
-                                <strong>שלח פרטים ל{volunteerInfo.firstName + " " +volunteerInfo.lastName}</strong>
+                                <strong>שלח פרטים ל{volunteerInfo.firstName + " " + volunteerInfo.lastName}</strong>
                                 <Button
                                     icon="pi pi-whatsapp"
                                     className="p-button-rounded p-button-info m-2"
@@ -439,7 +454,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                                 <div><strong>שם משנע</strong>: {transportingVolunteer ? transportingVolunteer.firstName + " " + transportingVolunteer.lastName : undefined}</div>}
                             {transportingVolunteer && <PhoneNumber phone={transportingVolunteer.phone} label="טלפון משנע" />}
                             {transportingVolunteer && transportingVolunteer.phone && (<li className="flex align-items-center">
-                                <strong>שלח פרטים ל{transportingVolunteer.firstName + " " +transportingVolunteer.lastName}</strong>
+                                <strong>שלח פרטים ל{transportingVolunteer.firstName + " " + transportingVolunteer.lastName}</strong>
                                 <Button
                                     icon="pi pi-whatsapp"
                                     className="p-button-rounded p-button-info m-2"
@@ -632,7 +647,8 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
             mainBaseFamilyId: family.mainBaseFamilyId,
             date: family.date,
             volunteerId: family.volunteerId,
-            parentFamily: groupedByCityAndFamily[city][family.mainBaseFamilyId]
+            parentFamily: groupedByCityAndFamily[city][family.mainBaseFamilyId],
+            transportingVolunteerId: family.transpotingVolunteerId,
         });
     });
 

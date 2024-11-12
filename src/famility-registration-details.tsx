@@ -288,7 +288,7 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                             <Button
                                 icon="pi pi-whatsapp"
                                 className="p-button-rounded p-button-info m-2"
-                                onClick={() => openWhatsApp(impersonateUser!.phone!, generateDetailsForWhatapp(familyDetails, family.city, date))}
+                                onClick={() => openWhatsApp(impersonateUser!.phone!, generateDetailsForWhatapp(familyDetails, family.city, date, volunteerInfo, transportingVolunteer, actualUserId))}
                                 aria-label="WhatsApp"
                             />
                         </li>)}
@@ -305,7 +305,7 @@ function getAddress(fd: FamilyDetails) {
         ", " + fd.city;
 }
 
-const generateDetailsForWhatapp = (familyDetails: FamilyDetails, city: string, date?: string) => {
+export const generateDetailsForWhatapp = (familyDetails: FamilyDetails, city: string, date?: string, volunteerInfo?: VolunteerInfo, transportingVolunteer?: VolunteerInfo, actualUserId?: string ) => {
     const alergies = familyDetails?.alergies;
 
     let msg = `*פרטי בישול*:\n`;
@@ -333,11 +333,25 @@ const generateDetailsForWhatapp = (familyDetails: FamilyDetails, city: string, d
     msg += `*כתובת*: ${getAddress(familyDetails)}\n`;
 
     if (isNotEmpty(familyDetails.contactName)) {
-        msg += `*איש קשר*: ${familyDetails.contactName}\n`;
+        msg += `*איש קשר משפחה*: ${familyDetails.contactName}\n`;
     }
 
     if (isNotEmpty(familyDetails.phone)) {
-        msg += `*טלפון*: ${nicePhone(familyDetails.phone)}\n`;
+        msg += `*טלפון איש קשר משפחה*: ${nicePhone(familyDetails.phone)}\n`;
+    }
+
+    if (volunteerInfo && transportingVolunteer && transportingVolunteer.id == actualUserId) {
+        msg += `*שם מבשל*: ${volunteerInfo.firstName} ${volunteerInfo.lastName}\n`;
+        if (isNotEmpty(volunteerInfo.phone)) {
+            msg += `*טלפון מבשל*: ${nicePhone(volunteerInfo.phone)}\n`;
+        }
+    }
+
+    if (transportingVolunteer && volunteerInfo && volunteerInfo.id == actualUserId) {
+        msg += `*שם משנע*: ${transportingVolunteer.firstName} ${transportingVolunteer.lastName}\n`;
+        if (isNotEmpty(transportingVolunteer.phone)) {
+            msg += `*טלפון משנע*: ${nicePhone(transportingVolunteer.phone)}\n`;
+        }
     }
 
     return msg;

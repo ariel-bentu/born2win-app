@@ -2,12 +2,21 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Chart } from 'primereact/chart';
 import { MultiSelect } from 'primereact/multiselect';
 import dayjs from 'dayjs';
-import { AppServices, FamilyCompact, FamilyDemand, UserInfo, VolunteerInfo } from './types';
-import { getDemands, getVolunteerInfo, handleSearchUsers, updateDemandTransportation, updateFamilityDemand } from './api';
+import {AppServices, FamilyCompact, FamilyDemand, FamilyDetails, UserInfo, VolunteerInfo} from './types';
+import {
+    getDemands,
+    getFamilyDetails,
+    getVolunteerInfo,
+    handleSearchUsers, impersonateUser,
+    updateDemandTransportation,
+    updateFamilityDemand
+} from './api';
+import { generateDetailsForWhatapp } from './famility-registration-details';
+
 
 import { InProgress, PhoneNumber, WeekSelectorSlider } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
-import { simplifyFamilyName, sortByDate } from './utils';
+import {simplifyFamilyName, sortByDate} from './utils';
 import { Button } from 'primereact/button';
 import "./charts.css"
 import { FamilyDetailsComponent } from './famility-registration-details';
@@ -18,6 +27,7 @@ import { ProgressBar } from 'primereact/progressbar';
 import { confirmPopup } from 'primereact/confirmpopup';
 import { Recipient } from './types';
 import { Dialog } from "primereact/dialog";
+import {openWhatsApp} from "./notification-actions";
 
 interface DemandChartProps {
     data: FamilyDemand[];
@@ -239,6 +249,8 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
     const [recipients, setRecipients] = useState<Recipient[]>([]);
     const [filteredUsers, setFilteredUsers] = useState<any[]>([]); // Adjust the type as needed
     const [transportingVolunteer, setTransportingVolunteer] = useState<VolunteerInfo | undefined>(undefined);
+    const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
+    const [error, setError] = useState<any>(undefined);
 
     const openRecipientModal = () => {
         setShowRecipientModal(true);
@@ -250,33 +262,23 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
     };
 
     const handleApprove = async (selectedDateInfo: DateInfo | undefined, recipients: Recipient[] | undefined) => {
-        try {
-            // Example IDs (replace these with actual IDs)
-            const demandId = selectedDateInfo?.demandId; // Replace with your actual demand ID
-            const transpotingVolunteerId = recipients && recipients.length > 0 ? recipients[0].id : ""; // Replace with your actual transporting volunteer ID
-
-            // Call the updateDemandTransportation function
-            if (demandId != null && transpotingVolunteerId != null) {
-                setLoading(true);
-                await updateDemandTransportation(demandId, transpotingVolunteerId)
-                    .then(response => {
-                        setReload(prev => prev + 1); // Reload the data after success
-                        appServices.showMessage("success", "נשמר בהצלחה ", "");
-                        // Handle success response
-                        console.log("Transportation updated successfully:", response);
-                    })
-                    .catch(error => {
-                        // Handle error response
-                        appServices.showMessage("error", "שמירה נכשלה", error.message);
-                        console.error("Error updating transportation:", error);
-                    })
-                    .finally(() => setLoading(false));
-            }
-            closeRecipientModal(); // Close the modal after success
-        } catch (error) {
-            console.error("Error in handleApprove:", error);
-            // appServices.showMessage("error", "Failed to update recipients", error.message);
+        const demandId = selectedDateInfo?.demandId;
+        const transpotingVolunteerId = recipients && recipients.length > 0 ? recipients[0].id : "";
+        if (demandId != null && transpotingVolunteerId != null) {
+            setLoading(true);
+            await updateDemandTransportation(demandId, transpotingVolunteerId)
+                .then(response => {
+                    setReload(prev => prev + 1);
+                    appServices.showMessage("success", "נשמר בהצלחה", "");
+                    console.log("Transportation updated successfully:", response);
+                })
+                .catch(error => {
+                    appServices.showMessage("error", "שמירה נכשלה", error.message);
+                    console.error("Error updating transportation:", error);
+                })
+                .finally(() => setLoading(false));
         }
+        closeRecipientModal();
     };
 
     const handlePrepareTransportMessage = (
@@ -305,7 +307,12 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
             getVolunteerInfo(selectedDateInfo.volunteerId).then(info => {
                 setVolunteerInfo(info);
             });
+            getFamilyDetails(selectedDateInfo.districtBaseFamilyId, selectedDateInfo.district, selectedDateInfo.demandId, selectedDateInfo.mainBaseFamilyId, true)
+                .then(res => setFamilyDetails(res))
+                .catch(err => setError(err))
+                .finally(() => setLoading(false));
         }
+
         const demand = demands.find(d => d.id === selectedDateInfo?.demandId);
         if (demand && demand.transpotingVolunteerId) {
             getVolunteerInfo(demand.transpotingVolunteerId).then(v => {
@@ -314,6 +321,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
         } else {
             setTransportingVolunteer(undefined);
         }
+
     }, [selectedDateInfo]);
 
 
@@ -411,9 +419,42 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                         <>
                             <div><strong>שם מבשל</strong>: {volunteerInfo.firstName + " " + volunteerInfo.lastName}</div>
                             <PhoneNumber phone={volunteerInfo.phone} label="טלפון מבשל" />
+                            {volunteerInfo && volunteerInfo.phone && (<li className="flex align-items-center">
+                                <strong>שלח פרטים ל{volunteerInfo.firstName + " " +volunteerInfo.lastName}</strong>
+                                <Button
+                                    icon="pi pi-whatsapp"
+                                    className="p-button-rounded p-button-info m-2"
+                                    onClick={() => {
+                                        if (volunteerInfo?.phone && familyDetails && selectedDateInfo?.parentFamily) {
+                                            openWhatsApp(
+                                                volunteerInfo.phone,
+                                                generateDetailsForWhatapp(familyDetails, selectedDateInfo.parentFamily.city, selectedDateInfo.date, volunteerInfo, transportingVolunteer, volunteerInfo.id)
+                                            );
+                                        }
+                                    }}
+                                    aria-label="WhatsApp"
+                                />
+                            </li>)}
                             {transportingVolunteer &&
                                 <div><strong>שם משנע</strong>: {transportingVolunteer ? transportingVolunteer.firstName + " " + transportingVolunteer.lastName : undefined}</div>}
                             {transportingVolunteer && <PhoneNumber phone={transportingVolunteer.phone} label="טלפון משנע" />}
+                            {transportingVolunteer && transportingVolunteer.phone && (<li className="flex align-items-center">
+                                <strong>שלח פרטים ל{transportingVolunteer.firstName + " " +transportingVolunteer.lastName}</strong>
+                                <Button
+                                    icon="pi pi-whatsapp"
+                                    className="p-button-rounded p-button-info m-2"
+                                    onClick={() => {
+                                        if (transportingVolunteer?.phone && familyDetails && selectedDateInfo?.parentFamily) {
+                                            openWhatsApp(
+                                                transportingVolunteer.phone,
+                                                generateDetailsForWhatapp(familyDetails, selectedDateInfo.parentFamily.city, selectedDateInfo.date, volunteerInfo, transportingVolunteer, transportingVolunteer.id)
+                                            );
+                                        }
+                                    }}
+
+                                    aria-label="WhatsApp"
+                                />
+                            </li>)}
                             <Button label="מחק התנדבות" onClick={() => {
                                 confirmPopup({
                                     message: 'האם למחוק התנדבות זו?',
@@ -440,12 +481,10 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                     <Button label="הכן הודעה לבקשת שינוע" onClick={() => handlePrepareTransportMessage(selectedDateInfo, volunteerInfo)} />
                     <Button
                         label={transportingVolunteer ? "הסר משנע מהתנדבות" : "הוסף משנע להתנדבות"}
-                        onClick={() => {
+                        onClick={async () => {  // Use async here
                             if (transportingVolunteer) {
-                                // If transportingVolunteer exists, call handleApprove with empty string
-                                handleApprove(selectedDateInfo, undefined); // Call with undefined or your logic for removing
+                                await handleApprove(selectedDateInfo, undefined);
                             } else {
-                                // Open modal to add a new volunteer
                                 openRecipientModal();
                             }
                         }}

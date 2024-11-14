@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Chart } from 'primereact/chart';
 import { MultiSelect } from 'primereact/multiselect';
 import dayjs from 'dayjs';
-import {AppServices, FamilyCompact, FamilyDemand, FamilyDetails, UserInfo, VolunteerInfo} from './types';
+import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails, UserInfo, VolunteerInfo } from './types';
 import {
     getDemands,
     getFamilyDetails,
@@ -16,7 +16,7 @@ import { generateDetailsForWhatapp } from './famility-registration-details';
 
 import { InProgress, PhoneNumber, WeekSelectorSlider } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
-import {simplifyFamilyName, sortByDate} from './utils';
+import { simplifyFamilyName, sortByDate } from './utils';
 import { Button } from 'primereact/button';
 import "./charts.css"
 import { FamilyDetailsComponent } from './famility-registration-details';
@@ -27,7 +27,7 @@ import { ProgressBar } from 'primereact/progressbar';
 import { confirmPopup } from 'primereact/confirmpopup';
 import { Recipient } from './types';
 import { Dialog } from "primereact/dialog";
-import {openWhatsApp} from "./notification-actions";
+import { openWhatsApp } from "./notification-actions";
 
 interface DemandChartProps {
     data: FamilyDemand[];
@@ -64,6 +64,7 @@ interface DateInfo {
     demandId: string;
     mainBaseFamilyId: string;
     districtBaseFamilyId: string;
+    transportingVolunteerId?: string;
     district: string;
     parentFamily: GroupedFamily;
 }
@@ -242,15 +243,16 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
 
     const overlayPanelRef = useRef<any>(null);
 
-    const [selectedDateInfo, setSelectedDateInfo] = useState<DateInfo | undefined>();
+    const [selectedMeal, setSelectedMeal] = useState<{ city: string, familyId: string, date: string } | undefined>();
     const [volunteerInfo, setVolunteerInfo] = useState<VolunteerInfo | undefined>();
     // Existing state declarations...
     const [showRecipientModal, setShowRecipientModal] = useState(false);
-    const [recipients, setRecipients] = useState<Recipient[]>([]);
+    const [recipient, setRecipient] = useState<Recipient | undefined>();
     const [filteredUsers, setFilteredUsers] = useState<any[]>([]); // Adjust the type as needed
     const [transportingVolunteer, setTransportingVolunteer] = useState<VolunteerInfo | undefined>(undefined);
     const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
     const [error, setError] = useState<any>(undefined);
+
 
     const openRecipientModal = () => {
         setShowRecipientModal(true);
@@ -258,41 +260,27 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
 
     const closeRecipientModal = () => {
         setShowRecipientModal(false);
-        setRecipients([]); // Clear selection on close if needed
+        setRecipient(undefined); // Clear selection on close if needed
     };
 
-    const handleApprove = async (selectedDateInfo: DateInfo | undefined, recipients: Recipient[] | undefined, volunteerInfo: VolunteerInfo | undefined ) => {
-        const demandId = selectedDateInfo?.demandId;
-        const transpotingVolunteerId = recipients && recipients.length > 0 ? recipients[0].id : "";
+    const handleSetTransportingVolunteer = async (selectedDateInfo: DateInfo | undefined, transportingVolunteer: Recipient | undefined) => {
+        if (!selectedDateInfo) return;
 
-        if (demandId != null) {
-            setLoading(true);
-            await updateDemandTransportation(demandId, transpotingVolunteerId)
-                .then(response => {
-                    // Update local transportingVolunteer state
-                    if (recipients && recipients[0]) {
-                        getVolunteerInfo(transpotingVolunteerId).then(v => {
-                            setTransportingVolunteer(v);
-                        })
-                    } else {
-                        setTransportingVolunteer(undefined); // Clear local state when removing
-                    }
+        setLoading(true);
+        await updateDemandTransportation(selectedDateInfo.demandId, transportingVolunteer?.id)
+            .then(response => {
+                setReload(prev => prev + 1);
+                appServices.showMessage("success", "נשמר בהצלחה", "");
+                console.log("Transportation updated successfully:", response);
+            })
+            .catch(error => {
+                appServices.showMessage("error", "שמירה נכשלה", error.message);
+                console.error("Error updating transportation:", error);
+            })
+            .finally(() => setLoading(false));
 
-                    appServices.showMessage("success", "נשמר בהצלחה", "");
-                    console.log("Transportation updated successfully:", response);
-
-                    // Optionally trigger a reload to ensure data is in sync with the database
-                    setReload(prev => prev + 1);
-                })
-                .catch(error => {
-                    appServices.showMessage("error", "שמירה נכשלה", error.message);
-                    console.error("Error updating transportation:", error);
-                })
-                .finally(() => setLoading(false));
-        }
         closeRecipientModal();
     };
-
 
     const handlePrepareTransportMessage = (
         selectedDateInfo: DateInfo | undefined,
@@ -314,27 +302,36 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
         appServices.showMessage("success", "הודעה הוכנה והועתקה - הדבקו היכן שתרצו", "");
     };
 
-    useEffect(() => {
-        if (selectedDateInfo) {
-            getVolunteerInfo(selectedDateInfo.volunteerId).then(info => {
-                setVolunteerInfo(info);
-            });
-            getFamilyDetails(selectedDateInfo.districtBaseFamilyId, selectedDateInfo.district, selectedDateInfo.demandId, selectedDateInfo.mainBaseFamilyId, true)
-                .then(res => setFamilyDetails(res))
-                .catch(err => setError(err))
-                .finally(() => setLoading(false));
-        }
 
-        const demand = demands.find(d => d.id === selectedDateInfo?.demandId);
-        if (demand && demand.transpotingVolunteerId) {
-            getVolunteerInfo(demand.transpotingVolunteerId).then(v => {
-                setTransportingVolunteer(v);
-            })
+    useEffect(() => {
+        if (data && selectedMeal) {
+            setTransportingVolunteer(undefined);
+            setVolunteerInfo(undefined);
+            
+            // find demand
+            const demand = data.find(d => d.date == selectedMeal.date && d.mainBaseFamilyId == selectedMeal.familyId)
+            if (demand) {
+                getVolunteerInfo(demand.volunteerId).then(info => {
+                    setVolunteerInfo(info);
+                });
+                getFamilyDetails(demand.districtBaseFamilyId, demand.district, demand?.id, demand?.mainBaseFamilyId, true)
+                    .then(res => setFamilyDetails(res))
+                    .catch(err => setError(err))
+                    .finally(() => setLoading(false));
+
+
+                if (demand.transpotingVolunteerId) {
+                    getVolunteerInfo(demand.transpotingVolunteerId).then(v => {
+                        setTransportingVolunteer(v);
+                    })
+                }
+            }
         } else {
             setTransportingVolunteer(undefined);
+            setVolunteerInfo(undefined);
         }
+    }, [selectedMeal, data]);
 
-    }, [selectedDateInfo]);
 
 
     if (showFilterByVolunteer && filterByVolunteer?.id) {
@@ -343,6 +340,11 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
 
     const groupedData = groupByCityAndFamily(demands);
     const sortedCities = Object.keys(groupedData).sort();
+
+    let selectedDateInfo: DateInfo | undefined = undefined;
+    if (selectedMeal) {
+        selectedDateInfo = groupedData[selectedMeal.city][selectedMeal.familyId].dates.find(d => d.date == selectedMeal.date);
+    }
 
     if (showFamilyDetails) {
         return <FamilyDetailsComponent
@@ -360,9 +362,9 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
             }} reloadOpenDemands={() => { }} detailsOnly={true} actualUserId={""} />;
     }
 
-    const handleDateClick = (e: any, dateInfo: DateInfo) => {
+    const handleDateClick = (e: any, city: string, familyId: string, date: string) => {
         setVolunteerInfo(undefined);
-        setSelectedDateInfo(dateInfo); // Store the date info to render in the OverlayPanel
+        setSelectedMeal({ city, familyId, date }); // Store the date info to render in the OverlayPanel
         overlayPanelRef.current.toggle(e); // Open the OverlayPanel next to the clicked element
     };
 
@@ -406,7 +408,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                                                 family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map(d => dayjs(d.date).format("DD.MM")).join(" | ") :
                                                 family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map((d, k) => (
                                                     <span key={k}>
-                                                        <span className='clickable-span' onClick={(e) => handleDateClick(e, d)}>{dayjs(d.date).format("DD.MM")}</span>
+                                                        <span className='clickable-span' onClick={(e) => handleDateClick(e, city, family.mainBaseFamilyId, d.date)}>{dayjs(d.date).format("DD.MM")}</span>
                                                         <span className='m-1'>|</span>
                                                     </span>
                                                 ))
@@ -421,17 +423,18 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
 
             {/* OverlayPanel for displaying additional info */}
             <OverlayPanel ref={overlayPanelRef} showCloseIcon closeOnEscape
-                          dismissable={true} >
+                dismissable={true} >
                 <div dir="rtl" style={{
                     width: 280, display: "flex",
                     flexDirection: "column",
+
                 }}>
                     {selectedDateInfo && (volunteerInfo ?
                         <>
                             <div><strong>שם מבשל</strong>: {volunteerInfo.firstName + " " + volunteerInfo.lastName}</div>
                             <PhoneNumber phone={volunteerInfo.phone} label="טלפון מבשל" />
                             {volunteerInfo && volunteerInfo.phone && (<li className="flex align-items-center">
-                                <strong>שלח פרטים ל{volunteerInfo.firstName + " " +volunteerInfo.lastName}</strong>
+                                <strong>שלח פרטים ל{volunteerInfo.firstName + " " + volunteerInfo.lastName}</strong>
                                 <Button
                                     icon="pi pi-whatsapp"
                                     className="p-button-rounded p-button-info m-2"
@@ -450,7 +453,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                                 <div><strong>שם משנע</strong>: {transportingVolunteer ? transportingVolunteer.firstName + " " + transportingVolunteer.lastName : undefined}</div>}
                             {transportingVolunteer && <PhoneNumber phone={transportingVolunteer.phone} label="טלפון משנע" />}
                             {transportingVolunteer && transportingVolunteer.phone && (<li className="flex align-items-center">
-                                <strong>שלח פרטים ל{transportingVolunteer.firstName + " " +transportingVolunteer.lastName}</strong>
+                                <strong>שלח פרטים ל{transportingVolunteer.firstName + " " + transportingVolunteer.lastName}</strong>
                                 <Button
                                     icon="pi pi-whatsapp"
                                     className="p-button-rounded p-button-info m-2"
@@ -494,7 +497,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                         label={transportingVolunteer ? "הסר משנע מהתנדבות" : "הוסף משנע להתנדבות"}
                         onClick={async () => {  // Use async here
                             if (transportingVolunteer) {
-                                await handleApprove(selectedDateInfo, undefined, transportingVolunteer);
+                                await handleSetTransportingVolunteer(selectedDateInfo, undefined);
                             } else {
                                 openRecipientModal();
                             }
@@ -510,10 +513,9 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                         <div className="flex justify-content-end">
                             <AutoComplete
                                 inputClassName="w-17rem md:w-15rem"
-                                multiple
-                                placeholder={!recipients || recipients.length < 1 ? "חיפוש לפי שם פרטי, משפחה או טלפון" : undefined}
+                                placeholder={!recipient ? "חיפוש לפי שם פרטי, משפחה או טלפון" : undefined}
                                 delay={500}
-                                value={recipients}
+                                value={recipient}
                                 field="name"
                                 optionGroupLabel="districtName"
                                 optionGroupChildren="users"
@@ -522,7 +524,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                                     const newFilter = await handleSearchUsers(userInfo, event.query);
                                     setFilteredUsers(newFilter);
                                 }}
-                                onChange={(e) => setRecipients(e.value)}
+                                onChange={(e) => setRecipient(e.value)}
                                 inputStyle={{ textAlign: 'right' }} // Align input text to the right
                                 itemTemplate={(item) => (
                                     <div style={{ textAlign: 'right' }}>{item.name}</div> // Align suggestion items to the right
@@ -531,7 +533,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                         </div>
                         <div className="flex justify-content-end mt-2">
                             <Button label="ביטול" onClick={closeRecipientModal} className="p-button-secondary ml-2" />
-                            <Button label="אשר" onClick={() => handleApprove(selectedDateInfo, recipients, undefined)} /> {/* Pass the data as arguments */}
+                            <Button label="אשר" disabled={!recipient} onClick={() => handleSetTransportingVolunteer(selectedDateInfo, recipient)} /> {/* Pass the data as arguments */}
                         </div>
                     </Dialog>
                 </div>
@@ -643,7 +645,8 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
             mainBaseFamilyId: family.mainBaseFamilyId,
             date: family.date,
             volunteerId: family.volunteerId,
-            parentFamily: groupedByCityAndFamily[city][family.mainBaseFamilyId]
+            parentFamily: groupedByCityAndFamily[city][family.mainBaseFamilyId],
+            transportingVolunteerId: family.transpotingVolunteerId,
         });
     });
 

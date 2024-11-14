@@ -221,7 +221,7 @@ export function updateFamilityDemand(demandId: string, mainBaseFamilyId: string,
 }
 
 
-export function updateDemandTransportation(demandId: string, transpotingVolunteerId: string) {
+export function updateDemandTransportation(demandId: string, transpotingVolunteerId: string | undefined) {
     const payload = {
         demandId,
         transpotingVolunteerId,

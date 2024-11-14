@@ -1034,3 +1034,43 @@ async function migrateUsers() {
 //migrateUsers()
 
 //syncBorn2WinUsers()
+
+async function updateAirTableAppinstalled() {
+    const airTableMainBase = mainBase.value();
+    const users = await db.collection("users").where("notificationOn", "==", true).get();
+
+    const url = `https://api.airtable.com/v0/${airTableMainBase}/מתנדבים/`;
+    const httpOptions = {
+        headers: {
+            "Authorization": `Bearer ${born2winApiKey.value()}`,
+            "Content-Type": "application/json",
+        },
+    };
+
+    let count = 0;
+    for (let i = 0; i < users.docs.length; i++) {
+        const user = users.docs[i];
+
+        if (user.id.startsWith("rec")) {
+            const loginInfo = user.data()?.loginInfo;
+            if (loginInfo && loginInfo.length) {
+                const date = loginInfo[0].createdAt;
+
+                const updatedFields = {
+                    fields: {
+                        "תאריך התקנת אפליקציה": dayjs(date).format("YYYY-MM-DD"),
+                    },
+                };
+                count++;
+                await axios.patch(url + user.id, updatedFields, httpOptions).catch(err => {
+                    console.log(err)
+                })
+                delay(1000);
+
+            }
+        }
+    }
+    console.log("Installed", count)
+}
+
+//updateAirTableAppinstalled()

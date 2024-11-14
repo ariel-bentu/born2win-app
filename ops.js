@@ -548,40 +548,7 @@ function getSafeFirstArrayElement(arr, defaultValue) {
 }
 
 
-async function updateAirTableAppinstalled() {
-    const users = await db.collection("users").where("notificationOn", "==", true).get();
 
-    const url = `https://api.airtable.com/v0/${baseId}/מתנדבים/`;
-    const httpOptions = {
-        headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-        },
-    };
-
-
-    for (let i = 0; i < users.docs.length; i++) {
-        const user = users.docs[i];
-
-        if (user.id.startsWith("rec")) {
-            const loginInfo = user.data()?.loginInfo;
-            if (loginInfo && loginInfo.length) {
-                const date = loginInfo[0].createdAt;
-
-                const updatedFields = {
-                    fields: {
-                        "תאריך התקנת אפליקציה": dayjs(date).format("YYYY-MM-DD"),
-                    },
-                };
-
-                await axios.patch(url + user.id, updatedFields, httpOptions).catch(err => {
-                    console.log(err)
-                })
-
-            }
-        }
-    }
-}
 
 async function greetingsToBirthdays() {
     const today = "01-06"// dayjs().add(3,"d").format("DD-MM");
@@ -602,7 +569,7 @@ async function greetingsToBirthdays() {
     return addNotificationToQueue(`ימי הולדת היום 💜`, `הנה רשימת המתנדבים שהיום יום הולדתם\n${usersList}`, "alerts",
         [], ["arielb"]);
 }
-//updateAirTableAppinstalled()
+
 
 async function syncBorn2WinFamilies() {
     let offset = null;

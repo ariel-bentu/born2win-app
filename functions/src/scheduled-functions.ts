@@ -178,12 +178,13 @@ export async function SendLinkOrInstall() {
     const districtsIdsWithFamilies = (await query.execute()).filter(d => d.familyCount > 0).map(d => d.id);
 
     const users = await db.collection(Collections.Users).where("active", "==", true).get();
-    const relevantUsers = users.docs.filter(u =>
+    let relevantUsers = users.docs.filter(u =>
         u.data().uid == undefined &&
         u.data().manychat_id !== undefined &&
-        u.data().sendWeeklyMessage !== date &&
-        districtsIdsWithFamilies.some((did:string)=> u.data().districts.includes(did))
-    );
+        u.data().sendWeeklyMessage !== date);
+    const potentialUsers = relevantUsers.length;
+    relevantUsers = relevantUsers.filter(u => districtsIdsWithFamilies.some((did: string) => u.data().districts.includes(did)));
+    const usersWithNoAvtiveFamilies = potentialUsers - relevantUsers.length;
 
     let bulk: Promise<any>[] = [];
     let totalInstall = 0;
@@ -227,5 +228,6 @@ export async function SendLinkOrInstall() {
 
     await addNotificationToQueue("נשלחו הודעות בווטסאפ!", `סה״כ הודעות התקנה: ${totalInstall}
 סה״כ לינקים: 0
-מותקני אפליקציה: ${users.docs.length - totalInstall}`, NotificationChannels.Alerts, [], adminsIds);
+מותקני אפליקציה: ${users.docs.length - totalInstall - usersWithNoAvtiveFamilies}
+מתנדבים במחוז ללא משפחות: ${usersWithNoAvtiveFamilies}`, NotificationChannels.Alerts, [], adminsIds);
 }

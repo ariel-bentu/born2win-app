@@ -5,6 +5,7 @@ import { AppServices } from "./types";
 import { updateLoginInfo } from "./api";
 import { InProgress } from "./common-ui";
 import { isIOS } from "./App";
+import { openWhatsApp, WhatsAppPhoneNumber } from "./notification-actions";
 
 interface PhoneRegistrationProps {
     onPhoneRegistrationComplete: (vid: string) => void;
@@ -18,6 +19,7 @@ export default function PhoneRegistration({ appServices, onPhoneRegistrationComp
     const [verificationCodeInput, setVerificationCodeInput] = useState<string>("");
     const [phonePhase, setPhonePhase] = useState<"phone" | "code">(initialPhone.length > 0 ? "code" : "phone");
     const [loading, setLoading] = useState<boolean>(false);
+    const [showTroubleshoot, setShowTroubleshoot] = useState<boolean>(false);
     const [error, setError] = useState<string | undefined>();
 
 
@@ -98,6 +100,30 @@ export default function PhoneRegistration({ appServices, onPhoneRegistrationComp
                         >
                             לא מספר הטלפון שלך? לחץ.י כאן
                         </a>}
+                    <a
+                        style={{
+                            color: "blue",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                        }}
+                        onClick={() => setShowTroubleshoot(true)}
+                    >
+                        קוד לא מגיע? לחץ.י כאן
+                    </a>
+                    {showTroubleshoot && <div>
+                        <div>לעיתים הודעת הוואסטאפ לא נשלחת, במקרה כזה מומלץ לשלוח ״הי״ לבוט של העמותה ולנסות שוב. לחץ על איקון הווטסאפ.</div>
+                        <Button
+                            icon="pi pi-whatsapp"
+                            className="p-button-rounded p-button-info m-2"
+                            onClick={() => {
+                                openWhatsApp(
+                                    WhatsAppPhoneNumber,
+                                    "הי מחכה לקוד שלא מגיע..."
+                                );
+                            }}
+                            aria-label="WhatsApp"
+                        />
+                    </div>}
                 </>
             }
             <Button disabled={!readyToSubmit} className="m-3" label="שלח" onClick={handlePhoneFlowSubmit} />

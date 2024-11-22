@@ -259,7 +259,7 @@ const Modes = {
     array: [
         { name: 'חג', value: 1 },
         { name: 'הוספת תאריך למשפחה', value: 2 },
-        { name: 'חסימת תאריך למשפחה', value: 3 },
+        { name: 'חסימה/החלפה תאריך למשפחה', value: 3 },
     ]
 }
 
@@ -295,7 +295,8 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
         </div>
 
         <div className="flex-auto">
-            <label htmlFor="date" className="font-bold block mt-5 mb-2">תאריך
+            <label htmlFor="date" className="font-bold block mt-5 mb-2">{mode == Modes.Block? "תאריך לחסום":
+            (mode == Modes.Holiday?"תאריך החג": "תאריך להוסיף")}
             </label>
             <Calendar
                 locale="he"

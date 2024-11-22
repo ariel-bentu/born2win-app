@@ -7,7 +7,7 @@ import { getSafeFirstArrayElement } from "../../src/utils";
 import { getCities } from ".";
 
 
-interface Family {
+export interface Family {
     id: string;
     name: string;
     district: string;

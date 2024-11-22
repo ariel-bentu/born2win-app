@@ -309,6 +309,7 @@ export enum Status {
     Cancelled = "בוטל",
     Occupied = "תפוס",
     Available = "זמין",
+    OccupiedOrCancelled = "תפוס או בוטל",
     Active = "פעיל",
 }
 

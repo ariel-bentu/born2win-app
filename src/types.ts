@@ -51,6 +51,20 @@ export interface FamilityDetailsPayload {
     familyDemandId: string;
 }
 
+export interface FamilityContactsPayload {
+    familyId: string;
+}
+
+export interface FamilityUpsertContactsPayload {
+    familyId: string;
+    contact: Contact;
+}
+
+export interface FamilityDeleteContactPayload {
+    familyId: string;
+    contactId: string;
+}
+
 
 export interface VolunteerInfoPayload {
     volunteerId: string;
@@ -335,9 +349,29 @@ export interface GetRegisteredHolidaysPayload {
 }
 
 export interface GetUserInfoPayload {
-    volunteerId?:string;
+    volunteerId?: string;
 }
 
 export enum AdminAuthorities {
     ManageHoliday = 1,
+}
+
+export interface Contact {
+    id: string;
+    firstName: string; // שם פרטי
+    lastName: string; // שם משפחה
+    role: string[]; // תפקיד (multiple selects)
+    email: string;
+    phone: string; // טלפון
+    age: number; // גיל
+    gender: string; // מגדר (single select)
+    dateOfBirth: string; // תאריך לידה
+    idNumber: string; // תעודת זהות
+    manychatId: string;
+    relationToPatient: string; // סוג הקשר לחולה (single select)
+}
+
+export interface SuitabilityCheck {
+    id: string;
+    // Other fields
 }

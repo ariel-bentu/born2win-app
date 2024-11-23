@@ -14,7 +14,10 @@ import dayjs from 'dayjs'
 
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
 import {
-    FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilyCompact, FamilyDemand,
+    Contact,
+    FamilityContactsPayload,
+    FamilityDeleteContactPayload,
+    FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilityUpsertContactsPayload, FamilyCompact, FamilyDemand,
     FamilyDetails, GenerateLinkPayload, GetDemandsPayload, GetRegisteredHolidaysPayload, GetUserInfoPayload, Holiday, IdName, NotificationChannels,
     NotificationUpdatePayload, OpenFamilyDemands, Recipient, SearchFamilyPayload, SearchUsersPayload,
     SendMessagePayload, UpdateDemandTransportationPayload, UpdateUserLoginPayload, UpsertHolidayPayload, UserInfo, VolunteerInfo, VolunteerInfoPayload
@@ -109,7 +112,7 @@ export function resetImpersonation() {
 }
 
 export function getUserInfo(volunteerId: string): Promise<UserInfo> {
-    const payload: GetUserInfoPayload| undefined = impersonateUser ?
+    const payload: GetUserInfoPayload | undefined = impersonateUser ?
         undefined :
         {
             volunteerId,
@@ -405,7 +408,6 @@ export async function searchFamilies(searchStr: string): Promise<FamilyCompact[]
     return searchFamiliesFunc(payload).then(res => res.data as FamilyCompact[]);
 }
 
-
 export const handleSearchFamilies = async (userInfo: UserInfo, query: string) => {
     const families = await searchFamilies(query);
     const districts = new Map();
@@ -430,4 +432,33 @@ export const handleSearchFamilies = async (userInfo: UserInfo, query: string) =>
     });
 
     return Array.from(districts.values());
+}
+
+export async function getFamilyContacts(familyId: string): Promise<Contact[]> {
+    const payload = {
+        familyId
+    } as FamilityContactsPayload;
+
+    return httpsCallable(functions, 'GetFamilyContacts')(payload)
+        .then((res: any) => {
+            return res.data as Contact[];
+        });
+}
+
+export async function upsertContact(contact: Contact, familyId: string) {
+    const payload = {
+        familyId,
+        contact,
+    } as FamilityUpsertContactsPayload;
+
+    return httpsCallable(functions, 'UpsertContact')(payload);
+}
+
+export async function deleteContact(contactId: string, familyId: string) {
+    const payload = {
+        familyId,
+        contactId,
+    } as FamilityDeleteContactPayload;
+
+    return httpsCallable(functions, 'DeleteContact')(payload);
 }

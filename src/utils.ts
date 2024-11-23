@@ -83,12 +83,14 @@ export function replaceAll(str: string, find: string, replace: string) {
 }
 
 
-export function normilizePhone(phone: string): string {
+export function normilizePhone(phone: string, addplus = true): string {
+    const plus = addplus ? "+" : ""
+
     if (phone.startsWith("0")) {
-        phone = "+972" + phone.substring(1);
+        phone = plus + "972" + phone.substring(1);
     } else {
         if (phone.startsWith("972")) {
-            phone = "+" + phone;
+            phone = plus + phone;
         }
     }
 

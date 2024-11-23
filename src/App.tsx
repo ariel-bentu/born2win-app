@@ -30,6 +30,7 @@ import PhoneRegistration from './phone-registration';
 import { Gallery } from './gallery';
 import { Button } from 'primereact/button';
 import { HolidaysAdmin } from './holidays';
+import ContactsManager from './families-mgmt';
 
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
 const UNSUPPORTED_PWA = "born2win_pwa";
@@ -305,7 +306,7 @@ function App() {
 
     useEffect(() => {
         if (user && user.uid) {
-            
+
             if (oldUrlParamID) {
                 console.log("Compatibility to old UI, vid=", oldUrlParamID);
                 setVolunteerId(oldUrlParamID);
@@ -318,7 +319,7 @@ function App() {
                 setVolunteerId(currentVolId);
                 return;
             }
-            
+
             if (!isPWA) {
                 // BROWSER flow
                 if (isNotEmpty(userPairingRequest) && isNotEmpty(otpPairingRequest)) {
@@ -710,6 +711,13 @@ function App() {
                                 <HolidaysAdmin userInfo={userInfo} appServices={appServices} topPosition={tabContentsTop} />}
                         </TabPanel>
                     }
+                    {userInfo &&
+                        <TabPanel headerStyle={{ fontSize: 20 }} header="אנשי קשר">
+                            {activeIndex === 7 &&
+                                <ContactsManager userInfo={userInfo} appServices={appServices}/>}
+                        </TabPanel>
+                    }
+
                 </TabView>}
         </div >
     );

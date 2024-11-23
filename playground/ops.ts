@@ -1,7 +1,7 @@
 import axios from "axios";
 import dayjs, { Dayjs } from "dayjs";
 
-import { AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilyDemand, FamilyDetails, LoginInfo, NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord, FamilityDetailsPayload, NotificationChannels, GenerateLinkPayload, OpenFamilyDemands, VolunteerInfo, VolunteerInfoPayload, GetDemandsPayload, Errors, Status } from "../src/types";
+import { AirTableRecord, Collections, FamilityDemandUpdatePayload, FamilyDemand, FamilyDetails, LoginInfo, NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload, SendNotificationStats, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord, FamilityDetailsPayload, NotificationChannels, GenerateLinkPayload, OpenFamilyDemands, VolunteerInfo, VolunteerInfoPayload, GetDemandsPayload, Errors, Status, Contact } from "../src/types";
 export const DATE_AT = "YYYY-MM-DD";
 const DATE_TIME = "YYYY-MM-DD HH:mm";
 
@@ -232,7 +232,7 @@ function mealAirtable2FamilyDemand(demand: AirTableRecord, familyCityName: strin
         //city: familyCityName,
         familyLastName: demand.fields.Name,
         district: getSafeFirstArrayElement(demand.fields["מחוז"], ""),
-        status: Status.Occupied,
+        status: demand.fields["סטטוס"] == Status.Cancelled ? Status.Cancelled : Status.Occupied,
         mainBaseFamilyId: getSafeFirstArrayElement(demand.fields["משפחה"], ""),
         districtBaseFamilyId: "N/A",
         volunteerId: getSafeFirstArrayElement(demand.fields["מתנדב"], undefined),
@@ -256,7 +256,7 @@ function getCities() {
     return cities.get();
 }
 
-const holidays = new CachedAirTable<Holiday>("חגים וחריגים", holidayAirtable2Holiday, ["AND(IS_AFTER({תאריך}, DATEADD(TODAY(), -1, 'days')))"], 1);
+const holidays = new CachedAirTable<Holiday>("חגים וחריגים", holidayAirtable2Holiday, ["AND(IS_AFTER({תאריך}, DATEADD(TODAY(), -7, 'days')))"], 1);
 
 
 
@@ -305,7 +305,7 @@ export async function getDemands2(
     }
 
     // calculate dates
-    const relevantHolidays = await holidays.get(h => dateInRange(h.date, dateStart, dateEnd));
+    const relevantHolidays = await holidays.get(h => (dateInRange(h.date, dateStart, dateEnd) || (!!h.alternateDate && dateInRange(h.alternateDate, dateStart, dateEnd))));
 
     const endDate = dayjs(dateEnd);
     const addedOpenDemands: FamilyDemand[] = [];
@@ -319,13 +319,13 @@ export async function getDemands2(
         if (holidays.length && holidays.some(h => !h.familyId && !h.alternateDate)) continue;
 
         const day = date.day();
-        const familiesInDay = families.filter(f => f.days.length > 0 && f.days[0] == day); // ignore more than one day of cooking - take the first
+        const familiesInDay = families.filter(f => f.days?.length > 0 && f.days[0] == day); // ignore more than one day of cooking - take the first
 
         // Now check if this date for this family does not exist
         for (const family of familiesInDay) {
             // skip if this family is blocked for this date with no alternate
             if (holidays.length && holidays.some(h => h.familyId == family.id && !h.addAvailability && !h.alternateDate)) continue;
-            const alternate = holidays.length > 0 ? holidays.find(h => (!h.familyId || h.familyId == family.id) && h.alternateDate) : undefined;
+            const alternate = holidays.length > 0 ? holidays.find(h => (!h.familyId || h.familyId == family.id) && !!h.alternateDate) : undefined;
             const actualDate = alternate ?
                 dayjs(alternate.alternateDate).format(DATE_AT) :
                 date.format(DATE_AT);
@@ -379,12 +379,180 @@ export async function getDemands2(
                     }
                 }
             });
+
+        relevantHolidays.filter(h =>
+            !!h.alternateDate && dayjs(h.alternateDate).format(DATE_AT) == date.format(DATE_AT) &&
+            !dateInRange(h.date, dateStart, dateEnd) && !!h.familyId
+        )
+            .forEach(holiday => {
+                // find family
+                const family = families.find(f => f.id == holiday.familyId);
+                if (family) {
+                    const holidayDate = dayjs(holiday.alternateDate).format(DATE_AT);
+                    if (!meals.find(m => dayjs(m.date).format(DATE_AT) == holidayDate && m.mainBaseFamilyId == family.id)) {
+                        addedOpenDemands.push({
+                            id: family.id + holidayDate,
+                            date: holidayDate,
+                            familyCityName: getCityName(family.cityId),
+                            district: family.district,
+                            status: Status.Available,
+                            familyLastName: family.name,
+                            mainBaseFamilyId: family.id,
+                            districtBaseFamilyId: "N/A",
+                            volunteerId: "",
+                            volunteerCityName: "",
+                            isFamilyActive: family.active,
+                        });
+                    }
+                }
+            });
     }
 
     if (status == Status.Available) {
         return addedOpenDemands;
     }
     return filteredMeals.concat(addedOpenDemands);
+}
+
+
+
+export async function getDemands3(
+    district: string | string[] | undefined,
+    status: Status.Occupied | Status.Available | undefined | Status.OccupiedOrCancelled,
+    dateStart: string,
+    dateEnd: string,
+    volunteerId?: string
+): Promise<FamilyDemand[]> {
+    const checkDistrict = ((districtId: string) => Array.isArray(district) ? district.some(d => d == districtId) : !district || district == districtId);
+
+    const families = await activeFamilies.get((f => checkDistrict(f.district)));
+    const _cities = await getCities();
+    const getCityName = (id: string) => _cities.find(c => c.id == id)?.name || "";
+
+    const mealsQuery = new AirTableQuery<FamilyDemand>("ארוחות", (m) => {
+        const family = families.find(f => f.id == getSafeFirstArrayElement(m.fields["משפחה"], ""));
+        return mealAirtable2FamilyDemand(m,
+            getCityName(getSafeFirstArrayElement(m.fields["עיר"], "")),
+            getCityName(getSafeFirstArrayElement(m.fields["עיר מתנדב"], "")),
+            family ? family.active : false);
+    });
+
+    const filters: string[] = [];
+    const startDateParam = dayjs(dateStart).format(DATE_AT);
+    const endDateParam = dayjs(dateEnd).format(DATE_AT);
+
+    if (status != Status.OccupiedOrCancelled) {
+        filters.push("{סטטוס}!='בוטל'");
+    }
+
+    // eslint-disable-next-line quotes
+    filters.push(`{DATE}>='${startDateParam}'`);
+    filters.push(`IS_BEFORE({DATE}, '${dayjs(dateEnd).add(1, "day").format(DATE_AT)}')`);
+
+    if (volunteerId) {
+        filters.push(`OR(${airtableArrayCondition("vol_id", volunteerId)}, ${airtableArrayCondition("transport_vol_id", volunteerId)})`);
+    }
+
+    const meals = await mealsQuery.execute(filters);
+    const filteredMeals = meals.filter(m => checkDistrict(m.district));
+
+    if (status === Status.Occupied || status === Status.OccupiedOrCancelled) {
+        // no need to calculate dates
+        return filteredMeals;
+    }
+
+    // calculate dates
+    const relevantHolidays = await holidays.get(h => (dateInRange(h.date, dateStart, dateEnd) || (!!h.alternateDate && dateInRange(h.alternateDate, dateStart, dateEnd))));
+
+    const endDate = dayjs(dateEnd);
+    const addedOpenDemands: FamilyDemand[] = [];
+    const startVacant = dayjs(dateStart);
+    for (let date = startVacant; endDate.isAfter(date); date = date.add(1, "day")) {
+        if (date.format(DATE_AT) < startDateParam) continue;
+        if (date.format(DATE_AT) > endDateParam) break;
+        const holidays = relevantHolidays.filter(h => dayjs(h.date).format(DATE_AT) == date.format(DATE_AT));
+
+        // Skip if this date is blocked for all and no alternate exists
+        if (holidays.length && holidays.some(h => !h.familyId && !h.alternateDate)) continue;
+
+        const day = date.day();
+        const familiesInDay = families.filter(f => f.days?.length > 0 && f.days[0] == day); // ignore more than one day of cooking - take the first
+
+        // Now check if this date for this family does not exist
+        for (const family of familiesInDay) {
+            // skip if this family is blocked for this date with no alternate
+            if (holidays.length && holidays.some(h => h.familyId == family.id && !h.addAvailability && !h.alternateDate)) continue;
+
+            const alternate = holidays.length > 0 ? holidays.find(h => (!h.familyId || h.familyId == family.id) && !!h.alternateDate) : undefined;
+            const actualDate = alternate ?
+                dayjs(alternate.alternateDate).format(DATE_AT) :
+                date.format(DATE_AT);
+
+            if (!dateInRange(actualDate, startVacant, endDate)) continue;
+
+            addMeal(addedOpenDemands, meals, families, family.id || "", actualDate, getCityName);
+        }
+
+        // Add special added days to family: (even if family already has committed date that week)
+        relevantHolidays.filter(h => dayjs(h.date).format(DATE_AT) == date.format(DATE_AT))
+            .forEach(holiday => {
+                if (holiday.addAvailability && holiday.familyId) {
+                    const holidayDate = dayjs(holiday.date).format(DATE_AT);
+                    addMeal(addedOpenDemands, meals, families, holiday.familyId || "", holidayDate, getCityName, false);
+                }
+            });
+
+    }
+
+    // add alternate date for those families that their date is on the date being replaced, only if that date is out of the
+    // range (those in the range were dealt with in previous loop)
+    relevantHolidays.filter(h =>
+        !!h.alternateDate &&
+        dateInRange(h.alternateDate, dateStart, dateEnd) &&
+        !dateInRange(h.date, dateStart, dateEnd)
+    )
+        .forEach(holiday => {
+            const holidayDate = dayjs(holiday.alternateDate).format(DATE_AT);
+            if (!holiday.familyId) {
+                const day = dayjs(holiday.date).day();
+                const familiesInDay = families.filter(f => f.days?.length > 0 && f.days[0] == day); // ignore more than one day of cooking - take the first
+
+                for (const family of familiesInDay) {
+                    addMeal(addedOpenDemands, meals, families, family.id || "", holidayDate || "", getCityName);
+                }
+            } else {
+                addMeal(addedOpenDemands, meals, families, holiday.familyId || "", holidayDate, getCityName, false);
+            }
+        });
+
+    if (status == Status.Available) {
+        return addedOpenDemands;
+    }
+    return filteredMeals.concat(addedOpenDemands);
+}
+
+function addMeal(demandsArray: FamilyDemand[], meals: FamilyDemand[], families: Family[], familyId: string, date: string, getCityName: (id: string) => string, uniqueInWeek: boolean = true) {
+    const family = families.find(f => f.id == familyId);
+    if (!family) return;
+
+    // Find meals in this day, or any other day in the same week.
+    // The reason for the week range, is that when a family's cooking days change, and a meal is already scheduled, we
+    // do not want another day to be openned
+    if (!uniqueInWeek || !meals.filter(m => m.status == Status.Occupied).find(m => dayjs(m.date).locale("he").isSame(date, "week") && m.mainBaseFamilyId == family.id)) {
+        demandsArray.push({
+            id: getCalcDemandID(family.id, date, family.cityId),
+            date,
+            familyCityName: getCityName(family.cityId),
+            district: family.district,
+            status: Status.Available,
+            familyLastName: family.name,
+            mainBaseFamilyId: family.id,
+            districtBaseFamilyId: "N/A",
+            volunteerId: "",
+            volunteerCityName: "",
+            isFamilyActive: family.active,
+        });
+    }
 }
 
 export function dateInRange(date: string | Dayjs, start: string | Dayjs, end: string | Dayjs) {
@@ -479,10 +647,10 @@ async function GetFamilyDetails2(familyId: string, includeContacts: boolean): Pr
 // });
 
 
-// getDemands2(["recLbwpPC80SdRmPO"], Status.Occupied, "2024-10-22", "2024-11-12").then(demands=>{
+// getDemands3(["recP17rsfOseG3Frx"], Status.Available, "2024-11-22", "2024-11-25").then(demands => {
 //     demands
-//     //.filter(d=>d.mainBaseFamilyId == "recwVL742srgkzO0u$$2024")
-//     .forEach(d=>console.log(d.date, d.status))
+//         //.filter(d=>d.mainBaseFamilyId == "recwVL742srgkzO0u$$2024")
+//         .forEach(d => console.log(d.date, d.status))
 // })
 
 async function syncBorn2WinFamilies() {
@@ -833,6 +1001,7 @@ function generateSignConfidentialityURL(firstName: string, identificationId: str
 
 //syncAllBorn2WinUsers()
 import { HebrewCalendar, HDate, Location, Event, CalOptions } from '@hebcal/core';
+import { only } from "node:test";
 
 
 function getHolidays() {
@@ -988,7 +1157,7 @@ async function syncBorn2WinUsers(sinceDate?: any) {
 
                 batch.create(docRef, userRecord);
             }
-            
+
         }
     } while (offset);
 
@@ -1015,14 +1184,14 @@ async function syncBorn2WinUsers(sinceDate?: any) {
 // })
 
 async function migrateUsers() {
-    db.collection(Collections.Users).get().then(res=>{
+    db.collection(Collections.Users).get().then(res => {
         for (const doc of res.docs) {
             if (!doc.data().mahoz) {
                 console.log("missing", doc.id)
                 doc.ref.update({
-                         districts: []
+                    districts: []
                 })
-                
+
             }
             // doc.ref.update({
             //     districts: [doc.data().mahoz]
@@ -1074,3 +1243,28 @@ async function updateAirTableAppinstalled() {
 }
 
 //updateAirTableAppinstalled()
+
+async function findDanglingContacts() {
+    const q = new AirTableQuery<any>("אנשי קשר", (rec=>rec));
+    const all = await q.execute();
+    let dangling = 0
+    let only2 = 0
+    let ok = 0
+
+    for (let c of all) {
+        const families = c.fields["משפחות רשומות"];
+        const families2 = c.fields["משפחות רשומות 2"];
+        if (!families && !families2) {
+            dangling++
+        } else if (!families && families2) {
+            //console.log("only 2", c);
+            only2++
+        } else {
+            ok++;
+        }
+        
+    }
+    console.log("Total ok", ok, "only2", only2, "dangling", dangling)
+}
+
+findDanglingContacts()

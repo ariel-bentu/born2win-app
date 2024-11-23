@@ -35,6 +35,10 @@ import {
     AdminAuthorities,
     District,
     GetUserInfoPayload,
+    Contact,
+    FamilityContactsPayload,
+    FamilityUpsertContactsPayload,
+    FamilityDeleteContactPayload,
 } from "../../src/types";
 import axios from "axios";
 import express = require("express");
@@ -45,9 +49,10 @@ import localeData = require("dayjs/plugin/localeData");
 import { SendLinkOrInstall, weeklyNotifyFamilies } from "./scheduled-functions";
 import { AirTableQuery, AirTableUpdate, CachedAirTable } from "./airtable";
 import { getDemands2, updateFamilityDemand } from "./demands";
-import { getFamilyDetails2, searchFamilies } from "./families";
+import { deleteContact, getFamilyContacts, getFamilyDetails2, searchFamilies, upsertContact } from "./families";
 import { Lock } from "./lock";
 import { deleteHoliday, getHolidays, upsertHoliday } from "./holidays";
+import { sendOTPViaManychat } from "./manychat";
 
 // [END Imports]
 
@@ -379,22 +384,6 @@ function validateOTPOrFingerprint(token: string | undefined, savedToken: string 
     if (!token || !savedToken) return false;
 
     return (token === savedToken && dayjs(createdAt).isAfter(dayjs().subtract(validForDays, "day")));
-}
-
-function sendOTPViaManychat(manySubscriberId: string, otp: string) {
-    const apiKey = manyChatApiKey.value();
-    const httpOptions = {
-        headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-        },
-    };
-
-    return axios.post("https://api.manychat.com/fb/subscriber/setCustomFieldByName", {
-        subscriber_id: manySubscriberId,
-        field_name: "verificationCode",
-        field_value: otp,
-    }, httpOptions);
 }
 
 exports.UpdateNotification = onCall({ cors: true }, async (request) => {
@@ -1134,6 +1123,37 @@ exports.SearchFamilies = onCall({ cors: true }, async (request): Promise<FamilyC
     }
 
     return searchFamilies(sfp.searchStr);
+});
+
+exports.GetFamilyContacts = onCall({ cors: true }, async (request): Promise<Contact[]> => {
+    // todo ncheck admin
+    await getUserInfo(request);
+    const gfp = request.data as FamilityContactsPayload;
+
+    if (!gfp.familyId) {
+        throw new HttpsError("invalid-argument", "Family ID is missing");
+    }
+    return getFamilyContacts(gfp.familyId);
+});
+
+exports.UpsertContact = onCall({ cors: true }, async (request) => {
+    await getUserInfo(request);
+    const fucp = request.data as FamilityUpsertContactsPayload;
+
+    if (!fucp.familyId) {
+        throw new HttpsError("invalid-argument", "Family ID is missing");
+    }
+    return upsertContact(fucp.contact, fucp.familyId);
+});
+
+exports.DeleteContact = onCall({ cors: true }, async (request) => {
+    await getUserInfo(request);
+    const fccp = request.data as FamilityDeleteContactPayload;
+
+    if (!fccp.contactId) {
+        throw new HttpsError("invalid-argument", "Missing contact ID");
+    }
+    return deleteContact(fccp.contactId, fccp.familyId);
 });
 
 exports.GetRegisteredHolidays = onCall({ cors: true }, async (request): Promise<Holiday[]> => {

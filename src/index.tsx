@@ -9,6 +9,7 @@ import he from 'primelocale/he.json'
 
 import localeData from 'dayjs/plugin/localeData';
 import dayjs from 'dayjs';
+import ContactsManager from './families-mgmt';
 require('dayjs/locale/he')
 
 
@@ -23,6 +24,19 @@ const root = ReactDOM.createRoot(
 root.render(
   // <React.StrictMode>
       <App />
+      // <ContactsManager userInfo={{
+      //   id: "abc",
+      //   firstName: "ariel",
+      //   notificationToken: undefined,
+      //   lastName: "bentu",
+      //   notificationOn: false,
+      //   phone: "0542277999",
+      //   userDistrict: { id: "מרכז", name: "מרכז" },
+      //   userDistricts: [],
+      //   isAdmin: false,
+      //   districts:[],
+      //   active: true
+      // }}/>
   // </React.StrictMode>
 );
 

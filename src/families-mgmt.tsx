@@ -19,6 +19,8 @@ import { InputNumber } from 'primereact/inputnumber';
 import { deleteContact, getFamilyContacts, handleSearchFamilies, upsertContact } from './api';
 import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete';
 import { openWhatsApp } from './notification-actions';
+import { InProgress } from './common-ui';
+import dayjs from 'dayjs';
 
 
 
@@ -91,18 +93,22 @@ const FamilyList: React.FC<FamilyListProps> = ({ selectedFamily, onSelectFamily,
 */
 interface ContactListProps {
     family: any;
-    appServices: AppServices
+    appServices: AppServices;
+    reload: number;
+    setReload: any;
+    setInProgress: (inprog: boolean) => void
 }
 
-const ContactList: React.FC<ContactListProps> = ({ family, appServices }) => {
+const ContactList: React.FC<ContactListProps> = ({ family, appServices, reload, setReload, setInProgress }) => {
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [openForm, setOpenForm] = useState<boolean>(false);
     const [currentContact, setCurrentContact] = useState<Contact | null>(null);
 
     useEffect(() => {
-        console.log("family", family)
-        getFamilyContacts(family.id).then(setContacts);
-    }, [family]);
+        setInProgress(true)
+        getFamilyContacts(family.id).then(setContacts)
+            .finally(() => setInProgress(false));
+    }, [family, reload]);
 
     const handleAddContact = () => {
         setCurrentContact(null);
@@ -114,8 +120,11 @@ const ContactList: React.FC<ContactListProps> = ({ family, appServices }) => {
         setOpenForm(true);
     };
 
-    const handleFormClose = () => {
+    const handleFormClose = (shouldReload: boolean) => {
         setOpenForm(false);
+        if (shouldReload) {
+            setReload((prev: number) => prev + 1);
+        }
         // Refresh contacts list after adding/editing
     };
 
@@ -157,7 +166,7 @@ const ContactList: React.FC<ContactListProps> = ({ family, appServices }) => {
                                 icon="pi pi-trash"
                                 className="p-button-text"
                                 onClick={() => deleteContact(rowData.id, family.id)
-                                    .then(() => appServices.showMessage("success", "נחמק בהצלחה", ""))
+                                    .then(() => appServices.showMessage("success", "נמחק בהצלחה", ""))
                                     .catch(err => appServices.showMessage("error", "מחיקה נכשלה", err.message))
                                 }
                             />
@@ -170,13 +179,14 @@ const ContactList: React.FC<ContactListProps> = ({ family, appServices }) => {
                 header={currentContact ? 'עריכת איש קשר' : 'הוספת איש קשר'}
                 visible={openForm}
                 style={{ width: '50vw', direction: "rtl" }}
-                onHide={handleFormClose}
+                onHide={() => handleFormClose(false)}
             >
                 <ContactForm
                     contact={currentContact}
                     appServices={appServices}
                     onClose={handleFormClose}
                     familyId={family.id}
+                    setInProgress={setInProgress}
                 />
             </Dialog>
         </div>
@@ -190,9 +200,12 @@ interface ContactsManagerProps {
 
 const ContactsManager = ({ userInfo, appServices }: ContactsManagerProps) => {
     const [selectedFamily, setSelectedFamily] = useState<FamilyCompact | null>(null);
+    const [inProgress, setInProgress] = useState<boolean>(false);
+    const [reload, setReload] = useState<number>(0);
 
     return (
         <div className="p-grid">
+            {inProgress && <InProgress />}
             <div className="p-col-12 p-md-4">
                 <FamilyList
                     userInfo={userInfo}
@@ -202,7 +215,7 @@ const ContactsManager = ({ userInfo, appServices }: ContactsManagerProps) => {
             </div>
             <div className="p-col-12 p-md-8">
                 {selectedFamily && (
-                    <ContactList family={selectedFamily} appServices={appServices} />
+                    <ContactList family={selectedFamily} appServices={appServices} reload={reload} setReload={setReload} setInProgress={setInProgress} />
                 )}
             </div>
         </div>
@@ -216,8 +229,9 @@ export interface ContactFormProps {
     appServices: AppServices;
     onClose: (reload: boolean) => void;
     familyId: string;
+    setInProgress: (inprog: boolean) => void;
 }
-const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices, familyId }) => {
+const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices, familyId, setInProgress }) => {
     const [phoneInvalid, setPhoneInvalid] = useState<boolean | undefined>();
     const [formData, setFormData] = useState<Contact>(
         contact || {
@@ -262,12 +276,14 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices
             return;
         }
 
+        setInProgress(true);
         upsertContact(contact, familyId)
             .then(() => {
+                appServices.showMessage("success", "נשמר בהצלחה", "");
                 onClose(true);
             })
-            .catch((err) => appServices.showMessage("error", "שמירה נכשלה", err.message));
-
+            .catch((err) => appServices.showMessage("error", "שמירה נכשלה", err.message))
+            .finally(() => setInProgress(false));
     };
 
     return (
@@ -381,6 +397,11 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices
                 <div className="p-field p-col-12 p-md-6">
                     <label htmlFor="dateOfBirth">תאריך לידה</label>
                     <Calendar
+                        selectionMode="single"
+                        yearNavigator={true}
+                        monthNavigator={true}
+                        yearRange={"1940:"+dayjs().year()}
+                        onMonthChange={(e)=>formData.dateOfBirth = `01/${e.month}/${e.year}`}
                         id="dateOfBirth"
                         value={new Date(formData.dateOfBirth)}
                         onChange={(e) => handleChange(e, 'dateOfBirth')}

@@ -32,8 +32,18 @@ export async function createManyChatSubscriber(first_name: string, last_name: st
 
     // verify if exists already
     const existingId = await findManyChatSubscriber(phone);
-    if (existingId) return existingId;
-    // todo update firstname ...
+    if (existingId) {
+        // todo update details
+
+        // remove deleted tag
+        await axios.post("https://api.manychat.com/fb/subscriber/removeTag", {
+            "subscriber_id": existingId,
+            "tag_id": manyChatToDeleteTag,
+        }, httpOptions);
+
+
+        return existingId;
+    }
 
     const res = await axios.post("https://api.manychat.com/fb/subscriber/createSubscriber", {
         first_name,

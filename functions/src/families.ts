@@ -186,7 +186,7 @@ export async function upsertContact(contact: Contact, familyId: string) {
                         "סוג הקשר לחולה": contact.relationToPatient,
                         "משפחות רשומות": [familyId],
                         "ערים": cities,
-                        "בדיקת התאמה": ["reccWsx2UZJf0x0Vs"],
+                        // "בדיקת התאמה": ["reccWsx2UZJf0x0Vs"],
                     },
                 },
             ],

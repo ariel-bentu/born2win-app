@@ -575,7 +575,7 @@ function App() {
 
     const isAdmin = userInfo?.isAdmin && userInfo?.districts?.length;
     const holidayAdmin = userInfo?.adminAuthorities?.includes(AdminAuthorities.ManageHoliday);
-
+    const contactsAdmin = userInfo?.adminAuthorities?.includes(AdminAuthorities.ManageContacts);
     /*
     header = 65
     divider = 32
@@ -711,7 +711,7 @@ function App() {
                                 <HolidaysAdmin userInfo={userInfo} appServices={appServices} topPosition={tabContentsTop} />}
                         </TabPanel>
                     }
-                    {userInfo &&
+                    {userInfo && contactsAdmin && 
                         <TabPanel headerStyle={{ fontSize: 20 }} header="אנשי קשר">
                             {activeIndex === 7 &&
                                 <ContactsManager userInfo={userInfo} appServices={appServices}/>}

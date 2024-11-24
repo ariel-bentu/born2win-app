@@ -803,15 +803,17 @@ async function getWebTokens(to: string | string[]): Promise<DeviceInfo[]> {
                 });
             });
         } else if (to.startsWith("admins")) {
+            const authority = to.length > 6 && to[6] == ":" ? Number(to.slice(7)) : -1;
             const adminUsersSnapshot = await usersRef.where("isAdmin", "==", true).get();
-            adminUsersSnapshot.forEach(admin => {
-                admin.data().notificationTokens?.forEach((nt: TokenInfo) => {
-                    webPushDevices.push({
-                        ownerId: admin.id,
-                        tokenInfo: nt,
+            adminUsersSnapshot.docs.filter(admin => authority == -1 || admin.data().adminAuthorities?.some((a: number) => a == authority))
+                .forEach(admin => {
+                    admin.data().notificationTokens?.forEach((nt: TokenInfo) => {
+                        webPushDevices.push({
+                            ownerId: admin.id,
+                            tokenInfo: nt,
+                        });
                     });
                 });
-            });
         }
     } else if (Array.isArray(to)) {
         // Case 3: Array of doc-ids
@@ -1369,7 +1371,7 @@ async function greetingsToBirthdays() {
     const usersList = users.map(user => `- ${user.data().firstName} ${user.data().lastName} (${districts.find(d => (user.data().districts?.length > 0 && d.id === user.data().districts[0]))?.name || ""}) tel:+${user.data().phone}`);
     if (usersList.length > 0) {
         return addNotificationToQueue("ימי הולדת היום 💜", `הנה רשימת המתנדבים שהיום יום הולדתם:\n${usersList.join("\n")}`, NotificationChannels.Alerts,
-            [], "admins");
+            [], `admins:${AdminAuthorities.NotifiedBirthdays}`);
     }
     return;
 }

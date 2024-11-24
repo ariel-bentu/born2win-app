@@ -354,6 +354,8 @@ export interface GetUserInfoPayload {
 
 export enum AdminAuthorities {
     ManageHoliday = 1,
+    ManageContacts = 2,
+    NotifiedBirthdays = 3,
 }
 
 export interface Contact {

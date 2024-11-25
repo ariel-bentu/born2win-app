@@ -1651,33 +1651,45 @@ async function syncBorn2WinFamilies() {
             const docRef = db.collection("families").doc(familyId);
             const familyDoc = await docRef.get();
 
+            const maid = getSafeFirstArrayElement(family.fields["מאניצט לוגיסטי"], "");
+            if (maid == "") {
+                logger.warn("Family with missing MAID", familyId, family.fields.Name);
+            }
+
             const familyRecord = {
                 active: family.fields["סטטוס בעמותה"] == "פעיל",
                 lastModified: now,
-                mahoz: family.fields["מחוז"][0],
+                mahoz: getSafeFirstArrayElement(family.fields["מחוז"], ""),
                 mainBaseFamilyId: family.id,
-                manychat_id: family.fields["מאניצט לוגיסטי"][0],
-                contactName: family.fields["שם איש קשר לוגיסטי"][0],
+                manychat_id: maid,
+                contactName: getSafeFirstArrayElement(family.fields["שם איש קשר לוגיסטי"], ""),
             };
 
             if (familyRecord.active) {
                 countActive++;
             }
 
+            let changedToActive = false;
             if (familyDoc && familyDoc.exists) {
                 const prevFamilyRecord = familyDoc.data();
-                if (prevFamilyRecord && familyRecord.active === prevFamilyRecord.active) {
+                if (prevFamilyRecord &&
+                    familyRecord.active === prevFamilyRecord.active &&
+                    familyRecord.manychat_id === prevFamilyRecord.manychat_id &&
+                    familyRecord.contactName === prevFamilyRecord.contactName &&
+                    familyRecord.mahoz === prevFamilyRecord.mahoz) {
                     // No change!
                     continue;
                 }
                 count++;
+                changedToActive = (prevFamilyRecord ? familyRecord.active != prevFamilyRecord.active : true);
                 batch.update(familyDoc.ref, familyRecord);
             } else {
                 count++;
+                changedToActive = true;
                 batch.create(docRef, familyRecord);
             }
 
-            if (familyRecord.active) {
+            if (familyRecord.active && changedToActive) {
                 // A new active family, or a family that has changed to active
                 const city = cities.find(c => c.id === getSafeFirstArrayElement(family.fields["עיר"], ""));
                 becameActive.push({

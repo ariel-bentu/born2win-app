@@ -97,6 +97,21 @@ async function AirTableGet<T>(tableName: string, id: string, mapper: (t: AirTabl
     return mapper(response.data);
 }
 
+export async function AirTableUpdate(tableName: string, id: string, updates: any) {
+    const url = `https://api.airtable.com/v0/${mainBase.value()}/${encodeURIComponent(tableName)}/${id}`;
+
+    const apiKey = born2winApiKey.value();
+
+    const headers = {
+        "Authorization": "Bearer " + apiKey,
+        "Content-Type": "application/json",
+    };
+
+    return axios.patch(url, updates, {
+        headers,
+    });
+}
+
 class AirTableQuery<T> {
     private tableName: string;
     private mapper: (record: AirTableRecord) => T;
@@ -678,7 +693,7 @@ async function syncBorn2WinFamilies() {
                 Authorization: `Bearer ${apiKey}`,
             },
             params: {
-                filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
+                //filterByFormula: `IS_AFTER(LAST_MODIFIED_TIME(), '${sinceDate.format("YYYY-MM-DDTHH:MM:SSZ")}')`,
                 fields: ["סטטוס בעמותה", "מחוז", "מאניצט לוגיסטי", "Name", "עיר", "שם איש קשר לוגיסטי"],
                 offset: offset,
             },
@@ -692,14 +707,18 @@ async function syncBorn2WinFamilies() {
 
             const docRef = db.collection("families").doc(familyId);
             const familyDoc = await docRef.get();
+            const maid = getSafeFirstArrayElement(family.fields["מאניצט לוגיסטי"], "");
+            if (maid == "") {
+                console.log("Family with missing MAID", familyId, family.fields.Name);
+            }
 
             const familyRecord = {
                 active: family.fields["סטטוס בעמותה"] == "פעיל",
                 lastModified: now,
-                mahoz: family.fields["מחוז"][0],
+                mahoz: getSafeFirstArrayElement(family.fields["מחוז"], ""),
                 mainBaseFamilyId: family.id,
-                manychat_id: family.fields["מאניצט לוגיסטי"][0],
-                contactName: family.fields["שם איש קשר לוגיסטי"][0],
+                manychat_id: maid,
+                contactName: getSafeFirstArrayElement(family.fields["שם איש קשר לוגיסטי"], ""),
             };
 
             if (familyRecord.active) {
@@ -708,7 +727,11 @@ async function syncBorn2WinFamilies() {
 
             if (familyDoc && familyDoc.exists) {
                 const prevFamilyRecord = familyDoc.data();
-                if (prevFamilyRecord && familyRecord.active === prevFamilyRecord.active) {
+                if (prevFamilyRecord &&
+                    familyRecord.active === prevFamilyRecord.active &&
+                    familyRecord.manychat_id === prevFamilyRecord.manychat_id &&
+                    familyRecord.contactName === prevFamilyRecord.contactName &&
+                    familyRecord.mahoz === prevFamilyRecord.mahoz) {
                     // No change!
                     continue;
                 }
@@ -1245,26 +1268,34 @@ async function updateAirTableAppinstalled() {
 //updateAirTableAppinstalled()
 
 async function findDanglingContacts() {
-    const q = new AirTableQuery<any>("אנשי קשר", (rec=>rec));
+    const q = new AirTableQuery<any>("אנשי קשר", (rec => rec));
     const all = await q.execute();
     let dangling = 0
     let only2 = 0
     let ok = 0
+    let onlyOne = 0
 
     for (let c of all) {
         const families = c.fields["משפחות רשומות"];
         const families2 = c.fields["משפחות רשומות 2"];
         if (!families && !families2) {
             dangling++
-        } else if (!families && families2) {
-            //console.log("only 2", c);
-            only2++
-        } else {
-            ok++;
-        }
-        
+            continue;
+        } else if (families  && families2) {
+            continue;
+        } 
+
+        ok++
+        // const list = c.fields["משפחות רשומות"] ? c.fields["משפחות רשומות"] :  c.fields["משפחות רשומות 2"];
+
+        // await AirTableUpdate("אנשי קשר", c.id, {
+        //     fields: {
+        //         "משפחות רשומות": list,
+        //         "משפחות רשומות 2": list,
+        //     }
+        // });
     }
-    console.log("Total ok", ok, "only2", only2, "dangling", dangling)
+    console.log("Total ok", ok, "only1", onlyOne, "only2", only2, "dangling", dangling)
 }
 
-findDanglingContacts()
+//findDanglingContacts()

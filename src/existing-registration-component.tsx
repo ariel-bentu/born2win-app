@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
-import {getUserRegistrations, getVolunteerInfo} from './api';
+import { getUserRegistrations, getVolunteerInfo } from './api';
 import { SelectButton } from 'primereact/selectbutton';
-import {AppServices, FamilyCompact, FamilyDemand, NavigationStep, UserInfo, VolunteerInfo} from './types';
+import { AppServices, FamilyCompact, FamilyDemand, NavigationStep, Status, UserInfo, VolunteerInfo } from './types';
 import { FaUtensils, FaTruck } from 'react-icons/fa'; // Import cooking and transporting icons
 import { GiCookingPot } from 'react-icons/gi';
 
@@ -49,23 +49,23 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
 
             regs.sort((r1, r2) => {
                 const today = dayjs(); // Get today's date
-            
+
                 const date1 = dayjs(r1.date);
                 const date2 = dayjs(r2.date);
-            
-                const isDate1FutureOrToday = date1.isToday() || date1.isAfter(today, 'day'); 
-                const isDate2FutureOrToday = date2.isToday() || date2.isAfter(today, 'day'); 
-            
+
+                const isDate1FutureOrToday = date1.isToday() || date1.isAfter(today, 'day');
+                const isDate2FutureOrToday = date2.isToday() || date2.isAfter(today, 'day');
+
                 // Case 1: Both dates are in the future or today
                 if (isDate1FutureOrToday && isDate2FutureOrToday) {
                     return date1.isAfter(date2) ? 1 : -1; // Closer future date comes first
                 }
-            
+
                 // Case 2: Both dates are in the past
                 if (!isDate1FutureOrToday && !isDate2FutureOrToday) {
                     return date1.isBefore(date2) ? 1 : -1; // More recent past date comes first
                 }
-            
+
                 // Case 3: One is in the future/today, the other is in the past
                 return isDate1FutureOrToday ? -1 : 1; // Future/today comes before past
             });
@@ -120,14 +120,14 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
             active: currentRegistration.isFamilyActive,
 
         } as FamilyCompact;
-        return <FamilyDetailsComponent 
+        return <FamilyDetailsComponent
             analyticComponent="ExistingRegistration"
             detailsOnly={true} familyDemandId={currentRegistration.id} date={currentRegistration.date}
             mainBaseFamilyId={currentRegistration.mainBaseFamilyId} family={currentFamily} onClose={() => {
                 setCurrentRegistration(undefined)
                 appServices.popNavigationStep();
             }}
-            appServices={appServices} demands={registrations} reloadOpenDemands={() => { }} includeContacts={true}  actualUserId={actualUserId}/>
+            appServices={appServices} demands={registrations} reloadOpenDemands={() => { }} includeContacts={true} actualUserId={actualUserId} />
     }
 
     if (showCancellationDialog) {
@@ -201,7 +201,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                                             appServices.pushNavigationStep("family-details-existing-reg", () => setCurrentRegistration(undefined));
                                         }}
                                         onDelete={
-                                            dayjs(reg.date).isBefore(dayjs())
+                                            dayjs(reg.date).isBefore(dayjs()) || reg.status == Status.Cancelled
                                                 ? undefined
                                                 : () => {
                                                     setShowCancellationDialog(reg);
@@ -209,6 +209,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                                                 }
                                         }
                                         deleteLabel={"ביטול שיבוץ"}
+                                        cancelled={reg.status == Status.Cancelled}
                                     />
                                 );
                             }
@@ -249,6 +250,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                                                 setCurrentRegistration(undefined);
                                             });
                                         }}
+                                        cancelled={reg.status == Status.Cancelled}
                                     />
                                 );
                             }
@@ -260,6 +262,6 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                 </div>
             </div>
         </div>
-            );
+    );
 };
 

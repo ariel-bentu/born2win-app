@@ -22,22 +22,24 @@ interface OneLineProps {
     onLineButtonPressed?: (action: string, params: string[]) => void;
     hideIcon?: boolean;
     className?: string;
+    cancelled?: boolean;
 }
 
 export default function OneLine({
-                                    title,
-                                    body,
-                                    unread,
-                                    footer,
-                                    onDelete,
-                                    onRead,
-                                    deleteLabel,
-                                    buttons,
-                                    onLineButtonPressed,
-                                    hideIcon,
-                                    icon,
-                                    className,
-                                }: OneLineProps) {
+    title,
+    body,
+    unread,
+    footer,
+    onDelete,
+    onRead,
+    deleteLabel,
+    buttons,
+    onLineButtonPressed,
+    hideIcon,
+    icon,
+    className,
+    cancelled
+}: OneLineProps) {
 
     const handleCopyLink = (link: string) => {
         navigator.clipboard.writeText(link);
@@ -114,7 +116,7 @@ export default function OneLine({
         return (
             <div className={bullet ? "flex align-items-center" : ""} key={index}>
                 <div className="flex">{part}</div>
-                {phone && <PhoneNumber phone={phone} hideText={true} label="טלפון"/>}
+                {phone && <PhoneNumber phone={phone} hideText={true} label="טלפון" />}
             </div>
         );
     };
@@ -131,6 +133,7 @@ export default function OneLine({
                             {body.split('\n').map(renderMessagePart)}
                         </div>
                     </div>
+                    {cancelled && <div className='one-line-cancelled'>בוטל</div>}
                     {unread && <div className="red-dot" />}
                     {!hideIcon && (
                         <div className="flex absolute  border-round" style={{ left: 50, top: 50, width: '2.5rem', height: '2.5rem' }}>

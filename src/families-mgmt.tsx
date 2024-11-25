@@ -21,6 +21,7 @@ import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete
 import { openWhatsApp } from './notification-actions';
 import { InProgress } from './common-ui';
 import dayjs from 'dayjs';
+import { confirmPopup } from 'primereact/confirmpopup';
 
 
 
@@ -165,10 +166,22 @@ const ContactList: React.FC<ContactListProps> = ({ family, appServices, reload, 
                             <Button
                                 icon="pi pi-trash"
                                 className="p-button-text"
-                                onClick={() => deleteContact(rowData.id, family.id)
-                                    .then(() => appServices.showMessage("success", "נמחק בהצלחה", ""))
-                                    .catch(err => appServices.showMessage("error", "מחיקה נכשלה", err.message))
-                                }
+                                onClick={() => {
+                                    confirmPopup({
+                                        message: 'האם למחוק איש קשר?',
+                                        icon: 'pi pi-exclamation-triangle',
+                                        accept: async () => {
+                                            setInProgress(true);
+                                            deleteContact(rowData.id, family.id)
+                                                .then(() => {
+                                                    appServices.showMessage("success", "נמחק בהצלחה", "");
+                                                    setReload((prev: number) => prev + 1);
+                                                })
+                                                .catch(err => appServices.showMessage("error", "מחיקה נכשלה", err.message))
+                                                .finally(() => setInProgress(false));
+                                        }
+                                    })
+                                }}
                             />
                         </div>
                     )}
@@ -400,8 +413,8 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices
                         selectionMode="single"
                         yearNavigator={true}
                         monthNavigator={true}
-                        yearRange={"1940:"+dayjs().year()}
-                        onMonthChange={(e)=>formData.dateOfBirth = `01/${e.month}/${e.year}`}
+                        yearRange={"1940:" + dayjs().year()}
+                        onMonthChange={(e) => formData.dateOfBirth = `01/${e.month}/${e.year}`}
                         id="dateOfBirth"
                         value={new Date(formData.dateOfBirth)}
                         onChange={(e) => handleChange(e, 'dateOfBirth')}

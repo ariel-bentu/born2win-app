@@ -76,6 +76,16 @@
   left: 0;
 }
 
+.one-line-cancelled {
+  position: absolute;
+  top: 50px;
+  right:200px;
+  color: red;
+  font-size: x-large;
+  font-weight: bold;
+  transform: rotate(-30deg);
+}
+
 
 /* Flip the arrows for hebrew experience of the Calendar control */
 .p-calendar .p-datepicker .p-datepicker-prev {

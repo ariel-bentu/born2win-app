@@ -343,7 +343,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
 
     let selectedDateInfo: DateInfo | undefined = undefined;
     if (selectedMeal) {
-        selectedDateInfo = groupedData[selectedMeal.city][selectedMeal.familyId].dates.find(d => d.date == selectedMeal.date);
+        selectedDateInfo = groupedData[selectedMeal.city] && groupedData[selectedMeal.city][selectedMeal.familyId]?.dates.find(d => d.date == selectedMeal.date);
     }
 
     if (showFamilyDetails) {

@@ -136,13 +136,13 @@ function contactAirtable2Contact(rec: AirTableRecord): Contact {
 export async function getFamilyContacts(familyId: string): Promise<Contact[]> {
     // eslint-disable-next-line new-cap
     const query = new AirTableQuery<Contact>(tables.Contacts, contactAirtable2Contact);
-    return query.execute([airtableArrayCondition("families", familyId)]);
+    return query.execute([airtableArrayCondition("families2", familyId)]);
 }
 
 // Only delete if no other family is attached to it
 export async function deleteContact(id: string, familyId: string) {
     const existingContact = await AirTableGet<any>(tables.Contacts, id, (rec) => ({
-        families: rec.fields["משפחות רשומות"],
+        families: rec.fields["משפחות רשומות 2"],
         manychatId: rec.fields.manychat_id,
     }));
     const leftFamilies = existingContact.families.filter((f: string) => f != familyId);
@@ -152,7 +152,7 @@ export async function deleteContact(id: string, familyId: string) {
     } else {
         return AirTableUpdate(tables.Contacts, id, {
             fields: {
-                "משפחות רשומות": leftFamilies,
+                "משפחות רשומות 2": leftFamilies,
             },
         });
     }
@@ -184,7 +184,7 @@ export async function upsertContact(contact: Contact, familyId: string) {
                         "תעודת זהות": contact.idNumber,
                         "manychat_id": contact.manychatId,
                         "סוג הקשר לחולה": contact.relationToPatient,
-                        "משפחות רשומות": [familyId],
+                        "משפחות רשומות 2": [familyId],
                         "ערים": cities,
                         // "בדיקת התאמה": ["reccWsx2UZJf0x0Vs"],
                     },

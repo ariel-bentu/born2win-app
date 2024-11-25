@@ -332,8 +332,9 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
             await sendOTPViaManychat(docData.manychat_id, newOTP);
         } else {
             // Phone - Phase 2 (with otp)
-            logger.warn("phone flow", docData.otp, uulp.otp, Math.abs(now.diff(docData.otpCreatedAt, "seconds")));
-            const validOtp = Math.abs(now.diff(dayjs.tz(docData.otpCreatedAt, JERUSALEM), "seconds")) < 300;
+            const diff = Math.abs(now.diff(dayjs.tz(docData.otpCreatedAt, JERUSALEM), "seconds"));
+            logger.warn("phone flow", docData.otp, "diff: ", diff);
+            const validOtp = diff < 300;
             if (docData.otp === uulp.otp &&
                 validOtp) {
                 // Update UID based on the verified phone (iOS Phase 2)
@@ -1048,7 +1049,7 @@ exports.GetUserRegistrationsNew = onCall({ cors: true }, async (request): Promis
     const doc = await authenticate(request);
     const districts = doc.data().districts;
     const volunteerId = doc.id;
-    return getDemands2(districts, Status.Occupied, dayjs().startOf("month").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT), volunteerId);
+    return getDemands2(districts, Status.OccupiedOrCancelled, dayjs().startOf("month").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT), volunteerId);
 });
 
 exports.UpdateDemandTransportation = onCall({ cors: true }, async (request) => {

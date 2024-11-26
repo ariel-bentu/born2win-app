@@ -1,5 +1,6 @@
 /* Styles for the registration component */
 .registration-component {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -11,21 +12,36 @@
     flex-direction: column;
     align-items: center;
     width: 100%;
-    
+
+}
+
+.mode-nav-button-host {
+    position: absolute;
+    top: -10px;
+    right: 0px;
+}
+
+.family-additional-header {
+    font-size: 22px;
+    color: var(--born2win-button-color);
+    font-weight: bold;
+    border: 1px solid;
+    margin-left: 100px;
+    margin-right: 100px;
 }
 
 .standalone-text-desc {
-    font-family:Roboto, Arial, sans-serif;
+    font-family: Roboto, Arial, sans-serif;
     font-size: 15px;
     font-weight: 700;
 }
 
 .standalone-text-title {
-    font-family:Roboto, Arial, sans-serif;
+    font-family: Roboto, Arial, sans-serif;
     font-size: 20px;
     font-weight: 700;
     margin-top: 15px;
-    width:90%;
+    width: 90%;
     text-align: right;
 }
 
@@ -151,7 +167,8 @@
     margin-left: 7px;
 }
 
-.p-multiselect-header, .p-multiselect-items-wrapper {
+.p-multiselect-header,
+.p-multiselect-items-wrapper {
     direction: rtl;
-    
+
 }

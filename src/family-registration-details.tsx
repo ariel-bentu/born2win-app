@@ -3,12 +3,12 @@ import { Calendar, CalendarDateTemplateEvent, CalendarMonthChangeEvent } from "p
 import "./registration.css";
 
 
-import {analyticLog, getFamilyDetails, getVolunteerInfo, impersonateUser, updateFamilityDemand} from "./api";
+import { analyticLog, getFamilyDetails, getVolunteerInfo, impersonateUser, updateFamilyDemand } from "./api";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
 import { ChannelHeader, InProgress, PhoneNumber } from "./common-ui";
-import {AppServices, FamilyCompact, FamilyDemand, FamilyDetails, VolunteerInfo} from "./types";
+import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails, VolunteerInfo, VolunteerType } from "./types";
 import { isNotEmpty, nicePhone } from "./utils";
 import { ProgressSpinner } from "primereact/progressspinner";
 import { SelectButton } from "primereact/selectbutton";
@@ -29,6 +29,8 @@ interface FamilyDetailsComponentProps {
     analyticComponent: string;
     actualUserId: string;
     showInactiveFamilyLabel?: boolean;
+    additionalHeader?: string;
+    type: VolunteerType;
 }
 
 function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
@@ -42,13 +44,16 @@ function isSameDate(d: Nullable<Date>, event: CalendarDateTemplateEvent) {
 
 export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandId,
     onClose, detailsOnly, appServices, demands, reloadOpenDemands, includeContacts,
-     date, analyticComponent, actualUserId, showInactiveFamilyLabel}: FamilyDetailsComponentProps) {
+    date, analyticComponent, actualUserId, showInactiveFamilyLabel,
+    additionalHeader,
+    type,
+}: FamilyDetailsComponentProps) {
     const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
     const [selectedDate, setSelectedDate] = useState<Nullable<Date>>(null);
     const [error, setError] = useState<any>(undefined);
     const [loading, setLoading] = useState<boolean>(false);
     const [reload, setReload] = useState<number>(0);
-    const [transportingVolunteer, setTranspotingVolunteer] = useState<VolunteerInfo|undefined>(undefined);
+    const [transportingVolunteer, setTranspotingVolunteer] = useState<VolunteerInfo | undefined>(undefined);
     const [volunteerInfo, setVolunteerInfo] = useState<VolunteerInfo | undefined>();
     const [saving, setSaving] = useState<boolean>(false);
     const [viewDate, setViewDate] = useState(new Date());
@@ -110,14 +115,6 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
     }, [mainBaseFamilyId, familyDemandId, detailsOnly, reload]);
 
     const availableDates = demands.map(demand => new Date(demand.date));
-    const isDateAvailable = (event: CalendarDateTemplateEvent) => {
-        return availableDates.some(availableDate =>
-            availableDate.getDate() === event.day &&
-            availableDate.getMonth() === event.month &&
-            availableDate.getFullYear() === event.year
-        );
-    };
-
 
     const handleScrollToDetails = () => {
         if (divRef.current) {
@@ -126,14 +123,14 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
         }
     };
 
-
-
     const dateTemplate = useCallback((event: CalendarDateTemplateEvent) => {
         const inVisibleMonth = event.month === viewVisibleMonth.month && event.year === viewVisibleMonth.year;
         if (!inVisibleMonth) {
             return <span style={{ visibility: 'hidden' }}>{event.day}</span>;
         }
-        if (isDateAvailable(event)) {
+
+        const eventDate = `${event.year}-${event.month + 1}-${event.day}`;
+        if (demands.find(d => dayjs(d.date).isSame(eventDate))) {
             return (
                 <span className={"available-day " + (isSameDate(selectedDate, event) ? "selected-day" : "")}>
                     {event.day}
@@ -141,7 +138,8 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
             );
         }
         return event.day;
-    }, [viewVisibleMonth, selectedDate])
+    }, [viewVisibleMonth, selectedDate, demands])
+
     const minDate = dayjs();
     const alergies = familyDetails?.alergies;
 
@@ -153,6 +151,7 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
     return (
         <div className="flex flex-column relative justify-content-center w-full p-3" style={{ maxWidth: 700 }}>
             <ChannelHeader name={family.familyLastName + (family.active || !showInactiveFamilyLabel ? "" : " - לא פעילה")} onBack={onClose} />
+            {additionalHeader && <div className="family-additional-header">{additionalHeader}</div>}
             <div className="flex flex-row w-12 justify-content-end mb-2">
                 {!detailsOnly &&
                     <div className="flex flex-column justify-content-start align-items-start w-12 pr-3">
@@ -219,7 +218,8 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                             if (availabilityRecord && familyDetails) {
                                 setSaving(true);
                                 analyticLog(analyticComponent, "save new Registration");
-                                updateFamilityDemand(availabilityRecord.id, familyDetails.mainBaseFamilyId, familyDetails.cityId, true, "", availabilityRecord.district).then(() => {
+                                updateFamilyDemand(availabilityRecord.id, familyDetails.mainBaseFamilyId, familyDetails.cityId, true, 
+                                    type, "", availabilityRecord.district).then(() => {
                                     appServices.showMessage("success", "שיבוץ נקלט בהצלחה", "");
                                     reloadOpenDemands();
                                     setReload(prev => prev + 1);
@@ -261,24 +261,24 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                             <li><strong>איש קשר משפחה:</strong> {familyDetails.contactName}</li>
                         )}
                         {isNotEmpty(familyDetails.phone) && (<li>
-                            <PhoneNumber phone={familyDetails.phone} label="טלפון איש קשר משפחה"/>
+                            <PhoneNumber phone={familyDetails.phone} label="טלפון איש קשר משפחה" />
                         </li>)}
-                        {volunteerInfo && transportingVolunteer && transportingVolunteer.id == actualUserId &&(
+                        {volunteerInfo && transportingVolunteer && transportingVolunteer.id == actualUserId && (
                             <>
-                                <li><strong>שם מבשל:</strong> {volunteerInfo.firstName+ " " + volunteerInfo.lastName}</li>
+                                <li><strong>שם מבשל:</strong> {volunteerInfo.firstName + " " + volunteerInfo.lastName}</li>
                                 {volunteerInfo?.phone && (
                                     <li>
-                                        <PhoneNumber phone={volunteerInfo.phone} label="טלפון מבשל"/>
+                                        <PhoneNumber phone={volunteerInfo.phone} label="טלפון מבשל" />
                                     </li>
                                 )}
                             </>
                         )}
-                        {transportingVolunteer && volunteerInfo && volunteerInfo.id == actualUserId &&(
+                        {transportingVolunteer && volunteerInfo && volunteerInfo.id == actualUserId && (
                             <>
-                                <li><strong>שם משנע:</strong> {transportingVolunteer.firstName+ " " + transportingVolunteer.lastName}</li>
+                                <li><strong>שם משנע:</strong> {transportingVolunteer.firstName + " " + transportingVolunteer.lastName}</li>
                                 {transportingVolunteer?.phone && (
                                     <li>
-                                        <PhoneNumber phone={transportingVolunteer.phone} label="טלפון משנע"/>
+                                        <PhoneNumber phone={transportingVolunteer.phone} label="טלפון משנע" />
                                     </li>
                                 )}
                             </>
@@ -305,7 +305,7 @@ function getAddress(fd: FamilyDetails) {
         ", " + fd.city;
 }
 
-export const generateDetailsForWhatapp = (familyDetails: FamilyDetails, city: string, date?: string, volunteerInfo?: VolunteerInfo, transportingVolunteer?: VolunteerInfo, actualUserId?: string ) => {
+export const generateDetailsForWhatapp = (familyDetails: FamilyDetails, city: string, date?: string, volunteerInfo?: VolunteerInfo, transportingVolunteer?: VolunteerInfo, actualUserId?: string) => {
     const alergies = familyDetails?.alergies;
 
     let msg = `*פרטי בישול*:\n`;

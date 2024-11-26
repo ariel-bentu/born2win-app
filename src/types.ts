@@ -43,7 +43,15 @@ export interface NotificationUpdatePayload {
     tokenInfo: TokenInfo;
 }
 
-export interface FamilityDetailsPayload {
+export interface GetOpenDemandPayload {
+    type: VolunteerType;
+}
+
+export interface GetUserRegistrationsPayload {
+    type: VolunteerType;
+}
+
+export interface FamilyDetailsPayload {
     districtBaseFamilyId: string;
     mainBaseFamilyId?: string;
     district: string;
@@ -51,16 +59,16 @@ export interface FamilityDetailsPayload {
     familyDemandId: string;
 }
 
-export interface FamilityContactsPayload {
+export interface FamilyContactsPayload {
     familyId: string;
 }
 
-export interface FamilityUpsertContactsPayload {
+export interface FamilyUpsertContactsPayload {
     familyId: string;
     contact: Contact;
 }
 
-export interface FamilityDeleteContactPayload {
+export interface FamilyDeleteContactPayload {
     familyId: string;
     contactId: string;
 }
@@ -85,11 +93,18 @@ export interface City {
     name: string;
 }
 
-export interface FamilityDemandUpdatePayload {
+export enum VolunteerType {
+    Meal = "ארוחה",
+    HolidayTreat = "פינוק לחג",
+    Any = "xxx",
+}
+
+export interface FamilyDemandUpdatePayload {
     demandId: string;
     mainBaseFamilyId: string;
     cityId: string;
     isRegistering: boolean; // true means register, false mean unregister
+    type: VolunteerType;
     reason?: string;
     district: string; // defaults to the user's. for admin this is needed
     volunteerId?: string // defaults to the user's. for admin this is needed
@@ -183,6 +198,7 @@ export interface FamilyDemand {
     volunteerCityName: string;
     transpotingVolunteerId?: string
     isFamilyActive: boolean;
+    type: VolunteerType;
 }
 
 export interface OpenFamilyDemands {
@@ -203,6 +219,7 @@ export interface GetDemandsPayload {
     districts: string[];
     from: string;
     to: string;
+    type: VolunteerType;
 }
 
 export interface SendMessagePayload {

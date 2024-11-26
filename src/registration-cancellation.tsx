@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card } from "primereact/card";
 import { InputTextarea } from "primereact/inputtextarea";
 import { Button } from "primereact/button";
-import { updateFamilityDemand } from "./api";
+import { updateFamilyDemand } from "./api";
 import { FamilyDemand, UserInfo } from "./types";
 import { InProgress } from "./common-ui";
 import dayjs from "dayjs";
@@ -79,7 +79,7 @@ export default function RegistrationCancellation({ onClose, onCancellationPerfor
                                     className="p-button-danger p-mr-2"
                                     onClick={() => {
                                         setSaving(true);
-                                        updateFamilityDemand(registration.id, registration.mainBaseFamilyId, "cityId(unknown)", false, reason, registration.district)
+                                        updateFamilyDemand(registration.id, registration.mainBaseFamilyId, "cityId(unknown)", false, registration.type, reason, registration.district)
                                             .then(onCancellationPerformed)
                                             .catch(onError)
                                             .finally(() => setSaving(false));

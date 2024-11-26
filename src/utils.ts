@@ -131,3 +131,17 @@ export function dateInRange(date: string | Dayjs, start: string | Dayjs, end: st
 
     return dateS >= startS && dateS <= endS;
 }
+
+export function getDatesBetween(startDateIn: string, endDateIn: string) {
+    const dates = [];
+    let currentDate = dayjs(startDateIn);
+    const endDate = dayjs(endDateIn);
+
+    // Loop until the current date is after the end date
+    while (currentDate.isSame(endDate) || currentDate.isBefore(endDate)) {
+        dates.push(currentDate.format("YYYY-MM-DD"));
+        currentDate = currentDate.add(1, "day");
+    }
+
+    return dates;
+}

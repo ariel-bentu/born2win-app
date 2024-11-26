@@ -9,7 +9,7 @@ import 'primeflex/primeflex.css';
 import './App.css';
 import * as api from './api';
 import { NextOrObserver, User } from 'firebase/auth';
-import { AdminAuthorities, AppServices, Cached, Errors, NavigationState, NavigationStep, OpenFamilyDemands, UserInfo } from './types';
+import { AdminAuthorities, AppServices, Cached, Errors, NavigationState, NavigationStep, OpenFamilyDemands, UserInfo, VolunteerType } from './types';
 import { ClientJS } from 'clientjs';
 import NotificationsComponent from './notifications-component';
 import { countUnreadNotifications } from './notifications';
@@ -237,7 +237,7 @@ function App() {
         }
 
         // Store the promise and make the API call
-        const fetchPromise = api.getOpenDemands()
+        const fetchPromise = api.getOpenDemands(VolunteerType.Any)
             .then((openDemandsResponse) => {
                 setOpenDemands({
                     data: openDemandsResponse,
@@ -592,27 +592,27 @@ function App() {
         </div>
     }
 
-    if (oldUrlParamID) {
+    // if (oldUrlParamID) {
 
-        // OLD URL SUPPORT - to remove after app launch
-        return <div className="App">
-            <ConfirmPopup />
-            <Toast ref={toast} />
+    //     // OLD URL SUPPORT - to remove after app launch
+    //     return <div className="App">
+    //         <ConfirmPopup />
+    //         <Toast ref={toast} />
 
-            {(isNotEmpty(volunteerId) && !error) ?
-                <RegistrationComponent
-                    userInfo={userInfo}
-                    topPosition={tabContentsTop}
-                    standalone={true}
-                    openDemands={getCachedOpenDemands()}
-                    openDemandsTS={openDemands?.fetchedTS.toISOString() || ""} appServices={appServices} actualUserId={oldUrlParamID}
-                    reloadOpenDemands={() => {
-                        getCachedOpenDemands(true);
-                    }} /> :
-                <InProgress />
-            }
-        </div>
-    }
+    //         {(isNotEmpty(volunteerId) && !error) ?
+    //             <RegistrationComponent
+    //                 userInfo={userInfo}
+    //                 topPosition={tabContentsTop}
+    //                 standalone={true}
+    //                 openDemands={getCachedOpenDemands()}
+    //                 openDemandsTS={openDemands?.fetchedTS.toISOString() || ""} appServices={appServices} actualUserId={oldUrlParamID}
+    //                 reloadOpenDemands={() => {
+    //                     getCachedOpenDemands(true);
+    //                 }} /> :
+    //             <InProgress />
+    //         }
+    //     </div>
+    // }
 
     const settings = <div style={{ display: "flex", flexDirection: "column", textAlign: "left", alignItems: "flex-start" }}>
         <div><strong>Technical Status:</strong></div>

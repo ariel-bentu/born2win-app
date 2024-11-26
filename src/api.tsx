@@ -15,12 +15,15 @@ import dayjs from 'dayjs'
 import { Functions, getFunctions, httpsCallable } from 'firebase/functions';
 import {
     Contact,
-    FamilityContactsPayload,
-    FamilityDeleteContactPayload,
-    FamilityDemandUpdatePayload, FamilityDetailsPayload, FamilityUpsertContactsPayload, FamilyCompact, FamilyDemand,
+    FamilyContactsPayload,
+    FamilyDeleteContactPayload,
+    FamilyDemandUpdatePayload, FamilyDetailsPayload, FamilyUpsertContactsPayload, FamilyCompact, FamilyDemand,
     FamilyDetails, GenerateLinkPayload, GetDemandsPayload, GetRegisteredHolidaysPayload, GetUserInfoPayload, Holiday, IdName, NotificationChannels,
     NotificationUpdatePayload, OpenFamilyDemands, Recipient, SearchFamilyPayload, SearchUsersPayload,
-    SendMessagePayload, UpdateDemandTransportationPayload, UpdateUserLoginPayload, UpsertHolidayPayload, UserInfo, VolunteerInfo, VolunteerInfoPayload
+    SendMessagePayload, UpdateDemandTransportationPayload, UpdateUserLoginPayload, UpsertHolidayPayload, UserInfo, VolunteerInfo, VolunteerInfoPayload,
+    VolunteerType,
+    GetOpenDemandPayload,
+    GetUserRegistrationsPayload
 } from "./types";
 import { readAllNotifications } from "./notifications";
 import { getDB } from "./db";
@@ -205,11 +208,13 @@ function callFunctionWithImpersonation(functionName: string, payload?: any) {
 }
 
 
-export function getOpenDemands(): Promise<OpenFamilyDemands> {
-    return callFunctionWithImpersonation('GetOpenDemands2').then((res: any) => res.data as OpenFamilyDemands);
+export function getOpenDemands(type: VolunteerType): Promise<OpenFamilyDemands> {
+    return callFunctionWithImpersonation('GetOpenDemands_v3', { type } as GetOpenDemandPayload).then((res: any) => res.data as OpenFamilyDemands);
 }
 
-export function updateFamilityDemand(demandId: string, mainBaseFamilyId: string, cityId: string, isRegistering: boolean, reason: string, district: string, volunteerId?: string) {
+export function updateFamilyDemand(demandId: string, mainBaseFamilyId: string,
+    cityId: string, isRegistering: boolean, type: VolunteerType, reason: string,
+    district: string, volunteerId?: string) {
     const payload = {
         demandId,
         mainBaseFamilyId,
@@ -218,9 +223,10 @@ export function updateFamilityDemand(demandId: string, mainBaseFamilyId: string,
         reason,
         district,
         volunteerId,
-    } as FamilityDemandUpdatePayload;
+        type,
+    } as FamilyDemandUpdatePayload;
 
-    return callFunctionWithImpersonation('UpdateFamilityDemandNew', payload);
+    return callFunctionWithImpersonation('UpdateFamilyDemand_v3', payload);
 }
 
 
@@ -236,7 +242,7 @@ export function updateDemandTransportation(demandId: string, transpotingVoluntee
 export function getFamilyDetails(districtBaseFamilyId: string, district: string, familyDemandId: string | undefined, mainBaseFamilyId: string, includeContacts: boolean): Promise<FamilyDetails> {
     const payload = {
         districtBaseFamilyId, district, includeContacts, familyDemandId, mainBaseFamilyId,
-    } as FamilityDetailsPayload;
+    } as FamilyDetailsPayload;
 
     return callFunctionWithImpersonation('GetFamilyDetailsNew', payload)
         .then((res: any) => {
@@ -245,7 +251,7 @@ export function getFamilyDetails(districtBaseFamilyId: string, district: string,
 }
 
 export function getUserRegistrations(): Promise<FamilyDemand[]> {
-    return callFunctionWithImpersonation('GetUserRegistrationsNew')
+    return callFunctionWithImpersonation('GetUserRegistrations_v3', { type: VolunteerType.Any } as GetUserRegistrationsPayload)
         .then((res: any) => res.data);
 }
 
@@ -267,7 +273,7 @@ export async function getVolunteerInfo(volunteerId: string): Promise<VolunteerIn
 }
 
 
-export async function getDemands(dateRange: [string, string], districts: string[]): Promise<FamilyDemand[]> {
+export async function getDemands(dateRange: [string, string], districts: string[], type = VolunteerType.Meal): Promise<FamilyDemand[]> {
     if (!dateRange[0] || !dateRange[1]) return [];
 
     // No impersonation
@@ -275,7 +281,8 @@ export async function getDemands(dateRange: [string, string], districts: string[
     const payload = {
         from: dateRange[0],
         to: dateRange[1],
-        districts
+        districts,
+        type,
     } as GetDemandsPayload;
     return getDemandsFunc(payload).then(res => res.data as FamilyDemand[]);
 }
@@ -437,7 +444,7 @@ export const handleSearchFamilies = async (userInfo: UserInfo, query: string) =>
 export async function getFamilyContacts(familyId: string): Promise<Contact[]> {
     const payload = {
         familyId
-    } as FamilityContactsPayload;
+    } as FamilyContactsPayload;
 
     return httpsCallable(functions, 'GetFamilyContacts')(payload)
         .then((res: any) => {
@@ -449,7 +456,7 @@ export async function upsertContact(contact: Contact, familyId: string) {
     const payload = {
         familyId,
         contact,
-    } as FamilityUpsertContactsPayload;
+    } as FamilyUpsertContactsPayload;
 
     return httpsCallable(functions, 'UpsertContact')(payload);
 }
@@ -458,7 +465,7 @@ export async function deleteContact(contactId: string, familyId: string) {
     const payload = {
         familyId,
         contactId,
-    } as FamilityDeleteContactPayload;
+    } as FamilyDeleteContactPayload;
 
     return httpsCallable(functions, 'DeleteContact')(payload);
 }

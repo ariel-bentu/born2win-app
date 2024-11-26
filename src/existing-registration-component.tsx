@@ -2,15 +2,15 @@ import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import { getUserRegistrations, getVolunteerInfo } from './api';
 import { SelectButton } from 'primereact/selectbutton';
-import { AppServices, FamilyCompact, FamilyDemand, NavigationStep, Status, UserInfo, VolunteerInfo } from './types';
+import { AppServices, FamilyCompact, FamilyDemand, NavigationStep, Status, UserInfo, VolunteerInfo, VolunteerType } from './types';
 import { FaUtensils, FaTruck } from 'react-icons/fa'; // Import cooking and transporting icons
-import { GiCookingPot } from 'react-icons/gi';
+import { GiCookingPot, GiPartyHat } from 'react-icons/gi';
 
 import { InProgress } from './common-ui';
 import OneLine from './one-line';
 import RegistrationCancellation from './registration-cancellation';
-import { getReferenceDays, NICE_DATE, sortByDateDesc } from './utils';
-import { FamilyDetailsComponent } from './famility-registration-details';
+import { DATE_AT, getReferenceDays, NICE_DATE, sortByDateDesc } from './utils';
+import { FamilyDetailsComponent } from './family-registration-details';
 
 const Filters = {
     ALL: 2,
@@ -121,6 +121,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
 
         } as FamilyCompact;
         return <FamilyDetailsComponent
+            type={VolunteerType.Any}
             analyticComponent="ExistingRegistration"
             detailsOnly={true} familyDemandId={currentRegistration.id} date={currentRegistration.date}
             mainBaseFamilyId={currentRegistration.mainBaseFamilyId} family={currentFamily} onClose={() => {
@@ -146,6 +147,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
         />;
     }
 
+    const now = dayjs().format(DATE_AT);
     const registrationsToShow = registrations?.filter(r => filter === Filters.ALL || (filter === Filters.FUTURE && isInFuture(r.date)));
     return (
         <div>
@@ -167,6 +169,14 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                 <div className="grid">
                     {registrationsToShow?.length ? (
                         registrationsToShow.flatMap((reg) => {
+                            let stamp = undefined;
+                            if (dayjs(reg.date).isBefore(now, "day")) {
+                                stamp = "עבר";
+                            }
+                            if (reg.status == Status.Cancelled) {
+                                stamp = stamp != undefined ? stamp + ",בוטל" :"בוטל";
+                            }
+
                             const lines = [];
                             // Cooking line (if volunteerId is present and current user is the volunteer)
                             if (reg.volunteerId === actualUserId) {
@@ -175,20 +185,19 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                                         key={`cooking-${reg.id}`}
                                         hideIcon={false}
                                         icon={
-                                            <div
-                                                style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    backgroundColor: 'inherit',
-                                                    padding: '0.2rem 0.5rem',
-                                                    borderRadius: '0.5rem',
-                                                    gap: '0.5rem', // Space between icon and text
-                                                    flexDirection: 'row-reverse', // Ensures text is on the right of the icon in RTL
-                                                    marginLeft: '1cm', // Moves both icon and text to the right
-                                                }}
-                                            >
-                                                <GiCookingPot style={{ fontSize: '2.5rem' }} />
-                                                <span>בישול</span>
+                                            <div style={{ width: 250 }}>
+                                                {reg.type == VolunteerType.Meal ?
+                                                    <div className='flex flex-column align-items-center'>
+                                                        <GiCookingPot style={{ fontSize: '2.5rem' }} />
+                                                        <span>בישול</span>
+                                                    </div> :
+                                                    <div className='flex flex-column align-items-center'>
+                                                        <GiPartyHat style={{ fontSize: '2.5rem' }} />
+                                                        <span>פינוקי חג</span>
+                                                    </div>
+                                                }
+
+
                                             </div>
                                         }
                                         title={reg.familyLastName}
@@ -209,7 +218,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                                                 }
                                         }
                                         deleteLabel={"ביטול שיבוץ"}
-                                        cancelled={reg.status == Status.Cancelled}
+                                        stamp={stamp}
                                     />
                                 );
                             }
@@ -250,7 +259,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                                                 setCurrentRegistration(undefined);
                                             });
                                         }}
-                                        cancelled={reg.status == Status.Cancelled}
+                                        stamp={stamp}
                                     />
                                 );
                             }
@@ -261,7 +270,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 

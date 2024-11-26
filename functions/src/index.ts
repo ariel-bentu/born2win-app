@@ -14,10 +14,10 @@ import utc = require("dayjs/plugin/utc");
 import timezone = require("dayjs/plugin/timezone");
 import { defineString } from "firebase-functions/params";
 import {
-    Collections, FamilityDemandUpdatePayload, FamilyDemand, FamilyDetails, LoginInfo,
+    Collections, FamilyDemandUpdatePayload, FamilyDemand, FamilyDetails, LoginInfo,
     NotificationActions, NotificationUpdatePayload, Recipient, SearchUsersPayload, SendMessagePayload,
     SendNotificationStats, TokenInfo, UpdateUserLoginPayload, UserInfo, UserRecord,
-    FamilityDetailsPayload,
+    FamilyDetailsPayload,
     NotificationChannels,
     GenerateLinkPayload,
     OpenFamilyDemands,
@@ -36,9 +36,12 @@ import {
     District,
     GetUserInfoPayload,
     Contact,
-    FamilityContactsPayload,
-    FamilityUpsertContactsPayload,
-    FamilityDeleteContactPayload,
+    FamilyContactsPayload,
+    FamilyUpsertContactsPayload,
+    FamilyDeleteContactPayload,
+    GetOpenDemandPayload,
+    VolunteerType,
+    GetUserRegistrationsPayload,
 } from "../../src/types";
 import axios from "axios";
 import express = require("express");
@@ -48,7 +51,7 @@ import { getSafeFirstArrayElement, IL_DATE, replaceAll, simplifyFamilyName } fro
 import localeData = require("dayjs/plugin/localeData");
 import { SendLinkOrInstall, weeklyNotifyFamilies } from "./scheduled-functions";
 import { AirTableQuery, AirTableUpdate, CachedAirTable } from "./airtable";
-import { getDemands2, updateFamilityDemand } from "./demands";
+import { getDemands, getDemands2, updateFamilyDemand } from "./demands";
 import { deleteContact, getFamilyContacts, getFamilyDetails2, searchFamilies, upsertContact } from "./families";
 import { Lock } from "./lock";
 import { deleteHoliday, getHolidays, upsertHoliday } from "./holidays";
@@ -1009,6 +1012,7 @@ interface City {
     id: string;
     name: string;
     district: string;
+    numOfFamilies: number;
 }
 
 // Cities cache
@@ -1017,13 +1021,26 @@ const cities = new CachedAirTable<City>("ערים", (city => {
         id: city.id,
         name: city.fields["שם"].replaceAll("\n", "").replaceAll("\"", "").trim(),
         district: city.fields["מחוז"][0],
+        numOfFamilies: city.fields["כמות משפחות פעילות בעיר"],
     };
-}), ["{כמות משפחות פעילות בעיר}>0"], 60 * 24);
+}), [], 60 * 24); // "{כמות משפחות פעילות בעיר}>0"
 
 
 export async function getCities(): Promise<City[]> {
     return cities.get();
 }
+
+exports.GetOpenDemands_v3 = onCall({ cors: true }, async (request): Promise<OpenFamilyDemands> => {
+    const doc = await authenticate(request);
+
+    const godp = request.data as GetOpenDemandPayload;
+
+    const districts = doc.data().districts;
+    const cities = await getCities();
+    const demands = await getDemands(districts, Status.Available, godp.type, dayjs().add(1, "day").format(DATE_AT),
+        dayjs().add(45, "days").format(DATE_AT));
+    return { demands, allDistrictCities: cities.filter(city => city.numOfFamilies > 0 && districts.some((d: string) => city.district === d)) };
+});
 
 
 exports.GetOpenDemands2 = onCall({ cors: true }, async (request): Promise<OpenFamilyDemands> => {
@@ -1032,7 +1049,7 @@ exports.GetOpenDemands2 = onCall({ cors: true }, async (request): Promise<OpenFa
     const districts = doc.data().districts;
     const cities = await getCities();
     const demands = await getDemands2(districts, Status.Available, dayjs().add(1, "day").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT));
-    return { demands, allDistrictCities: cities.filter(city => districts.some((d: string) => city.district === d)) };
+    return { demands, allDistrictCities: cities.filter(city => city.numOfFamilies > 0 && districts.some((d: string) => city.district === d)) };
 });
 
 
@@ -1040,11 +1057,26 @@ exports.GetDemandsNew = onCall({ cors: true }, async (request): Promise<FamilyDe
     const userInfo = await getUserInfo(request);
     if (userInfo.isAdmin) {
         const gdp = request.data as GetDemandsPayload;
-        return await getDemands2(gdp.districts, undefined, gdp.from, gdp.to);
+        return await getDemands(gdp.districts, undefined, gdp.type || VolunteerType.Meal, gdp.from, gdp.to);
     }
     throw new HttpsError("permission-denied", "Unauthorized user to read all demands");
 });
 
+
+exports.GetUserRegistrations_v3 = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
+    const doc = await authenticate(request);
+
+    const godp = request.data as GetUserRegistrationsPayload;
+    const type = godp?.type || VolunteerType.Meal;
+
+
+    const districts = doc.data().districts;
+    const volunteerId = doc.id;
+    return getDemands(districts, Status.OccupiedOrCancelled, type, dayjs().startOf("month").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT), volunteerId);
+});
+
+
+// Temp - delete after upgrade
 exports.GetUserRegistrationsNew = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
     const doc = await authenticate(request);
     const districts = doc.data().districts;
@@ -1079,10 +1111,10 @@ exports.UpdateDemandTransportation = onCall({ cors: true }, async (request) => {
         });
 });
 
-
+// Temp - delete after upgrade UI
 exports.UpdateFamilityDemandNew = onCall({ cors: true }, async (request) => {
     const userInfo = await getUserInfo(request);
-    const fdup = request.data as FamilityDemandUpdatePayload;
+    const fdup = request.data as FamilyDemandUpdatePayload;
 
     const demandDistrictId = (fdup.district);
     const volunteerId = (fdup.volunteerId || userInfo.id);
@@ -1093,12 +1125,30 @@ exports.UpdateFamilityDemandNew = onCall({ cors: true }, async (request) => {
     if (!fdup.isRegistering && !(fdup.reason && fdup.reason.trim().length > 0)) {
         throw new HttpsError("invalid-argument", "Missing cancellation reason");
     }
-    return updateFamilityDemand(fdup.demandId, demandDistrictId, fdup.isRegistering, volunteerId, userInfo.firstName + " " + userInfo.lastName, fdup.reason);
+    return updateFamilyDemand(fdup.demandId, demandDistrictId, fdup.isRegistering, VolunteerType.Meal,
+        volunteerId, userInfo.firstName + " " + userInfo.lastName, fdup.reason);
+});
+
+
+exports.UpdateFamilyDemand_v3 = onCall({ cors: true }, async (request) => {
+    const userInfo = await getUserInfo(request);
+    const fdup = request.data as FamilyDemandUpdatePayload;
+
+    const demandDistrictId = (fdup.district);
+    const volunteerId = (fdup.volunteerId || userInfo.id);
+
+    const demandDistrict = userInfo.districts.find(d => d.id == demandDistrictId);
+    if (!demandDistrict) throw new HttpsError("not-found", "District " + demandDistrictId + " not in scope of the user");
+
+    if (!fdup.isRegistering && !(fdup.reason && fdup.reason.trim().length > 0)) {
+        throw new HttpsError("invalid-argument", "Missing cancellation reason");
+    }
+    return updateFamilyDemand(fdup.demandId, demandDistrictId, fdup.isRegistering, fdup.type || VolunteerType.Meal, volunteerId, userInfo.firstName + " " + userInfo.lastName, fdup.reason);
 });
 
 exports.GetFamilyDetailsNew = onCall({ cors: true }, async (request): Promise<FamilyDetails> => {
     const userInfo = await getUserInfo(request);
-    const gfp = request.data as FamilityDetailsPayload;
+    const gfp = request.data as FamilyDetailsPayload;
 
     if (!gfp.mainBaseFamilyId) {
         throw new HttpsError("invalid-argument", "Family ID is missing");
@@ -1131,7 +1181,7 @@ exports.SearchFamilies = onCall({ cors: true }, async (request): Promise<FamilyC
 exports.GetFamilyContacts = onCall({ cors: true }, async (request): Promise<Contact[]> => {
     // todo ncheck admin
     await getUserInfo(request);
-    const gfp = request.data as FamilityContactsPayload;
+    const gfp = request.data as FamilyContactsPayload;
 
     if (!gfp.familyId) {
         throw new HttpsError("invalid-argument", "Family ID is missing");
@@ -1141,7 +1191,7 @@ exports.GetFamilyContacts = onCall({ cors: true }, async (request): Promise<Cont
 
 exports.UpsertContact = onCall({ cors: true }, async (request) => {
     await getUserInfo(request);
-    const fucp = request.data as FamilityUpsertContactsPayload;
+    const fucp = request.data as FamilyUpsertContactsPayload;
 
     if (!fucp.familyId) {
         throw new HttpsError("invalid-argument", "Family ID is missing");
@@ -1151,7 +1201,7 @@ exports.UpsertContact = onCall({ cors: true }, async (request) => {
 
 exports.DeleteContact = onCall({ cors: true }, async (request) => {
     await getUserInfo(request);
-    const fccp = request.data as FamilityDeleteContactPayload;
+    const fccp = request.data as FamilyDeleteContactPayload;
 
     if (!fccp.contactId) {
         throw new HttpsError("invalid-argument", "Missing contact ID");

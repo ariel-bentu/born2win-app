@@ -22,7 +22,7 @@ interface OneLineProps {
     onLineButtonPressed?: (action: string, params: string[]) => void;
     hideIcon?: boolean;
     className?: string;
-    cancelled?: boolean;
+    stamp?: string;
 }
 
 export default function OneLine({
@@ -38,7 +38,7 @@ export default function OneLine({
     hideIcon,
     icon,
     className,
-    cancelled
+    stamp
 }: OneLineProps) {
 
     const handleCopyLink = (link: string) => {
@@ -133,10 +133,10 @@ export default function OneLine({
                             {body.split('\n').map(renderMessagePart)}
                         </div>
                     </div>
-                    {cancelled && <div className='one-line-cancelled'>בוטל</div>}
+                    {stamp && <div className='one-line-cancelled'>{stamp}</div>}
                     {unread && <div className="red-dot" />}
                     {!hideIcon && (
-                        <div className="flex absolute  border-round" style={{ left: 50, top: 50, width: '2.5rem', height: '2.5rem' }}>
+                        <div className="flex absolute  border-round" style={{ left: -10, top: 40, width: '4rem', height: '2.5rem' }}>
                             {icon || <i className="pi pi-comment text-purple-500 text-xl"></i>}
                         </div>
                     )}

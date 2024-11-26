@@ -2,16 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Chart } from 'primereact/chart';
 import { MultiSelect } from 'primereact/multiselect';
 import dayjs from 'dayjs';
-import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails, UserInfo, VolunteerInfo } from './types';
+import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails, UserInfo, VolunteerInfo, VolunteerType } from './types';
 import {
     getDemands,
     getFamilyDetails,
     getVolunteerInfo,
     handleSearchUsers, impersonateUser,
     updateDemandTransportation,
-    updateFamilityDemand
+    updateFamilyDemand
 } from './api';
-import { generateDetailsForWhatapp } from './famility-registration-details';
+import { generateDetailsForWhatapp } from './family-registration-details';
 
 
 import { InProgress, PhoneNumber, WeekSelectorSlider } from './common-ui';
@@ -19,7 +19,7 @@ import { SelectButton } from 'primereact/selectbutton';
 import { simplifyFamilyName, sortByDate } from './utils';
 import { Button } from 'primereact/button';
 import "./charts.css"
-import { FamilyDetailsComponent } from './famility-registration-details';
+import { FamilyDetailsComponent } from './family-registration-details';
 import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete';
 import { OverlayPanel } from 'primereact/overlaypanel';
 import { ProgressSpinner } from 'primereact/progressspinner';
@@ -28,6 +28,7 @@ import { confirmPopup } from 'primereact/confirmpopup';
 import { Recipient } from './types';
 import { Dialog } from "primereact/dialog";
 import { openWhatsApp } from "./notification-actions";
+import { GiPartyHat } from 'react-icons/gi';
 
 interface DemandChartProps {
     data: FamilyDemand[];
@@ -67,6 +68,7 @@ interface DateInfo {
     transportingVolunteerId?: string;
     district: string;
     parentFamily: GroupedFamily;
+    type: VolunteerType;
 }
 
 interface GroupedFamily extends FamilyCompact {
@@ -80,7 +82,7 @@ interface GroupedData {
 }
 
 
-const filterOnlyOpen = (f: FamilyDemand) => f.status === "זמין" && f.isFamilyActive === true;
+const filterOnlyOpen = (f: FamilyDemand) => f.status === "זמין" && f.isFamilyActive === true && f.type != VolunteerType.HolidayTreat;
 const filterOnlyFulfilled = (f: FamilyDemand) => f.status === "תפוס";
 
 
@@ -100,7 +102,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
             setLoading(true);
 
             const range = selectedWeeks.map(d => dayjs().add(d, "week").toISOString()) as [string, string];
-            getDemands(range, selectedDistricts).then(demands => {
+            getDemands(range, selectedDistricts, VolunteerType.Any).then(demands => {
                 demands.sort((a, b) => sortByDate(a.date, b.date));
                 setData(demands);
             }).finally(() => setLoading(false));
@@ -281,15 +283,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
 
         closeRecipientModal();
     };
-    const formatDate = (dateString?: string): string => {
-        if (!dateString) return ""; // Handle undefined or empty string
-        const date = new Date(dateString); // Convert string to Date
-        return new Intl.DateTimeFormat('he-IL', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        }).format(date);
-    };
+   
     const handlePrepareTransportMessage = (
         selectedDateInfo: DateInfo | undefined,
         volunteerInfo: VolunteerInfo | undefined
@@ -298,7 +292,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
         
 מי יכול.ה לעזור בשינוע?
         
-בתאריך ${selectedDateInfo ? formatDate(selectedDateInfo.date) : ""}
+בתאריך ${selectedDateInfo ? dayjs(selectedDateInfo.date).format("DD.MM.YYYY") : ""}
         
 מ${volunteerInfo ? volunteerInfo.city : ""}
 ל${selectedDateInfo && selectedDateInfo.parentFamily ? `${selectedDateInfo.parentFamily.city}` : ""}
@@ -315,7 +309,6 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
         if (data && selectedMeal) {
             setTransportingVolunteer(undefined);
             setVolunteerInfo(undefined);
-            
             // find demand
             const demand = data.find(d => d.date == selectedMeal.date && d.mainBaseFamilyId == selectedMeal.familyId)
             if (demand) {
@@ -356,6 +349,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
 
     if (showFamilyDetails) {
         return <FamilyDetailsComponent
+            type={VolunteerType.Any}
             analyticComponent="Management"
             showInactiveFamilyLabel={true}
             appServices={appServices} demands={demands}
@@ -416,7 +410,8 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                                                 family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map(d => dayjs(d.date).format("DD.MM")).join(" | ") :
                                                 family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map((d, k) => (
                                                     <span key={k}>
-                                                        <span className='clickable-span' onClick={(e) => handleDateClick(e, city, family.mainBaseFamilyId, d.date)}>{dayjs(d.date).format("DD.MM")}</span>
+                                                        <span className='clickable-span position-relative' onClick={(e) => handleDateClick(e, city, family.mainBaseFamilyId, d.date)}>{dayjs(d.date).format("DD.MM")}
+                                                            {d.type == VolunteerType.HolidayTreat && <GiPartyHat className='position-absolute ' style={{ color: "var(--born2win-button-color)", top: -5 }} />}</span>
                                                         <span className='m-1'>|</span>
                                                     </span>
                                                 ))
@@ -483,7 +478,8 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
                                     icon: 'pi pi-exclamation-triangle',
                                     accept: async () => {
                                         setCancelInProgress(true);
-                                        updateFamilityDemand(selectedDateInfo.demandId, selectedDateInfo.mainBaseFamilyId, "cityId(unknown)", false, `מנהל ${userInfo.firstName} ביטל.ה`, selectedDateInfo.district, selectedDateInfo.volunteerId)
+                                        updateFamilyDemand(selectedDateInfo.demandId, selectedDateInfo.mainBaseFamilyId, "cityId(unknown)", false,
+                                            selectedDateInfo.type, `מנהל ${userInfo.firstName} ביטל.ה`, selectedDateInfo.district, selectedDateInfo.volunteerId)
                                             .then(onCancellationPerformed)
                                             .catch(err => appServices.showMessage("error", "ביטול נכשל", err.message))
                                             .finally(() => setCancelInProgress(false));
@@ -641,7 +637,7 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
                 mainBaseFamilyId: family.mainBaseFamilyId,
                 city,
                 district: family.district,
-                active: family.isFamilyActive,
+                active: family.isFamilyActive
             };
         }
 
@@ -655,6 +651,7 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
             volunteerId: family.volunteerId,
             parentFamily: groupedByCityAndFamily[city][family.mainBaseFamilyId],
             transportingVolunteerId: family.transpotingVolunteerId,
+            type: family.type,
         });
     });
 

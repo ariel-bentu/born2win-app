@@ -2,21 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { MultiSelect } from 'primereact/multiselect';
 import headerImg from './media/header.png';
 import bunnerImg from './media/reg-banner.png';
+import holidayTreatImg from './media/holiday-treat-banner.png';
 import footerImg from './media/registration-footer.png';
 
 import 'primereact/resources/themes/saga-blue/theme.css';
 import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
 import "./registration.css";
-import { FamilyDetailsComponent } from './famility-registration-details';
+import { FamilyDetailsComponent } from './family-registration-details';
 
 import { InProgress } from './common-ui';
-import { AppServices, City, FamilyCompact, FamilyDemand, OpenFamilyDemands, ShowToast, UserInfo } from './types';
+import { AppServices, City, FamilyCompact, FamilyDemand, OpenFamilyDemands, ShowToast, UserInfo, VolunteerType } from './types';
 import OneLine from './one-line';
 import { getUniqueFamilies } from './utils';
 import { ScrollPanel } from 'primereact/scrollpanel';
 import { analyticLog } from './api';
 import { oldUrlParamID } from './App';
+import { Button } from 'primereact/button';
 
 function cleanseCityName(cityName: string) {
     return cityName.replace(/["\n\s]/g, '');
@@ -52,6 +54,8 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
     const [families, setFamilies] = useState<FamilyCompact[]>([]);
     const [selectedFamily, setSelectedFamily] = useState<FamilyCompact | null>(null);
     const [error, setError] = useState<any>(undefined);
+    const [mode, setMode] = useState<VolunteerType>(VolunteerType.Meal);
+    const [holidayTreatsExists, setHolidayTreatsExists] = useState<boolean>(false);
 
     const analyticComponent = oldUrlParamID !== null ? "LinkRegistration" : "Registration";
 
@@ -59,23 +63,24 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
         analyticLog(analyticComponent, "open");
         setSelectedCities([])
         openDemands.then().then((demands: OpenFamilyDemands) => {
-            setFamilyDemands(demands.demands);
+            setHolidayTreatsExists(demands.demands.some(d => d.type == VolunteerType.HolidayTreat));
+            const demandsForType = demands.demands.filter(demand => demand.type == mode);
+
+            setFamilyDemands(demandsForType);
 
             // calculate the cities' availability
-            // const cities = getUniqueCities(demands.demands).map(city => ({ ...city, available: true }));
-            // console.log("cities", demands.allDistrictCities)
-            const cities = demands.allDistrictCities.map(city => ({ ...city, available: (demands.demands.some(d => compareCities(d.familyCityName, city.name))) } as CityAvailability));
+            const cities = demands.allDistrictCities.map(city => ({ ...city, available: (demandsForType.some(d => compareCities(d.familyCityName, city.name))) } as CityAvailability));
             setCities(cities);
             if (cities.length == 1) {
                 console.log("cities", cities)
                 setSelectedCities([cities[0]]);
             }
 
-            const uniqueFamilies = getUniqueFamilies(demands.demands);
+            const uniqueFamilies = getUniqueFamilies(demandsForType);
             setFamilies(uniqueFamilies);
 
         }).catch(err => setError(err));
-    }, [actualUserId, openDemandsTS]);
+    }, [actualUserId, openDemandsTS, mode]);
 
 
     if (error) return (
@@ -101,6 +106,20 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
     const filteredFamilies = families.filter(family => selectedCities.some(sc => compareCities(sc.name, family.city)));
     return (
         <div className="registration-component">
+            {!selectedFamily && userInfo?.isAdmin &&  <div className="mode-nav-button-host">
+                <Button
+                    style={{ zIndex: 1000 }}
+                    disabled={!holidayTreatsExists}
+                    onClick={() => {
+                        if (mode == VolunteerType.Meal) {
+                            setMode(VolunteerType.HolidayTreat);
+                        } else {
+                            setMode(VolunteerType.Meal);
+                        }
+                    }}
+
+                >{mode == VolunteerType.Meal ? "פינוקי חג" : "ארוחות"}</Button>
+            </div>}
             <div className="img-header">
                 {standalone && <img src={headerImg} />}
             </div>
@@ -123,7 +142,8 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
                     }}
 
                 >
-                    {!standalone && !selectedFamily && <img src={bunnerImg} alt="Registration Banner" style={{ maxWidth: "70%" }} />}
+                    {!standalone && !selectedFamily &&
+                        <img src={mode == VolunteerType.Meal ? bunnerImg : holidayTreatImg} alt="Registration Banner" style={{ maxWidth: "70%" }} />}
 
 
 
@@ -136,7 +156,10 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
                             }}
                             appServices={appServices} demands={selectedFamilyDemand || []}
                             reloadOpenDemands={reloadOpenDemands} includeContacts={false}
-                            actualUserId={actualUserId}/> :
+                            actualUserId={actualUserId}
+                            additionalHeader={mode == VolunteerType.HolidayTreat ? "פינוקי חגים" : undefined}
+                            type={mode}
+                        /> :
                         <>
                             {standalone && <span className='standalone-text-title'>אלו הערים שבהן ניתן לחבק משפחות החודש</span>}
                             <MultiSelect

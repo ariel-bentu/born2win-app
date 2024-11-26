@@ -19,6 +19,8 @@ import { ScrollPanel } from 'primereact/scrollpanel';
 import { analyticLog } from './api';
 import { oldUrlParamID } from './App';
 import { Button } from 'primereact/button';
+import { SelectButton } from 'primereact/selectbutton';
+import { Dialog } from 'primereact/dialog';
 
 function cleanseCityName(cityName: string) {
     return cityName.replace(/["\n\s]/g, '');
@@ -28,6 +30,13 @@ function compareCities(c1: string, c2: string) {
     return cleanseCityName(c1) === cleanseCityName(c2);
 }
 
+
+const Filters = {
+    array: [
+        { name: 'ארוחות', value: VolunteerType.Meal },
+        { name: 'פינוקי חג', value: VolunteerType.HolidayTreat },
+    ]
+}
 
 interface RegistrationComponentProps {
     userInfo: UserInfo | null;
@@ -56,6 +65,7 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
     const [error, setError] = useState<any>(undefined);
     const [mode, setMode] = useState<VolunteerType>(VolunteerType.Meal);
     const [holidayTreatsExists, setHolidayTreatsExists] = useState<boolean>(false);
+    const [showWhatsHolidayTreats, setShowWhatsHolidayTreats] = useState<boolean>(false);
 
     const analyticComponent = oldUrlParamID !== null ? "LinkRegistration" : "Registration";
 
@@ -106,20 +116,49 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
     const filteredFamilies = families.filter(family => selectedCities.some(sc => compareCities(sc.name, family.city)));
     return (
         <div className="registration-component">
-            {!selectedFamily && userInfo?.isAdmin &&  <div className="mode-nav-button-host">
-                <Button
-                    style={{ zIndex: 1000 }}
-                    disabled={!holidayTreatsExists}
-                    onClick={() => {
-                        if (mode == VolunteerType.Meal) {
-                            setMode(VolunteerType.HolidayTreat);
-                        } else {
-                            setMode(VolunteerType.Meal);
-                        }
-                    }}
 
-                >{mode == VolunteerType.Meal ? "פינוקי חג" : "ארוחות"}</Button>
-            </div>}
+
+
+            {!selectedFamily && userInfo?.isAdmin && holidayTreatsExists &&
+
+                <div className='flex flex-row justify-content-center relative'>
+                    <SelectButton
+                        pt={{ root: { className: "select-button-container" } }}
+                        unstyled
+                        value={mode}
+                        onChange={(e) => setMode(e.value)}
+                        optionLabel="name"
+                        options={Filters.array}
+                        itemTemplate={(option) => (
+                            <div className={`select-button-item ${mode === option.value ? 'p-highlight' : ''}`}>
+                                {option.name}
+                            </div>
+                        )}
+                    />
+                    <a
+                        style={{
+                            color: "blue",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                        }}
+                        onClick={() => setShowWhatsHolidayTreats(true)}
+                    >
+                        מה זה?
+                    </a>
+                </div>
+            }
+            <Dialog  style={{direction:"rtl"}} visible={showWhatsHolidayTreats} onHide={() => setShowWhatsHolidayTreats(false)} header=" מה זה פינוקי חג?">
+                <div className='registration-explain'>
+                    גם השנה ממשיכים במסורת של נולדת לנצח ונשלח למשפחות שלנו פינוקים לכבוד החג.💜
+                    <br/><br/>
+                    מה זה פינוקים?! עוגה/עוגיות/ מארז טעים וכל מה שבא לכם להכין באווירת החג שיהיה להם מתוק בנשמה .
+                    אפשרי לשתף את הילדים להכין ברכה מהממת 💞🌟
+                    <br/><br/>
+                    מתי?<br/>
+                    בשבוע של החג מוסרים בתיאום מראש לפי מה שנוח לכם
+                </div>
+            </Dialog>
+
             <div className="img-header">
                 {standalone && <img src={headerImg} />}
             </div>
@@ -185,7 +224,6 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
                                             setSelectedFamily(null)
                                         })
                                     }}
-                                    hideIcon={true}
                                 />))
                             }
                         </>

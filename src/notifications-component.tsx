@@ -213,7 +213,6 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                                         }
                                     }
                                     return <OneLine
-                                        hideIcon={true}
                                         key={notification.id}
                                         title={notification.title}
                                         body={fullImage ? "IMAGE:" + fullImage : notification.body}

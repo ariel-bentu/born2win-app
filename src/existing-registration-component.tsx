@@ -165,8 +165,8 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
             </div>
 
             {loading && <InProgress />}
-            <div className="surface-ground px-4 py-5 md:px-6 lg:px-8">
-                <div className="grid">
+            <div className="surface-ground md:px-4 lg:px-6">
+                <div className="w-full">
                     {registrationsToShow?.length ? (
                         registrationsToShow.flatMap((reg) => {
                             let stamp = undefined;
@@ -183,9 +183,8 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                                 lines.push(
                                     <OneLine
                                         key={`cooking-${reg.id}`}
-                                        hideIcon={false}
                                         icon={
-                                            <div style={{ width: 250 }}>
+                                            <div>
                                                 {reg.type == VolunteerType.Meal ?
                                                     <div className='flex flex-column align-items-center'>
                                                         <GiCookingPot style={{ fontSize: '2.5rem' }} />
@@ -230,7 +229,6 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                                 lines.push(
                                     <OneLine
                                         key={`transport-${reg.id}`}
-                                        hideIcon={false}
                                         icon={
                                             <div
                                                 style={{

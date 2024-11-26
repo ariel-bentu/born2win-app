@@ -64,6 +64,20 @@
   border-radius: 50%;
 }
 
+.one-line-icon {
+  top: 10px;
+  display: flex;
+  position: absolute;
+  height: 100px;
+  width: 100px;
+  border-radius: 50%;
+
+  justify-content: center;
+  align-items: center;
+  background-color: #F6F6F6;
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.15);
+}
+
 .settingMenuItem {
   text-align: right;
   align-items: center;
@@ -79,7 +93,7 @@
 .one-line-cancelled {
   position: absolute;
   top: 50px;
-  right:200px;
+  right:150px;
   color: red;
   font-size: x-large;
   font-weight: bold;

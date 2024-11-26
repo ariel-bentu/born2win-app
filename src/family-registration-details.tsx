@@ -61,11 +61,13 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
     const months = useMemo(() => {
         const today = dayjs();
         const nextMonth = today.add(1, "month");
+        const twoMonthsAhead = today.add(2, "month");
 
         const thisMonthCount = demands.filter(d => dayjs(d.date).month() === today.month()).length;
         const nextMonthCount = demands.filter(d => dayjs(d.date).month() === nextMonth.month()).length;
+        const twoMonthsAheadCount = demands.filter(d => dayjs(d.date).month() === twoMonthsAhead.month()).length;
 
-        return [{
+        const res = [{
             name: today.format("MMMM"),
             month: today.month(),
             year: today.year(),
@@ -77,6 +79,17 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
             year: nextMonth.year(),
             count: nextMonthCount,
         }];
+
+        if (twoMonthsAheadCount > 0) {
+            res.push({
+                name: twoMonthsAhead.format("MMMM"),
+                month: twoMonthsAhead.month(),
+                year: twoMonthsAhead.year(),
+                count: twoMonthsAheadCount,
+            });
+        }
+
+        return res;
     }, [demands])
 
     const [viewVisibleMonth, setViewVisibleMonth] = useState<CalendarMonthChangeEvent>({ year: dayjs().year(), month: dayjs().month() });
@@ -218,12 +231,12 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                             if (availabilityRecord && familyDetails) {
                                 setSaving(true);
                                 analyticLog(analyticComponent, "save new Registration");
-                                updateFamilyDemand(availabilityRecord.id, familyDetails.mainBaseFamilyId, familyDetails.cityId, true, 
+                                updateFamilyDemand(availabilityRecord.id, familyDetails.mainBaseFamilyId, familyDetails.cityId, true,
                                     type, "", availabilityRecord.district).then(() => {
-                                    appServices.showMessage("success", "שיבוץ נקלט בהצלחה", "");
-                                    reloadOpenDemands();
-                                    setReload(prev => prev + 1);
-                                }).catch((err) => appServices.showMessage("error", "תקלה ברישום (1) - ", err.message))
+                                        appServices.showMessage("success", "שיבוץ נקלט בהצלחה", "");
+                                        reloadOpenDemands();
+                                        setReload(prev => prev + 1);
+                                    }).catch((err) => appServices.showMessage("error", "תקלה ברישום (1) - ", err.message))
                                     .finally(() => setSaving(false));
                             }
                         }} className="w-full" />

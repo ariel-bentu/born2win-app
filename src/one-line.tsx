@@ -20,7 +20,6 @@ interface OneLineProps {
     icon?: React.ReactNode; // Add icon prop here
     buttons?: LineButton[];
     onLineButtonPressed?: (action: string, params: string[]) => void;
-    hideIcon?: boolean;
     className?: string;
     stamp?: string;
 }
@@ -35,7 +34,6 @@ export default function OneLine({
     deleteLabel,
     buttons,
     onLineButtonPressed,
-    hideIcon,
     icon,
     className,
     stamp
@@ -123,8 +121,14 @@ export default function OneLine({
 
     return (
         <div className={`flex flex-row m-2 w-11 ${className || ''}`}>
-            <div className="surface-card shadow-2 p-3 border-round-xl w-12" onClick={onRead}>
-                <div className="flex justify-content-between mb-3 relative">
+            <div className="surface-card shadow-2 p-3 border-round-xl w-12 relative" onClick={onRead}>
+                {icon &&
+                    <div className="one-line-icon">
+                        {icon}
+                    </div>
+                }
+                <div className="flex justify-content-between mb-3" style={{marginRight:icon?120:0}}>
+
                     <div className="flex flex-column w-12">
                         <div className={`text-right text-xl font-xlarge mb-3 ${unread ? 'font-bold' : ''}`}>
                             {title}
@@ -133,13 +137,9 @@ export default function OneLine({
                             {body.split('\n').map(renderMessagePart)}
                         </div>
                     </div>
-                    {stamp && <div className='one-line-cancelled'>{stamp}</div>}
+                    {stamp && <div className='one-line-cancelled' style={{marginRight:icon?120:0}}>{stamp}</div>}
                     {unread && <div className="red-dot" />}
-                    {!hideIcon && (
-                        <div className="flex absolute  border-round" style={{ left: -10, top: 40, width: '4rem', height: '2.5rem' }}>
-                            {icon || <i className="pi pi-comment text-purple-500 text-xl"></i>}
-                        </div>
-                    )}
+
                 </div>
 
                 {buttons?.length && onLineButtonPressed && (

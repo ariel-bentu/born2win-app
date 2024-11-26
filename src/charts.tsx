@@ -281,7 +281,15 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
 
         closeRecipientModal();
     };
-
+    const formatDate = (dateString?: string): string => {
+        if (!dateString) return ""; // Handle undefined or empty string
+        const date = new Date(dateString); // Convert string to Date
+        return new Intl.DateTimeFormat('he-IL', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        }).format(date);
+    };
     const handlePrepareTransportMessage = (
         selectedDateInfo: DateInfo | undefined,
         volunteerInfo: VolunteerInfo | undefined
@@ -290,7 +298,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, isShowOpen, appSe
         
 מי יכול.ה לעזור בשינוע?
         
-בתאריך ${selectedDateInfo ? selectedDateInfo.date : ""}
+בתאריך ${selectedDateInfo ? formatDate(selectedDateInfo.date) : ""}
         
 מ${volunteerInfo ? volunteerInfo.city : ""}
 ל${selectedDateInfo && selectedDateInfo.parentFamily ? `${selectedDateInfo.parentFamily.city}` : ""}

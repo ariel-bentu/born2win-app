@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { DataTable, DataTableRowGroupHeaderTemplateOptions } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { deleteHoliday, getRegisteredHolidays, handleSearchFamilies, upsertHoliday } from './api';
-import { AppServices, FamilyCompact, Holiday, IdName, UserInfo } from './types';
+import { AppServices, EventType, FamilyCompact, Holiday, IdName, UserInfo } from './types';
 import './holidays.css'
 
 import { CalOptions, HebrewCalendar } from '@hebcal/core'
@@ -37,7 +37,7 @@ export const getPotentialHolidays = ({ from, to }: { from: Dayjs, to: Dayjs }): 
             id: dayjs(date).format(DATE_AT),
             name: ev.render('he'),
             date: dayjs(date).format(DATE_AT),
-            addAvailability: false,
+            type: EventType.Holiday,
         };
     });
 
@@ -86,11 +86,11 @@ export const HolidaysAdmin = ({ userInfo, appServices }: HolidaysAdminProps) => 
         getRegisteredHolidays(from.format(DATE_AT), to.format(DATE_AT)).then(list => {
             // sort by district, then family name then date
             list.sort((a, b) => {
-                let ret = sortByStringField(a,b, "district");
+                let ret = sortByStringField(a, b, "district");
                 if (ret != 0) return ret;
 
                 // same district
-                ret = sortByStringField(a,b, "familyName");
+                ret = sortByStringField(a, b, "familyName");
                 if (ret != 0) return ret;
 
                 return sortByDate(a.date, b.date);
@@ -129,11 +129,11 @@ export const HolidaysAdmin = ({ userInfo, appServices }: HolidaysAdminProps) => 
     };
 
     const today = dayjs()
-    const formatData = (date:string | undefined) => {
+    const formatData = (date: string | undefined) => {
         if (!date) return "";
         const d = dayjs(date);
         if (today.year() != d.year()) return d.format("DD/MM/YY")
-        return  d.format("DD/MM");
+        return d.format("DD/MM");
     }
 
     return (<div>
@@ -170,18 +170,14 @@ export const HolidaysAdmin = ({ userInfo, appServices }: HolidaysAdminProps) => 
         <div className='holiday-table-title'>חגים וחריגים רשומים</div>
         <DataTable
             dir='rtl'
-            value={registeredHolidays?.filter(rh=> selectedDistricts.length == 0 || selectedDistricts.some(sd=>sd == rh.district) )}
+            value={registeredHolidays?.filter(rh => selectedDistricts.length == 0 || selectedDistricts.some(sd => sd == rh.district))}
             style={{ textAlign: 'right' }}
             rowGroupMode="subheader"
             groupRowsBy={'district'}
             rowGroupHeaderTemplate={rowGroupHeaderTemplate}
         >
-            <Column body={(h: Holiday) => formatData(h.date)}  header="תאריך" style={{ textAlign: 'right' }} />
-            <Column body={(rowData: Holiday) => {
-                if (!rowData.familyId) return Modes.array[Modes.Holiday - 1].name;
-                if (rowData.addAvailability) return Modes.array[Modes.Add - 1].name;
-                return Modes.array[Modes.Block - 1].name;
-            }} header="סוג" style={{ textAlign: 'right' }} />
+            <Column body={(h: Holiday) => formatData(h.date)} header="תאריך" style={{ textAlign: 'right' }} />
+            <Column field="type" header="סוג" style={{ textAlign: 'right' }} />
             <Column field="name" header="תיאור" style={{ textAlign: 'right' }} />
             <Column field="familyName" header="משפחה" style={{ textAlign: 'right' }} />
             <Column body={(h: Holiday) => formatData(h.alternateDate)} header="תאריך חלופי" style={{ textAlign: 'right' }} />
@@ -193,7 +189,7 @@ export const HolidaysAdmin = ({ userInfo, appServices }: HolidaysAdminProps) => 
                             id: "",
                             date: "",
                             name: "",
-                            addAvailability: false,
+                            type: EventType.Block,
                         });
                     }}
                 />)}
@@ -231,7 +227,7 @@ export const HolidaysAdmin = ({ userInfo, appServices }: HolidaysAdminProps) => 
                                     id: "",
                                     name: rowData.name,
                                     date: rowData.date,
-                                    addAvailability: false,
+                                    type: EventType.Holiday,
                                 })}
                             />
                         )}
@@ -252,20 +248,17 @@ interface EditHolidayProps {
     onCancel: () => void;
 }
 
-const Modes = {
-    Add: 2,
-    Block: 3,
-    Holiday: 1,
-    array: [
-        { name: 'חג', value: 1 },
-        { name: 'הוספת תאריך למשפחה', value: 2 },
-        { name: 'חסימה/החלפה תאריך למשפחה', value: 3 },
-    ]
-}
+const typeArray = [
+    { name: 'חג', value: EventType.Holiday },
+    { name: 'הוספת תאריך למשפחה', value: EventType.Add },
+    { name: 'חסימה/החלפה תאריך למשפחה', value: EventType.Block },
+    { name: 'פינוקי חג', value: EventType.HolidayTreats },
+];
+
 
 function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices }: EditHolidayProps) {
     const [name, setName] = useState<string>(holiday.name);
-    const [mode, setMode] = useState(holiday.familyId ? (holiday.addAvailability ? Modes.Add : Modes.Block) : Modes.Holiday);
+    const [type, setType] = useState<EventType>(holiday.familyId ? holiday.type : EventType.Block);
     const [alternateDate, setAlternateDate] = useState<string | undefined>(holiday.alternateDate);
     const [date, setDate] = useState<string>(holiday.date);
     const [family, setFamily] = useState<IdName | undefined>(holiday.familyId && holiday.familyName ? ({
@@ -274,14 +267,43 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
     }) : undefined);
     const [filteredFamilies, setFilteredFamilies] = useState<any[]>([]);
     console.log("Holiday in edit", holiday, name, family)
+
+
+    let labelDate = "";
+    let labelAlternativeDate = "";
+    let alternativeMandatory = false;
+    let alternativeVisible = false;
+    switch (type) {
+        case EventType.Holiday:
+            labelDate = "תאריך החג לחסום";
+            labelAlternativeDate = "תאריך חלופי (לא חובה)";
+            alternativeVisible = true;
+            break;
+        case EventType.Block:
+            labelDate = "תאריך לחסום";
+            labelAlternativeDate = "תאריך חלופי (לא חובה)";
+            alternativeVisible = true;
+            break;
+        case EventType.Add:
+            labelDate = "תאריך להוסיף";
+            break;
+        case EventType.HolidayTreats:
+            labelDate = "מתאריך";
+            labelAlternativeDate = "עד תאריך";
+            alternativeMandatory = true;
+            alternativeVisible = true;
+            break;
+    }
+
+
     return <Dialog style={{ direction: "rtl" }} visible={visible} onHide={onCancel} header="עריכת חג/יום חריג" >
         <div className="flex flex-row justify-content-start">
             <SelectButton
                 pt={{ root: { className: "select-button-container" } }}
                 unstyled
-                value={mode} onChange={(e) => setMode(e.value)} optionLabel="name" options={Modes.array}
+                value={type} onChange={(e) => setType(e.value)} optionLabel="name" options={typeArray}
                 itemTemplate={(option) => (
-                    <div className={`select-button-item ${mode === option.value ? 'p-highlight' : ''}`}>
+                    <div className={`select-button-item ${type === option.value ? 'p-highlight' : ''}`}>
                         {option.name}
                     </div>
                 )}
@@ -295,8 +317,8 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
         </div>
 
         <div className="flex-auto">
-            <label htmlFor="date" className="font-bold block mt-5 mb-2">{mode == Modes.Block? "תאריך לחסום":
-            (mode == Modes.Holiday?"תאריך החג": "תאריך להוסיף")}
+            <label htmlFor="date" className="font-bold block mt-5 mb-2">
+                {labelDate}
             </label>
             <Calendar
                 locale="he"
@@ -304,7 +326,7 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
                 onChange={(e) => setDate(dayjs(e.value).format(DATE_AT))} showIcon />
         </div>
 
-        {mode != Modes.Holiday &&
+        {type != EventType.Holiday && type != EventType.HolidayTreats &&
             <div className="flex-auto">
                 <label htmlFor="family" className="font-bold block mt-5 mb-2">משפחה
                 </label>
@@ -327,10 +349,10 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
         }
 
 
-        {(mode == Modes.Holiday || mode == Modes.Block) &&
+        {alternativeVisible &&
             <div className="flex-auto">
                 <label htmlFor="altDate" className="font-bold block mt-5 mb-2">
-                    {`תאריך אלטרנטיבי ${mode == Modes.Block ? "(לא חובה)" : ""}`}
+                    {labelAlternativeDate}
                 </label>
                 <Calendar
                     locale="he"
@@ -355,16 +377,22 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
                     id: holiday.id,
                     name,
                     date,
+                    type,
                 } as Holiday;
-                if (mode != Modes.Holiday) {
+
+                if (type != EventType.Holiday && type != EventType.HolidayTreats) {
                     if (!family) {
                         appServices.showMessage("error", "חסר משפחה", "יש לבחור משפחה");
                         return;
                     }
-                    holidayToSave.alternateDate = mode == Modes.Block && alternateDate != "" ? alternateDate : undefined;
                     holidayToSave.familyId = family.id;
-                } else if (alternateDate != "") {
-                    holidayToSave.alternateDate = alternateDate;
+                }
+
+                holidayToSave.alternateDate = alternativeVisible ? alternateDate : undefined;
+
+                if (alternativeMandatory && !holidayToSave.alternateDate) {
+                    appServices.showMessage("error", "חסר תאריך סיום", "יש לבחור תאריך סיום");
+                    return;
                 }
                 onSave(holidayToSave);
 

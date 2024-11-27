@@ -1,7 +1,7 @@
 import axios from "axios";
 import dayjs, { Dayjs } from "dayjs";
 
-import { AirTableRecord, Collections, FamilyDemand, FamilyDetails,  UserRecord, NotificationChannels, GenerateLinkPayload, OpenFamilyDemands, VolunteerInfo, VolunteerInfoPayload, GetDemandsPayload, Errors, Status, Contact, VolunteerType } from "../src/types";
+import { AirTableRecord, Collections, FamilyDemand, FamilyDetails,  UserRecord, NotificationChannels, GenerateLinkPayload, OpenFamilyDemands, VolunteerInfo, VolunteerInfoPayload, GetDemandsPayload, Errors, Status, Contact, VolunteerType, EventType } from "../src/types";
 export const DATE_AT = "YYYY-MM-DD";
 const DATE_TIME = "YYYY-MM-DD HH:mm";
 
@@ -1031,6 +1031,32 @@ async function migrateMeals() {
     
 }
 
+
+async function migrateHolidays() {
+    const q = new AirTableQuery<any>("חגים וחריגים", (rec => rec));
+    const all = await q.execute();
+    const fields = {} as any;
+    for (const h of all) {
+        if (h.fields["Name"].startsWith("פינוקי")) {
+            fields["סוג"] = EventType.HolidayTreats;
+        } else {
+            continue;
+        }
+
+        // if (h.fields["זמין"] == true && h.fields["משפחה"]) {
+        //     fields["סוג"] = "הוספת תאריך למשפחה";
+        // } else if (!h.fields["משפחה"]) {
+        //     fields["סוג"] = "חג";
+        // } else {
+        //     fields["סוג"] = "חסימה/החלפת תאריך למשפחה";
+        // }
+
+        await AirTableUpdate("חגים וחריגים", h.id,  {fields});
+    }
+    
+}
+
+migrateHolidays();
 // migrateMeals()
 
 
@@ -1240,12 +1266,12 @@ export function getDatesBetween(startDateIn:string, endDateIn:string) {
   }
 
 
-  getDemands("recmLo9MWRxmrLEsM", Status.Occupied, VolunteerType.Any, dayjs().add(1, "day").format(DATE_AT),
-  dayjs().add(45, "days").format(DATE_AT),"rec6LsfiNvuwykEei"
+//   getDemands("recmLo9MWRxmrLEsM", Status.Occupied, VolunteerType.Any, dayjs().add(1, "day").format(DATE_AT),
+//   dayjs().add(45, "days").format(DATE_AT),"rec6LsfiNvuwykEei"
     
-//    "2024-11-30", "2024-12-31"
-).then(demands=>
-  {
-    console.log(demands.length)
-  }
-  )
+// //    "2024-11-30", "2024-12-31"
+// ).then(demands=>
+//   {
+//     console.log(demands.length)
+//   }
+//   )

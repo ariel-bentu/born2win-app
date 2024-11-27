@@ -11,11 +11,11 @@ function holidayAirtable2Holiday(holiday: AirTableRecord, cityName?: string, dis
         name: holiday.fields.Name,
         date: holiday.fields["תאריך"],
         alternateDate: holiday.fields["תאריך חלופי"],
-        addAvailability: holiday.fields["זמין"] == true,
         familyId: getSafeFirstArrayElement(holiday.fields["משפחה"], undefined),
         familyName: getSafeFirstArrayElement(holiday.fields["שם משפחה"], undefined),
         cityName,
         district,
+        type: holiday.fields["סוג"],
     };
 }
 
@@ -32,7 +32,7 @@ export async function upsertHoliday(holiday: Holiday) {
         fields: {
             "Name": holiday.name,
             "תאריך": dayjs(holiday.date).format(DATE_AT),
-            "זמין": holiday.addAvailability,
+            "סוג": holiday.type,
         },
     };
 

@@ -51,7 +51,7 @@ import { getSafeFirstArrayElement, IL_DATE, replaceAll, simplifyFamilyName } fro
 import localeData = require("dayjs/plugin/localeData");
 import { SendLinkOrInstall, weeklyNotifyFamilies } from "./scheduled-functions";
 import { AirTableQuery, AirTableUpdate, CachedAirTable } from "./airtable";
-import { getDemands, getDemands2, updateFamilyDemand } from "./demands";
+import { getDemands, updateFamilyDemand } from "./demands";
 import { deleteContact, getFamilyContacts, getFamilyDetails2, searchFamilies, upsertContact } from "./families";
 import { Lock } from "./lock";
 import { deleteHoliday, getHolidays, upsertHoliday } from "./holidays";
@@ -1043,16 +1043,6 @@ exports.GetOpenDemands_v3 = onCall({ cors: true }, async (request): Promise<Open
 });
 
 
-exports.GetOpenDemands2 = onCall({ cors: true }, async (request): Promise<OpenFamilyDemands> => {
-    const doc = await authenticate(request);
-
-    const districts = doc.data().districts;
-    const cities = await getCities();
-    const demands = await getDemands2(districts, Status.Available, dayjs().add(1, "day").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT));
-    return { demands, allDistrictCities: cities.filter(city => city.numOfFamilies > 0 && districts.some((d: string) => city.district === d)) };
-});
-
-
 exports.GetDemandsNew = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
     const userInfo = await getUserInfo(request);
     if (userInfo.isAdmin) {
@@ -1075,14 +1065,6 @@ exports.GetUserRegistrations_v3 = onCall({ cors: true }, async (request): Promis
     return getDemands(districts, Status.OccupiedOrCancelled, type, dayjs().startOf("month").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT), volunteerId);
 });
 
-
-// Temp - delete after upgrade
-exports.GetUserRegistrationsNew = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
-    const doc = await authenticate(request);
-    const districts = doc.data().districts;
-    const volunteerId = doc.id;
-    return getDemands2(districts, Status.OccupiedOrCancelled, dayjs().startOf("month").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT), volunteerId);
-});
 
 exports.UpdateDemandTransportation = onCall({ cors: true }, async (request) => {
     const userInfo = await getUserInfo(request);
@@ -1109,24 +1091,6 @@ exports.UpdateDemandTransportation = onCall({ cors: true }, async (request) => {
         .finally(() => {
             lock.release();
         });
-});
-
-// Temp - delete after upgrade UI
-exports.UpdateFamilityDemandNew = onCall({ cors: true }, async (request) => {
-    const userInfo = await getUserInfo(request);
-    const fdup = request.data as FamilyDemandUpdatePayload;
-
-    const demandDistrictId = (fdup.district);
-    const volunteerId = (fdup.volunteerId || userInfo.id);
-
-    const demandDistrict = userInfo.districts.find(d => d.id == demandDistrictId);
-    if (!demandDistrict) throw new HttpsError("not-found", "District " + demandDistrictId + " not in scope of the user");
-
-    if (!fdup.isRegistering && !(fdup.reason && fdup.reason.trim().length > 0)) {
-        throw new HttpsError("invalid-argument", "Missing cancellation reason");
-    }
-    return updateFamilyDemand(fdup.demandId, demandDistrictId, fdup.isRegistering, VolunteerType.Meal,
-        volunteerId, userInfo.firstName + " " + userInfo.lastName, fdup.reason);
 });
 
 
@@ -1437,7 +1401,7 @@ async function alertOpenDemands() {
     let notifyAdmins = false;
 
     for (let i = 0; i < districts.length; i++) {
-        const openDemands = await getDemands2(districts[i].id, Status.Available, dayjs().add(1, "day").format(DATE_AT), dayjs().add(5, "days").format(DATE_AT));
+        const openDemands = await getDemands(districts[i].id, Status.Available, VolunteerType.Meal, dayjs().add(1, "day").format(DATE_AT), dayjs().add(5, "days").format(DATE_AT));
         let msgBody = "מחוז: " + districts[i].name + "\n";
         if (openDemands.length > 0) {
             let found = false;
@@ -1467,7 +1431,7 @@ async function alertOpenDemands() {
 
 async function alertUpcomingCooking() {
     const daysBefore = 3;
-    const upcomingDemands = await getDemands2(undefined, Status.Occupied, dayjs().format(DATE_AT), dayjs().add(daysBefore + 1, "days").format(DATE_AT));
+    const upcomingDemands = await getDemands(undefined, Status.Occupied, VolunteerType.Meal, dayjs().format(DATE_AT), dayjs().add(daysBefore + 1, "days").format(DATE_AT));
     for (let j = 0; j < upcomingDemands.length; j++) {
         const demand = upcomingDemands[j];
 

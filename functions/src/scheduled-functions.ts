@@ -4,9 +4,9 @@ import axios from "axios";
 import { addNotificationToQueue, chunkArray, DATE_AT, db, manyChatApiKey } from ".";
 import { FieldPath } from "firebase-admin/firestore";
 import localeData = require("dayjs/plugin/localeData");
-import { Collections, NotificationChannels } from "../../src/types";
-import { getDemands2 } from "./demands";
+import { Collections, NotificationChannels, VolunteerType } from "../../src/types";
 import { AirTableQuery } from "./airtable";
+import { getDemands } from "./demands";
 
 require("dayjs/locale/he");
 dayjs.extend(localeData);
@@ -36,7 +36,7 @@ export async function weeklyNotifyFamilies() {
     const tomorrow = dayjs().add(1, "days");
     const notifications: Notification[] = [];
     const volunteers: { [key: string]: string } = {};
-    const upcomingDemands = await getDemands2(undefined, undefined, tomorrow.format(DATE_AT), tomorrow.add(28, "days").format(DATE_AT));
+    const upcomingDemands = await getDemands(undefined, undefined, VolunteerType.Meal, tomorrow.format(DATE_AT), tomorrow.add(28, "days").format(DATE_AT));
     for (const demand of upcomingDemands) {
         let notification = notifications.find(n => n.mainBaseFamilyId === demand.mainBaseFamilyId);
         if (!notification) {

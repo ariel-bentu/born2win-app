@@ -344,6 +344,13 @@ export enum Status {
     Active = "פעיל",
 }
 
+export enum EventType {
+    Holiday = "חג",
+    Block = "חסימה/החלפת תאריך למשפחה",
+    Add = "הוספת תאריך למשפחה",
+    HolidayTreats = "פינוקי חג",
+}
+
 export interface Holiday {
     id: string;
     date: string;
@@ -351,9 +358,9 @@ export interface Holiday {
     familyId?: string;
     familyName?: string;
     alternateDate?: string
-    addAvailability: boolean; // when true, it means the main "date" should be added to family
     cityName?: string;
     district?: string;
+    type: EventType;
 }
 
 export interface UpsertHolidayPayload {

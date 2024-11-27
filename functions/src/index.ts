@@ -1170,7 +1170,7 @@ exports.DeleteContact = onCall({ cors: true }, async (request) => {
     if (!fccp.contactId) {
         throw new HttpsError("invalid-argument", "Missing contact ID");
     }
-    return deleteContact(fccp.contactId, fccp.familyId);
+    return deleteContact(fccp.contactId);
 });
 
 exports.GetRegisteredHolidays = onCall({ cors: true }, async (request): Promise<Holiday[]> => {

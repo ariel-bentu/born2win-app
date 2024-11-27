@@ -136,26 +136,15 @@ function contactAirtable2Contact(rec: AirTableRecord): Contact {
 export async function getFamilyContacts(familyId: string): Promise<Contact[]> {
     // eslint-disable-next-line new-cap
     const query = new AirTableQuery<Contact>(tables.Contacts, contactAirtable2Contact);
-    return query.execute([airtableArrayCondition("families2", familyId)]);
+    return query.execute([`OR(${airtableArrayCondition("families2", familyId)},${airtableArrayCondition("families", familyId)})`]);
 }
 
-// Only delete if no other family is attached to it
-export async function deleteContact(id: string, familyId: string) {
+export async function deleteContact(id: string) {
     const existingContact = await AirTableGet<any>(tables.Contacts, id, (rec) => ({
-        families: rec.fields["משפחות רשומות 2"],
         manychatId: rec.fields.manychat_id,
     }));
-    const leftFamilies = existingContact.families.filter((f: string) => f != familyId);
-    if (leftFamilies.length == 0) {
-        await deleteManyChatSubscriber(existingContact.manychatId);
-        return AirTableDelete(tables.Contacts, id);
-    } else {
-        return AirTableUpdate(tables.Contacts, id, {
-            fields: {
-                "משפחות רשומות 2": leftFamilies,
-            },
-        });
-    }
+    await deleteManyChatSubscriber(existingContact.manychatId);
+    return AirTableDelete(tables.Contacts, id);
 }
 
 export async function upsertContact(contact: Contact, familyId: string) {
@@ -184,13 +173,19 @@ export async function upsertContact(contact: Contact, familyId: string) {
                         "תעודת זהות": contact.idNumber,
                         "manychat_id": contact.manychatId,
                         "סוג הקשר לחולה": contact.relationToPatient,
-                        "משפחות רשומות 2": [familyId],
                         "ערים": cities,
-                        // "בדיקת התאמה": ["reccWsx2UZJf0x0Vs"],
                     },
                 },
             ],
         };
+
+        if (contact.role.some(r => r == "איש קשר לוגיסטי")) {
+            newContacts.records[0].fields["משפחות רשומות 2"] = [familyId];
+        }
+        if (contact.role.some(r => r == "חולה")) {
+            newContacts.records[0].fields["משפחות רשומות"] = [familyId];
+        }
+
         await AirTableInsert(tables.Contacts, newContacts);
     } else {
         // First read the current contact:
@@ -198,6 +193,17 @@ export async function upsertContact(contact: Contact, familyId: string) {
         if (existingContact.phone !== contact.phone) {
             contact.manychatId = await updateManyChatSubscriber(contact.manychatId, contact.firstName, contact.lastName,
                 contact.gender == "אישה" ? "female" : "male", normilizePhone(contact.phone));
+        }
+        const familyLink: any = {
+            "משפחות רשומות 2": undefined,
+            "משפחות רשומות": undefined,
+        };
+
+        if (contact.role.some(r => r == "איש קשר לוגיסטי")) {
+            familyLink["משפחות רשומות 2"] = [familyId];
+        }
+        if (contact.role.some(r => r == "חולה")) {
+            familyLink["משפחות רשומות"] = [familyId];
         }
 
         await AirTableUpdate(tables.Contacts, contact.id, {
@@ -212,6 +218,7 @@ export async function upsertContact(contact: Contact, familyId: string) {
                 "תעודת זהות": contact.idNumber,
                 "סוג הקשר לחולה": contact.relationToPatient,
                 "manychat_id": contact.manychatId,
+                ...familyLink,
             },
         });
     }

@@ -138,7 +138,9 @@ const ContactList: React.FC<ContactListProps> = ({ family, appServices, reload, 
             <DataTable value={contacts} className="p-datatable-gridlines" dir='rtl'>
                 <Column field="firstName" header="שם פרטי" />
                 <Column field="lastName" header="שם משפחה" />
-                <Column field="role" header="תפקיד" />
+                <Column body={(rowData) =>
+                    rowData.role?.map((r: string) => (<span>-{r}<br /></span>))
+                } header="תפקיד" style={{ textAlign: "right" }} />
                 <Column field="email" header="Email" />
                 <Column field="phone" header="טלפון" />
                 <Column
@@ -362,25 +364,7 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices
                         }}
                     />
                 </div>
-                {/* Cities
-                <div className="p-field p-col-12">
-                    <label htmlFor="cities">ערים</label>
-                    <MultiSelect
-                        id="cities"
-                        value={formData.cities.map((city) => city.id)}
-                        options={allCities.map((city) => ({ label: city.name, value: city.id }))}
-                        onChange={(e) =>
-                            setFormData((prev) => ({
-                                ...prev,
-                                cities: (e.value as string[]).map((id) =>
-                                    allCities.find((city) => city.id === id)!
-                                ),
-                            }))
-                        }
-                        placeholder="בחר ערים"
-                        display="chip"
-                    />
-                </div> */}
+
                 {/* Age */}
                 <div className="p-field w-2 p-md-6">
                     <label htmlFor="age">גיל</label>

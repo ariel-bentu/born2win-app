@@ -1056,8 +1056,56 @@ async function migrateHolidays() {
     
 }
 
-migrateHolidays();
+async function migrateContacts() {
+    const q = new AirTableQuery<any>("אנשי קשר", (rec => rec));
+    const all = await q.execute();
+    let count = 0;
+    const update = {records: [] as any[]};
+
+
+    for (const h of all) {
+
+        const familyId = getSafeFirstArrayElement(h.fields["משפחות רשומות"], undefined) || getSafeFirstArrayElement(h.fields["משפחות רשומות 2"], undefined);
+        if (!familyId) continue;
+
+        
+
+        const familyLink:any = {
+            "משפחות רשומות 2": [],
+            "משפחות רשומות": [],
+        };
+
+        if (h.fields["תפקיד"]?.some((r:any)=>r == "איש קשר לוגיסטי")) {
+            familyLink["משפחות רשומות 2"] = [familyId];
+        }
+        if (h.fields["תפקיד"]?.some((r:any)=>r == "חולה")) {
+            familyLink["משפחות רשומות"] = [familyId];
+        }
+        update.records.push({
+            "id": h.id,
+            "fields": familyLink,
+        });
+
+        count++;
+        if (count == 10) {
+            console.log("push 10")
+            await AirTableUpdateBatch("אנשי קשר", update);
+            update.records = [];
+            count = 0;
+        }
+
+    }
+
+    if (update.records.length > 0) {
+        await AirTableUpdateBatch("אנשי קשר", update);
+    }
+    
+    console.log("done")
+}
+
+//migrateHolidays();
 // migrateMeals()
+//migrateContacts()
 
 
 function mealAirtable2FamilyDemand(demand: AirTableRecord, familyCityName: string, volunteerCityName: string, active: boolean): FamilyDemand {

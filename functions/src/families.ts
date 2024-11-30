@@ -136,7 +136,7 @@ function contactAirtable2Contact(rec: AirTableRecord): Contact {
 export async function getFamilyContacts(familyId: string): Promise<Contact[]> {
     // eslint-disable-next-line new-cap
     const query = new AirTableQuery<Contact>(tables.Contacts, contactAirtable2Contact);
-    return query.execute([`OR(${airtableArrayCondition("families2", familyId)},${airtableArrayCondition("families", familyId)})`]);
+    return query.execute([airtableArrayCondition("families2", familyId)]);
 }
 
 export async function deleteContact(id: string) {
@@ -174,17 +174,11 @@ export async function upsertContact(contact: Contact, familyId: string) {
                         "manychat_id": contact.manychatId,
                         "סוג הקשר לחולה": contact.relationToPatient,
                         "ערים": cities,
+                        "משפחות רשומות 2": [familyId],
                     },
                 },
             ],
         };
-
-        if (contact.role.some(r => r == "איש קשר לוגיסטי")) {
-            newContacts.records[0].fields["משפחות רשומות 2"] = [familyId];
-        }
-        if (contact.role.some(r => r == "חולה")) {
-            newContacts.records[0].fields["משפחות רשומות"] = [familyId];
-        }
 
         await AirTableInsert(tables.Contacts, newContacts);
     } else {
@@ -194,17 +188,7 @@ export async function upsertContact(contact: Contact, familyId: string) {
             contact.manychatId = await updateManyChatSubscriber(contact.manychatId, contact.firstName, contact.lastName,
                 contact.gender == "אישה" ? "female" : "male", normilizePhone(contact.phone));
         }
-        const familyLink: any = {
-            "משפחות רשומות 2": undefined,
-            "משפחות רשומות": undefined,
-        };
 
-        if (contact.role.some(r => r == "איש קשר לוגיסטי")) {
-            familyLink["משפחות רשומות 2"] = [familyId];
-        }
-        if (contact.role.some(r => r == "חולה")) {
-            familyLink["משפחות רשומות"] = [familyId];
-        }
 
         await AirTableUpdate(tables.Contacts, contact.id, {
             fields: {
@@ -218,7 +202,7 @@ export async function upsertContact(contact: Contact, familyId: string) {
                 "תעודת זהות": contact.idNumber,
                 "סוג הקשר לחולה": contact.relationToPatient,
                 "manychat_id": contact.manychatId,
-                ...familyLink,
+                "משפחות רשומות 2": [familyId],
             },
         });
     }

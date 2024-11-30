@@ -29,8 +29,8 @@ import { confirmPopup } from 'primereact/confirmpopup';
 const roles = [
     'חולה',
     'איש קשר לוגיסטי',
-    'איש קשר לשלב הסינון',
-    'מגיש הטופס',
+    // 'איש קשר לשלב הסינון',
+    // 'מגיש הטופס',
 ];
 
 const genders = ['אישה', 'גבר', 'אחר'];

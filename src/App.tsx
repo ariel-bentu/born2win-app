@@ -114,7 +114,7 @@ function App() {
     const [latestVersion, setLatestVersion] = useState<string | undefined>();
     const [newVersionExists, setNewVersionExists] = useState<boolean>(false);
     const [blockUserWithMessage, setBlockUserWithMessage] = useState<ReactNode | undefined>();
-
+    const [notificationsReady, setNotificationsReady] = useState<boolean>(true);
 
     const onAuth: NextOrObserver<User> = (user: User | null) => {
         console.log("OnAuth - Login callback called", user);
@@ -419,12 +419,33 @@ function App() {
         }
     }, [user, userInfo, isTokenAdmin])
 
+
+    const checkNotificationToken = (userInfo: UserInfo) => {
+        // check if notification is enabled
+        if (!userInfo?.notificationToken) {
+            setNotificationsReady(false);
+        } else {
+            setNotificationsReady(true);
+            console.log("token exists in server")
+            // try obtaining token
+            api.getLatestTokenPersisted().then(token => {
+                if (!token || token != userInfo.notificationToken?.token) {
+                    console.log("mismatch token", token)
+                    setNotificationsReady(false);
+                }
+            }).catch((e) => console.log("attemp to load token failed", e));
+        }
+    }
+
+
     useEffect(() => {
         if (!offline && (isPWA || isDev || oldUrlParamID) && user && isNotEmpty(volunteerId)) {
             console.log("Loading UserInfo ");
             api.getUserInfo(volunteerId).then((uInfo) => {
                 console.log("UserInfo set to", uInfo.firstName);
                 setUserInfo(uInfo);
+
+                checkNotificationToken(uInfo)
             }).catch(err => {
                 if (err.message === Errors.UserAlreadyOnboardedToApp) {
                     // cannot use old URL any more
@@ -535,7 +556,10 @@ function App() {
                     appServices.showMessage('success', 'נשמר בהצלחה', 'הודעות אושרו בהצלחה');
                     setNotificationPermission("granted");
                     if (user && isNotEmpty(volunteerId)) {
-                        api.getUserInfo(volunteerId).then(uInfo => setUserInfo(uInfo));
+                        api.getUserInfo(volunteerId).then(uInfo => {
+                            setUserInfo(uInfo);
+                            checkNotificationToken(uInfo);
+                        });
                     }
                 });
             }
@@ -583,8 +607,8 @@ function App() {
     tab = 54
     */
 
-    const showRegToMessages = appReady && userInfo && !userInfo?.notificationToken;
-    const tabContentsTop = 161 + (showRegToMessages || newVersionExists ? 120 : 0);
+
+    const tabContentsTop = 161 + (!notificationsReady || newVersionExists ? 120 : 0);
 
     if (blockUserWithMessage) {
         return <div className="App text-2xl">
@@ -670,7 +694,7 @@ function App() {
             {error && <div>{error}</div>}
             {loading && !isNotificationTab && <InProgress />}
             {newVersionExists && <NewAppVersion onClick={() => window.location.reload()} />}
-            {showRegToMessages && !newVersionExists && <RegisterToNotification onClick={loading ? undefined : onAllowNotification} />}
+            {!notificationsReady && !newVersionExists && <RegisterToNotification onClick={loading ? undefined : onAllowNotification} />}
             {appReady &&
                 <TabView dir='rtl' renderActiveOnly={false} activeIndex={activeIndex} onTabChange={(e) => setActiveIndex(e.index)}>
                     <TabPanel headerStyle={{ fontSize: 20 }} header={<><span>הודעות</span>{unreadCount > 0 && <Badge className="msg-badge" value={unreadCount} severity="danger" size="normal" />}</>}>
@@ -711,10 +735,10 @@ function App() {
                                 <HolidaysAdmin userInfo={userInfo} appServices={appServices} topPosition={tabContentsTop} />}
                         </TabPanel>
                     }
-                    {userInfo && contactsAdmin && 
+                    {userInfo && contactsAdmin &&
                         <TabPanel headerStyle={{ fontSize: 20 }} header="אנשי קשר">
                             {activeIndex === 7 &&
-                                <ContactsManager userInfo={userInfo} appServices={appServices}/>}
+                                <ContactsManager userInfo={userInfo} appServices={appServices} />}
                         </TabPanel>
                     }
 

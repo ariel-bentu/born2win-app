@@ -54,7 +54,7 @@ export let impersonateUser: {
     phone?: string;
 } | undefined = undefined;
 
-export function init(onAuth: NextOrObserver<User>) {
+export async function init(onAuth: NextOrObserver<User>) {
     if (!app) {
         app = initializeApp(firebaseConfig);
         const messaging = getMessaging(app);
@@ -62,9 +62,16 @@ export function init(onAuth: NextOrObserver<User>) {
         let m_any: any = messaging;
         m_any.vapidKey = VAPID_KEY;
 
+
         if ("serviceWorker" in navigator) {
-            navigator.serviceWorker.register("service-worker.js").then((swReg) => {
+            await navigator.serviceWorker.register("service-worker.js", {
+                scope:
+                    window.location.href.startsWith("http://localhost") ? "http://localhost:3000/firebase-messaging-sw.js" :
+                        "https://app.born2win.org.il/firebase-messaging-sw.js"
+            }).then((swReg) => {
                 serviceWorkerRegistration = swReg;
+                m_any.swRegistration = swReg;
+                console.log("WSReg", swReg)
             });
             window.addEventListener('beforeinstallprompt', (e) => {
                 e.preventDefault();
@@ -126,6 +133,64 @@ export function getUserInfo(volunteerId: string): Promise<UserInfo> {
 export function analyticLog(component: string, action: string) {
     logEvent(analytics, component + ":" + action);
 }
+
+export async function getLatestTokenPersisted(): Promise<string | null> {
+    const dbName = 'firebase-messaging-database';
+    const storeName = 'firebase-messaging-store';
+
+    return new Promise((resolve, reject) => {
+        // Open the IndexedDB database
+        const request = indexedDB.open(dbName);
+
+        request.onerror = (event) => {
+            console.error('Error opening IndexedDB:', event);
+            reject('Failed to open IndexedDB');
+        };
+
+        request.onsuccess = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result;
+
+            // Open a transaction and access the store
+            const transaction = db.transaction(storeName, 'readonly');
+            const store = transaction.objectStore(storeName);
+
+            const tokens: { token: string; createTime: number }[] = [];
+
+            // Iterate through all records
+            const cursorRequest = store.openCursor();
+            cursorRequest.onerror = (cursorEvent) => {
+                console.error('Error reading IndexedDB:', cursorEvent);
+                reject('Failed to read from IndexedDB');
+            };
+
+            cursorRequest.onsuccess = (cursorEvent) => {
+                const cursor = (cursorEvent.target as any)?.result;
+                if (cursor) {
+                    const value = cursor.value;
+                    if (value.subscriptionOptions?.vapidKey === VAPID_KEY) {
+                        tokens.push({ token: value.token, createTime: value.createTime });
+                    }
+                    cursor.continue();
+                } else {
+                    // No more records, process the results
+                    if (tokens.length > 0) {
+                        // Find the token with the latest createTime
+                        const latestToken = tokens.reduce((latest, current) =>
+                            current.createTime > latest.createTime ? current : latest
+                        );
+                        resolve(latestToken.token);
+                    } else {
+                        // No matching tokens found
+                        resolve(null);
+                    }
+                }
+            };
+        };
+    });
+}
+
+
+
 
 export async function getFCMToken() {
     const messaging = getMessaging(app);

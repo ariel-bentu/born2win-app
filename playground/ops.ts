@@ -137,11 +137,12 @@ class AirTableQuery<T> {
         this.mapper = mapper;
     }
 
-    async execute(filters?: string[]): Promise<T[]> {
-        const url = `https://api.airtable.com/v0/${mainBase.value()}/${encodeURIComponent(this.tableName)}`;
+    async execute(filters?: string[], apikey = "", baseIn = ""): Promise<T[]> {
+        const base = baseIn.length > 0 ? baseIn : mainBase.value();
+        const url = `https://api.airtable.com/v0/${base}/${encodeURIComponent(this.tableName)}`;
 
         let offset: string | undefined;
-        const apiKey = born2winApiKey.value();
+        const apiKey = apikey.length > 0 ?apikey : born2winApiKey.value();
 
         const headers = {
             Authorization: `Bearer ${apiKey}`,
@@ -160,7 +161,11 @@ class AirTableQuery<T> {
                 console.log(err)
             });
 
-            offset = response.data.offset;
+            if (response && response.data) {
+                offset = response.data.offset;
+            } else {
+                console.log("ttt")
+            }
             if (response.data.records) {
                 results = results.concat(response.data.records.map((record: AirTableRecord) => this.mapper(record)));
             }
@@ -1057,50 +1062,45 @@ async function migrateHolidays() {
 }
 
 async function migrateContacts() {
+    try{
     const q = new AirTableQuery<any>("אנשי קשר", (rec => rec));
     const all = await q.execute();
+
+    const f = new AirTableQuery<any>("משפחות רשומות", (rec => rec));
+
+    const families = await f.execute();
+
     let count = 0;
-    const update = {records: [] as any[]};
+
+    for (const fam of families) {
+        const contacts = fam.fields["פרטי קשר של המשפחה"];
+        if (contacts && new Set(contacts).size !== contacts.length) {
+            console.log("duplicates", fam)
+        }
+    }
 
 
-    for (const h of all) {
+    // for (const contact of all) {
+    //     const f2 = contact.fields["משפחות רשומות 2"];
+    //     if (!f2) continue;
 
-        const familyId = getSafeFirstArrayElement(h.fields["משפחות רשומות"], undefined) || getSafeFirstArrayElement(h.fields["משפחות רשומות 2"], undefined);
-        if (!familyId) continue;
+    //     const familyIds = f2.map((ff:string)=>families.find(f=>f.id == ff));
+    //     if (familyIds.length > 1) {
+    //         console.log("more than one family", contact)
+    //     } else if (familyIds.length == 1){
+    //         const contacts = families.find(f=>f.id = familyIds[0])?.fields["פרטי קשר של המשפחה"];
+    //         if (contacts?.length > 1 ) {
+    //             console.log("more than one contact", contacts)
+    //         }
+    //     }
 
+
+    // }
         
-
-        const familyLink:any = {
-            "משפחות רשומות 2": [],
-            "משפחות רשומות": [],
-        };
-
-        if (h.fields["תפקיד"]?.some((r:any)=>r == "איש קשר לוגיסטי")) {
-            familyLink["משפחות רשומות 2"] = [familyId];
-        }
-        if (h.fields["תפקיד"]?.some((r:any)=>r == "חולה")) {
-            familyLink["משפחות רשומות"] = [familyId];
-        }
-        update.records.push({
-            "id": h.id,
-            "fields": familyLink,
-        });
-
-        count++;
-        if (count == 10) {
-            console.log("push 10")
-            await AirTableUpdateBatch("אנשי קשר", update);
-            update.records = [];
-            count = 0;
-        }
-
-    }
-
-    if (update.records.length > 0) {
-        await AirTableUpdateBatch("אנשי קשר", update);
-    }
-    
     console.log("done")
+} catch(e){
+    console.log(e)
+}
 }
 
 //migrateHolidays();

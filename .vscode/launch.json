@@ -13,7 +13,16 @@
                 "program": "${workspaceFolder}/playground/ops.ts",
                 "outFiles": ["${workspaceFolder}/playground/dist/**/*.js"],
                 "skipFiles": ["<node_internals>/**"],
-                "envFile": "${workspaceFolder}/functions/.env.born2win-prod"
+                "envFile": "${workspaceFolder}/functions/.env.born2win-prod",
+              },
+              {
+                "localRoot": "${workspaceFolder}/playground",
+                "type": "node",
+                "request": "launch",
+                "name": "run ops.js",
+                "program": "${workspaceFolder}/playground/dist/playground/ops.js",
+                "skipFiles": ["<node_internals>/**"],
+                "envFile": "${workspaceFolder}/functions/.env.born2win-prod",
               }
     ]
 }

@@ -301,7 +301,11 @@ function addMeal(demandsArray: FamilyDemand[], meals: FamilyDemand[], families: 
     // Find meals in this day, or any other day in the same week.
     // The reason for the week range, is that when a family's cooking days change, and a meal is already scheduled, we
     // do not want another day to be openned
-    if (!uniqueInWeek || !meals.filter(m => m.status == Status.Occupied).find(m => dayjs(m.date).locale("he").isSame(date, "week") &&
+    const filterDateExisting = uniqueInWeek ?
+        (m: FamilyDemand) => dayjs(m.date).locale("he").isSame(date, "week") :
+        (m: FamilyDemand) => dayjs(m.date).locale("he").isSame(date, "day");
+
+    if (!meals.filter(m => m.status == Status.Occupied).find(m => filterDateExisting(m) &&
         m.mainBaseFamilyId == family.id &&
         type == m.type)) {
         demandsArray.push({

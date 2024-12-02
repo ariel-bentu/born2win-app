@@ -1,7 +1,7 @@
 import axios from "axios";
 import dayjs, { Dayjs } from "dayjs";
 
-import { AirTableRecord, Collections, FamilyDemand, FamilyDetails,  UserRecord, NotificationChannels, GenerateLinkPayload, OpenFamilyDemands, VolunteerInfo, VolunteerInfoPayload, GetDemandsPayload, Errors, Status, Contact, VolunteerType, EventType } from "../src/types";
+import { AirTableRecord, Collections, FamilyDemand, FamilyDetails, UserRecord, NotificationChannels, GenerateLinkPayload, OpenFamilyDemands, VolunteerInfo, VolunteerInfoPayload, GetDemandsPayload, Errors, Status, Contact, VolunteerType, EventType } from "../src/types";
 export const DATE_AT = "YYYY-MM-DD";
 const DATE_TIME = "YYYY-MM-DD HH:mm";
 
@@ -142,7 +142,7 @@ class AirTableQuery<T> {
         const url = `https://api.airtable.com/v0/${base}/${encodeURIComponent(this.tableName)}`;
 
         let offset: string | undefined;
-        const apiKey = apikey.length > 0 ?apikey : born2winApiKey.value();
+        const apiKey = apikey.length > 0 ? apikey : born2winApiKey.value();
 
         const headers = {
             Authorization: `Bearer ${apiKey}`,
@@ -914,20 +914,25 @@ async function syncBorn2WinUsers(sinceDate?: any) {
 // })
 
 async function migrateUsers() {
-    db.collection(Collections.Users).get().then(res => {
+    db.collection(Collections.Users).get().then(async (res) => {
+        let i = 1
+        let sum = "לא נרשמו להודעות\n"
         for (const doc of res.docs) {
-            if (!doc.data().mahoz) {
-                console.log("missing", doc.id)
-                doc.ref.update({
-                    districts: []
-                })
-
+            if (doc.data().loginInfo && (!doc.data().notificationTokens || doc.data().notificationTokens.length == 0) && !!doc.data().active) {
+                sum += i + ". " + doc.data().firstName + " " + doc.data().lastName + "\n"; //+(doc.data().loginInfo[0].isIOS?" IOS":" Android" )+"\n"
+                i++
+                // if (doc.data().manychat_id){
+                // await sendToManychat(doc.data().manychat_id, "content20241130162157_600222", {}).catch(e=>{
+                //     console.log("send error", e)
+                // });
+                // }
             }
+
             // doc.ref.update({
             //     districts: [doc.data().mahoz]
             // })
         }
-        console.log("Done migrating users")
+        console.log(sum)
     })
 }
 //migrateUsers()
@@ -988,9 +993,9 @@ async function findDanglingContacts() {
         if (!families && !families2) {
             dangling++
             continue;
-        } else if (families  && families2) {
+        } else if (families && families2) {
             continue;
-        } 
+        }
 
         ok++
         // const list = c.fields["משפחות רשומות"] ? c.fields["משפחות רשומות"] :  c.fields["משפחות רשומות 2"];
@@ -1012,14 +1017,14 @@ async function migrateMeals() {
     const q = new AirTableQuery<any>("ארוחות", (rec => rec));
     const all = await q.execute();
     let count = 0;
-    const update = {records: [] as any[]};
+    const update = { records: [] as any[] };
 
     for (let c of all) {
         update.records.push({
-                "id": c.id,
-                "fields": {
-                  "סוג": "ארוחה"
-                }
+            "id": c.id,
+            "fields": {
+                "סוג": "ארוחה"
+            }
         })
         count++;
         if (count == 10) {
@@ -1033,7 +1038,7 @@ async function migrateMeals() {
     if (update.records.length > 0) {
         await AirTableUpdateBatch("ארוחות", update);
     }
-    
+
 }
 
 
@@ -1056,51 +1061,51 @@ async function migrateHolidays() {
         //     fields["סוג"] = "חסימה/החלפת תאריך למשפחה";
         // }
 
-        await AirTableUpdate("חגים וחריגים", h.id,  {fields});
+        await AirTableUpdate("חגים וחריגים", h.id, { fields });
     }
-    
+
 }
 
 async function migrateContacts() {
-    try{
-    const q = new AirTableQuery<any>("אנשי קשר", (rec => rec));
-    const all = await q.execute();
+    try {
+        const q = new AirTableQuery<any>("אנשי קשר", (rec => rec));
+        const all = await q.execute();
 
-    const f = new AirTableQuery<any>("משפחות רשומות", (rec => rec));
+        const f = new AirTableQuery<any>("משפחות רשומות", (rec => rec));
 
-    const families = await f.execute();
+        const families = await f.execute();
 
-    let count = 0;
+        let count = 0;
 
-    for (const fam of families) {
-        const contacts = fam.fields["פרטי קשר של המשפחה"];
-        if (contacts && new Set(contacts).size !== contacts.length) {
-            console.log("duplicates", fam)
+        for (const fam of families) {
+            const contacts = fam.fields["פרטי קשר של המשפחה"];
+            if (contacts && new Set(contacts).size !== contacts.length) {
+                console.log("duplicates", fam)
+            }
         }
+
+
+        // for (const contact of all) {
+        //     const f2 = contact.fields["משפחות רשומות 2"];
+        //     if (!f2) continue;
+
+        //     const familyIds = f2.map((ff:string)=>families.find(f=>f.id == ff));
+        //     if (familyIds.length > 1) {
+        //         console.log("more than one family", contact)
+        //     } else if (familyIds.length == 1){
+        //         const contacts = families.find(f=>f.id = familyIds[0])?.fields["פרטי קשר של המשפחה"];
+        //         if (contacts?.length > 1 ) {
+        //             console.log("more than one contact", contacts)
+        //         }
+        //     }
+
+
+        // }
+
+        console.log("done")
+    } catch (e) {
+        console.log(e)
     }
-
-
-    // for (const contact of all) {
-    //     const f2 = contact.fields["משפחות רשומות 2"];
-    //     if (!f2) continue;
-
-    //     const familyIds = f2.map((ff:string)=>families.find(f=>f.id == ff));
-    //     if (familyIds.length > 1) {
-    //         console.log("more than one family", contact)
-    //     } else if (familyIds.length == 1){
-    //         const contacts = families.find(f=>f.id = familyIds[0])?.fields["פרטי קשר של המשפחה"];
-    //         if (contacts?.length > 1 ) {
-    //             console.log("more than one contact", contacts)
-    //         }
-    //     }
-
-
-    // }
-        
-    console.log("done")
-} catch(e){
-    console.log(e)
-}
 }
 
 //migrateHolidays();
@@ -1158,7 +1163,7 @@ export async function getDemands(
     }
 
     if (type != VolunteerType.Any) {
-        filters.push(`{סוג}='${type}'`);
+        //filters.push(`{סוג}='${type}'`);
     }
 
     // eslint-disable-next-line quotes
@@ -1280,7 +1285,12 @@ function addMeal(demandsArray: FamilyDemand[], meals: FamilyDemand[], families: 
     // Find meals in this day, or any other day in the same week.
     // The reason for the week range, is that when a family's cooking days change, and a meal is already scheduled, we
     // do not want another day to be openned
-    if (!uniqueInWeek || !meals.filter(m => m.status == Status.Occupied).find(m => dayjs(m.date).locale("he").isSame(date, "week") &&
+    const filterDateExisting = uniqueInWeek ?
+        (m: FamilyDemand) => dayjs(m.date).locale("he").isSame(date, "week") :
+        (m: FamilyDemand) => dayjs(m.date).locale("he").isSame(date, "day")
+
+
+    if (!meals.filter(m => m.status == Status.Occupied).find(m => filterDateExisting(m) &&
         m.mainBaseFamilyId == family.id &&
         type == m.type)) {
         demandsArray.push({
@@ -1299,27 +1309,26 @@ function addMeal(demandsArray: FamilyDemand[], meals: FamilyDemand[], families: 
         });
     }
 }
-export function getDatesBetween(startDateIn:string, endDateIn:string) {
+export function getDatesBetween(startDateIn: string, endDateIn: string) {
     const dates = [];
     let currentDate = dayjs(startDateIn);
     const endDate = dayjs(endDateIn);
-  
+
     // Loop until the current date is after the end date
     while (currentDate.isSame(endDate) || currentDate.isBefore(endDate)) {
-      dates.push(currentDate.format('YYYY-MM-DD'));
-      currentDate = currentDate.add(1, 'day');
+        dates.push(currentDate.format('YYYY-MM-DD'));
+        currentDate = currentDate.add(1, 'day');
     }
-  
+
     return dates;
-  }
+}
 
 
-//   getDemands("recmLo9MWRxmrLEsM", Status.Occupied, VolunteerType.Any, dayjs().add(1, "day").format(DATE_AT),
-//   dayjs().add(45, "days").format(DATE_AT),"rec6LsfiNvuwykEei"
-    
-// //    "2024-11-30", "2024-12-31"
-// ).then(demands=>
-//   {
+// getDemands("recmLo9MWRxmrLEsM", Status.Available, VolunteerType.Any, dayjs().add(1, "day").format(DATE_AT),
+//     dayjs().add(15, "days").format(DATE_AT),
+
+//     //    "2024-11-30", "2024-12-31"
+// ).then(demands => {
 //     console.log(demands.length)
-//   }
-//   )
+// }
+// )

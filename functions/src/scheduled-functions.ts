@@ -30,6 +30,7 @@ enum ManyChatFlows {
     FamilyFourWeekSummary = "content20241008192343_098603",
     SendOldLink = "content20230824123136_725765",
     SendInstallMessage = "content20241013201532_353172",
+    RegisterToMessages = "content20241130162157_600222",
 }
 
 export async function weeklyNotifyFamilies() {

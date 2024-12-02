@@ -409,14 +409,15 @@ function App() {
                 // Force a token refresh
                 user.getIdToken(true);
             }
-
-            if (userInfo && userInfo.needToSignConfidentiality && userInfo.needToSignConfidentiality.length > 0) {
-                setBlockUserWithMessage(<div>
-                    <h3>מתנדב.ת יקר.ה, נדרשת חתימה על הסכם סודיות עם העמותה</h3>
-                    <Button label="מעבר לחתימה על הסכם סודיות" onClick={() => openAppUrl(userInfo.needToSignConfidentiality || "")} />
-                </div>);
-            }
         }
+        
+        if (userInfo && userInfo.needToSignConfidentiality && userInfo.needToSignConfidentiality.length > 0) {
+            setBlockUserWithMessage(<div>
+                <h3>מתנדב.ת יקר.ה, נדרשת חתימה על הסכם סודיות עם העמותה</h3>
+                <Button label="מעבר לחתימה על הסכם סודיות" onClick={() => openAppUrl(userInfo.needToSignConfidentiality || "")} />
+            </div>);
+        }
+
     }, [user, userInfo, isTokenAdmin])
 
 

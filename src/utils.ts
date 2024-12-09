@@ -150,3 +150,18 @@ export function getDatesBetween(startDateIn: string, endDateIn: string) {
 
     return dates;
 }
+
+export function isValidIsraeliIdentificationNumber(id: string | undefined) {
+    if (!id) return false;
+    if (id.length < 9) return false;
+
+    const idNum = parseInt(id);
+    id = String(id).trim();
+    if (id.length > 9 || isNaN(idNum)) return false;
+
+    id = id.length < 9 ? ("00000000" + id).slice(-9) : id;
+    return Array.from(id, Number).reduce((counter, digit, i) => {
+        const step = digit * ((i % 2) + 1);
+        return counter + (step > 9 ? step - 9 : step);
+    }) % 10 === 0;
+}

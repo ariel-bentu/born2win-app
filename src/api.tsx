@@ -23,7 +23,8 @@ import {
     SendMessagePayload, UpdateDemandTransportationPayload, UpdateUserLoginPayload, UpsertHolidayPayload, UserInfo, VolunteerInfo, VolunteerInfoPayload,
     VolunteerType,
     GetOpenDemandPayload,
-    GetUserRegistrationsPayload
+    GetUserRegistrationsPayload,
+    UpdateIdentificationNumberPayload
 } from "./types";
 import { readAllNotifications } from "./notifications";
 import { getDB } from "./db";
@@ -237,6 +238,14 @@ export function updateLoginInfo(volunteerId: string | null | undefined, otp: str
 
     return updateLoginInfoFunc(uulp).then(res => res.data);
 }
+
+export function updateIdentificationNumber(identificationNumber:string) {
+    const updateIdentificationNumberFunc = httpsCallable(functions, 'UpdateIdentificationNumber');
+    const uulp = { identificationNumber } as UpdateIdentificationNumberPayload;
+
+    return updateIdentificationNumberFunc(uulp);
+}
+
 
 export async function updateUserNotification(notificationOn: boolean | undefined, token: string, isSafari: boolean) {
     // no impersonation

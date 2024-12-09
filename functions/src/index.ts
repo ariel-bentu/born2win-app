@@ -42,12 +42,13 @@ import {
     GetOpenDemandPayload,
     VolunteerType,
     GetUserRegistrationsPayload,
+    UpdateIdentificationNumberPayload,
 } from "../../src/types";
 import axios from "axios";
 import express = require("express");
 import crypto = require("crypto");
 import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
-import { getSafeFirstArrayElement, IL_DATE, replaceAll, simplifyFamilyName } from "../../src/utils";
+import { getSafeFirstArrayElement, IL_DATE, isValidIsraeliIdentificationNumber, replaceAll, simplifyFamilyName } from "../../src/utils";
 import localeData = require("dayjs/plugin/localeData");
 import { SendLinkOrInstall, weeklyNotifyFamilies } from "./scheduled-functions";
 import { AirTableQuery, AirTableUpdate, CachedAirTable } from "./airtable";
@@ -90,6 +91,11 @@ const usersWebHookMacSecretBase64 = defineString("BORM2WIN_AT_WEBHOOK_USERS_MAC"
 
 const familiesWebHookID = defineString("BORM2WIN_AT_WEBHOOK_FAMILIES_ID");
 const familiesWebHookMacSecretBase64 = defineString("BORM2WIN_AT_WEBHOOK_FAMILIES_MAC");
+
+const Tables = {
+    Volunteers: "מתנדבים",
+
+};
 
 /**
  * users collection
@@ -371,6 +377,27 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
     }
 });
 
+exports.UpdateIdentificationNumber = onCall({ cors: true }, async (request) => {
+    const doc = await authenticate(request);
+    const uinp = request.data as UpdateIdentificationNumberPayload;
+
+    await AirTableUpdate(Tables.Volunteers, doc.id, {
+        fields: {
+            "תעודת זהות": uinp.identificationNumber,
+        },
+    });
+
+    const docUpdate:any = {
+        missingIdentificationNumber: FieldValue.delete(),
+    };
+    if (doc.data().needToSignConfidentiality) {
+        docUpdate.needToSignConfidentiality = generateSignConfidentialityURL(doc.data().firstName, uinp.identificationNumber, doc.id);
+    }
+
+    await doc.ref.update(docUpdate);
+});
+
+
 async function updateVolunteerHasInstalled(volunteerId: string, date: string) {
     const updatedFields = {
         fields: {
@@ -519,6 +546,7 @@ async function getUserInfo(request: CallableRequest<any>): Promise<UserInfo> {
         districts: availableDistricts, // holds District id/name of all districts the user volunteers in, or relevant for admin
         needToSignConfidentiality: data.needToSignConfidentiality,
         active: data.active,
+        missingIdentificationNumber: data.missingIdentificationNumber,
     } as UserInfo;
 }
 
@@ -1540,6 +1568,7 @@ async function syncBorn2WinUsers(sinceDate?: any) {
             const docRef = db.collection(Collections.Users).doc(userId);
             const userDoc = await docRef.get();
             const isNeedToSignConfidentiality = (user.fields["חתם על שמירת סודיות"] !== "חתם");
+            const isMissingIdentificationNumber = !isValidIsraeliIdentificationNumber(user.fields["תעודת זהות"]);
 
             const userRecord = {
                 active: user.fields["פעיל"] == "פעיל",
@@ -1554,7 +1583,13 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                 volId: user.id,
                 manychat_id: user.fields.manychat_id || "",
                 cityId: getSafeFirstArrayElement(user.fields["ערים"], ""),
+                missingIdentificationNumber: isMissingIdentificationNumber,
             } as UserRecord;
+
+            if (isNeedToSignConfidentiality) {
+                userRecord.needToSignConfidentiality = generateSignConfidentialityURL(user.fields["שם פרטי"], user.fields["תעודת זהות"], userId);
+            }
+
 
             if (userDoc && userDoc.exists) {
                 const prevUserRecord = userDoc.data();
@@ -1566,6 +1601,8 @@ async function syncBorn2WinUsers(sinceDate?: any) {
                     userRecord.birthDate === prevUserRecord.birthDate &&
                     userRecord.gender === prevUserRecord.gender &&
                     userRecord.cityId === prevUserRecord.cityId &&
+                    !!userRecord.missingIdentificationNumber == !!prevUserRecord.missingIdentificationNumber &&
+                    userRecord.needToSignConfidentiality === prevUserRecord.needToSignConfidentiality &&
                     (isNeedToSignConfidentiality && prevUserRecord.needToSignConfidentiality ||
                         (!isNeedToSignConfidentiality && !prevUserRecord.needToSignConfidentiality))
                 ) {

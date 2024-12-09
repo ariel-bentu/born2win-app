@@ -31,6 +31,7 @@ import { Gallery } from './gallery';
 import { Button } from 'primereact/button';
 import { HolidaysAdmin } from './holidays';
 import ContactsManager from './families-mgmt';
+import { InputIdentificationNumber } from './input-id';
 
 const VOL_ID_STORAGE_KEY = "born2win_vol_id";
 const UNSUPPORTED_PWA = "born2win_pwa";
@@ -259,7 +260,7 @@ function App() {
     // hack until Apple fix the postMessage not recieved when app is openned
     // Poll every 10 seconds the local indexDB
     useEffect(() => {
-        if (isIOS && !oldUrlParamID) {
+        if (isIOS) {
             const interval = setInterval(() => {
                 if (document.visibilityState === "visible") {
                     setReloadNotifications(prev => prev + 1);
@@ -271,10 +272,6 @@ function App() {
 
     // INIT Firebase
     useEffect(() => {
-        if (oldUrlParamID) {
-            api.impersonate("OLD:" + oldUrlParamID, "OLD-AccessPoint id: " + oldUrlParamID);
-        }
-
         if (!offline) {
             console.log("Init firebase... ")
 
@@ -307,11 +304,6 @@ function App() {
     useEffect(() => {
         if (user && user.uid) {
 
-            if (oldUrlParamID) {
-                console.log("Compatibility to old UI, vid=", oldUrlParamID);
-                setVolunteerId(oldUrlParamID);
-                return;
-            }
             console.log("Login passed, initializing...", currentVolId);
 
             if (isPWA && isNotEmpty(currentVolId)) {
@@ -401,8 +393,8 @@ function App() {
     }, [user]);
 
 
-    // Refresh token for admins
     useEffect(() => {
+        // Refresh token for admins
         if (user && userInfo && isTokenAdmin !== undefined) {
             if (userInfo.isAdmin !== isTokenAdmin) {
                 console.log("Refresh user token");
@@ -410,13 +402,35 @@ function App() {
                 user.getIdToken(true);
             }
         }
-        
-        if (userInfo && userInfo.needToSignConfidentiality && userInfo.needToSignConfidentiality.length > 0) {
+
+        if (oldUrlParamID) {
             setBlockUserWithMessage(<div>
-                <h3>מתנדב.ת יקר.ה, נדרשת חתימה על הסכם סודיות עם העמותה</h3>
-                <Button label="מעבר לחתימה על הסכם סודיות" onClick={() => openAppUrl(userInfo.needToSignConfidentiality || "")} />
+                <h3>יש לגשת דרך האפליקציה</h3>
+                <div>אם מותקנת, סגור עמוד זה וכנס לאפליקציה</div>
+                <div>אם טרם מותקנת, התקן כאן: <a href="https://app.born2win.org.il">התקנה</a></div>
             </div>);
         }
+
+        if (userInfo && userInfo.missingIdentificationNumber) {
+            setBlockUserWithMessage(<div>
+                <h3>מתנדב.ת יקר.ה, ברישומינו חסרה תעודת הזהות שלך</h3>
+                <InputIdentificationNumber appServices={appServices} onUpdate={() => {
+                    setBlockUserWithMessage(<div>
+                        <h3>עדכונך התקבל, מיד תועבר.י להמשך</h3>
+                    </div>);
+                    setTimeout(() => window.location.reload(), 1500);
+                }} />
+            </div>);
+            return;
+        } else
+
+            if (userInfo && userInfo.needToSignConfidentiality && userInfo.needToSignConfidentiality.length > 0) {
+                setBlockUserWithMessage(<div>
+                    <h3>מתנדב.ת יקר.ה, נדרשת חתימה על הסכם סודיות עם העמותה</h3>
+                    <Button label="מעבר לחתימה על הסכם סודיות" onClick={() => openAppUrl(userInfo.needToSignConfidentiality || "")} />
+                    <Button label="לאחר חתימה לחץ כאן" onClick={() => window.location.reload()}></Button>
+                </div>);
+            }
 
     }, [user, userInfo, isTokenAdmin])
 

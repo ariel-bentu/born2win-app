@@ -150,6 +150,7 @@ export interface UserInfo {
     needToSignConfidentiality?: string;
     districts: District[],
     active: boolean;
+    missingIdentificationNumber?:boolean;
 }
 
 export interface LoginInfo {
@@ -157,6 +158,10 @@ export interface LoginInfo {
     fingerprint: string;
     createdAt: string;
     isIOS: boolean;
+}
+
+export interface UpdateIdentificationNumberPayload {
+    identificationNumber: string;
 }
 
 export interface UserRecord {
@@ -176,6 +181,7 @@ export interface UserRecord {
     gender: string;
     needToSignConfidentiality?: string | any;
     cityId: string;
+    missingIdentificationNumber?:boolean;
 }
 
 

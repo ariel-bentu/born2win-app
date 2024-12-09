@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { MultiSelect } from 'primereact/multiselect';
-import headerImg from './media/header.png';
 import bunnerImg from './media/reg-banner.png';
-import holidayTreatImg from './media/holiday-treat-banner.png';
-import footerImg from './media/registration-footer.png';
+import holidayTreatImg from './media/holiday-treat-banner.jpeg';
+import whatIsTreats from './media/what_is_pinukay.jpeg';
 
 import 'primereact/resources/themes/saga-blue/theme.css';
 import 'primereact/resources/primereact.min.css';
@@ -45,7 +44,6 @@ interface RegistrationComponentProps {
     appServices: AppServices;
     openDemandsTS: string;
     reloadOpenDemands: () => void;
-    standalone?: boolean;
     topPosition: number;
 }
 
@@ -56,7 +54,7 @@ interface CityAvailability {
 }
 
 function RegistrationComponent({ openDemands, appServices, actualUserId, openDemandsTS,
-    reloadOpenDemands, standalone, topPosition, userInfo }: RegistrationComponentProps) {
+    reloadOpenDemands, topPosition, userInfo }: RegistrationComponentProps) {
     const [cities, setCities] = useState<CityAvailability[]>([]);
     const [selectedCities, setSelectedCities] = useState<City[]>([]);
     const [familyDemands, setFamilyDemands] = useState<FamilyDemand[] | null>(null);
@@ -122,6 +120,7 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
             {!selectedFamily && userInfo?.isAdmin && holidayTreatsExists &&
 
                 <div className='flex flex-row justify-content-center relative'>
+
                     <SelectButton
                         pt={{ root: { className: "select-button-container" } }}
                         unstyled
@@ -145,45 +144,36 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
                     >
                         מה זה?
                     </a>
+
+
                 </div>
+
             }
-            <Dialog  style={{direction:"rtl"}} visible={showWhatsHolidayTreats} onHide={() => setShowWhatsHolidayTreats(false)} header=" מה זה פינוקי חג?">
-                <div className='registration-explain'>
+            <Dialog style={{ direction: "rtl", width:"95%" }} visible={showWhatsHolidayTreats} onHide={() => setShowWhatsHolidayTreats(false)}>
+                <img src={whatIsTreats} alt="פינוקי חג" style={{ maxWidth: "100%" }} />
+
+                {/* <div className='registration-explain'>
                     גם השנה ממשיכים במסורת של נולדת לנצח ונשלח למשפחות שלנו פינוקים לכבוד החג.💜
-                    <br/><br/>
+                    <br /><br />
                     מה זה פינוקים?! עוגה/עוגיות/ מארז טעים וכל מה שבא לכם להכין באווירת החג שיהיה להם מתוק בנשמה .
                     אפשרי לשתף את הילדים להכין ברכה מהממת 💞🌟
-                    <br/><br/>
-                    מתי?<br/>
+                    <br /><br />
+                    מתי?<br />
                     בשבוע של החג מוסרים בתיאום מראש לפי מה שנוח לכם
-                </div>
+                </div> */}
             </Dialog>
 
-            <div className="img-header">
-                {standalone && <img src={headerImg} />}
-            </div>
-            {standalone && <img src={bunnerImg} alt="Registration Banner" style={{ maxWidth: "100%" }} />}
-            {standalone && <div>
-                <div className='standalone-title bm-4'>נולדת לנצח - מחוז {userInfo && userInfo.userDistrict.name}</div>
-                <div className='m-2 standalone-text-desc'>
-                    <div className='m-2'>{userInfo && (userInfo.firstName + " " + userInfo.lastName)}</div>
-                    היי אנחנו מודים לך על הבחירה לחבק חולים ולהכניס להם נצנצים הביתה.
-                    <br />
-                    יש לבחור מטה את הערים שבהן תרצו לחבק משפחה. לאחר מכן בחרו משפחה כדי לראות באלו ימים ניתן למסור לה את הארוחות
-                </div>
 
-            </div>}
-            <div className={standalone ? 'standalone-dynamic-host' : "w-full"}>
-                <ScrollPanel style={{ width: "100%", height: standalone ? "100%" : window.innerHeight - topPosition }}
+            <div className={"w-full"}>
+                <ScrollPanel style={{ width: "100%", height: window.innerHeight - topPosition }}
                     pt={{
-                        wrapper: { className: "registration-scroller-wrapper", style: { paddingTop: standalone ? 40 : 0 } },
-                        content: { className: "registration-scroller-content " + (standalone ? "standalone-card" : ""), style: { width: Math.max(window.innerWidth - 50, 350) } }  // Pass class to the content
+                        wrapper: { className: "registration-scroller-wrapper", style: { paddingTop: 0 } },
+                        content: { className: "registration-scroller-content", style: { width: Math.max(window.innerWidth - 50, 350) } }  // Pass class to the content
                     }}
 
                 >
-                    {!standalone && !selectedFamily &&
+                    {!selectedFamily &&
                         <img src={mode == VolunteerType.Meal ? bunnerImg : holidayTreatImg} alt="Registration Banner" style={{ maxWidth: "70%" }} />}
-
 
 
                     {selectedFamily ?
@@ -200,7 +190,6 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
                             type={mode}
                         /> :
                         <>
-                            {standalone && <span className='standalone-text-title'>אלו הערים שבהן ניתן לחבק משפחות החודש</span>}
                             <MultiSelect
                                 value={selectedCities}
                                 options={cities.map(city => ({ label: city.name + (city.available ? "" : " (כל התאריכים תפוסים)"), value: city }))}
@@ -232,7 +221,6 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
 
             </div>
 
-            {standalone && <img src={footerImg} style={{ maxWidth: "100%" }} />}
         </div>
     );
 };

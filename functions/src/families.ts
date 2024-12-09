@@ -7,6 +7,7 @@ import { airtableArrayCondition, DATE_AT, getSafeFirstArrayElement, normilizePho
 import { getCities } from ".";
 import { createManyChatSubscriber, deleteManyChatSubscriber, updateManyChatSubscriber } from "./manychat";
 import dayjs = require("dayjs");
+import { logger } from "firebase-functions/v2";
 
 
 const tables = {
@@ -148,6 +149,7 @@ export async function deleteContact(id: string) {
 }
 
 export async function upsertContact(contact: Contact, familyId: string) {
+    logger.info("Upserting contact", familyId, contact);
     if (contact.id.length == 0) {
         // creates manychatid:
         contact.manychatId = await createManyChatSubscriber(contact.firstName, contact.lastName, contact.phone,
@@ -182,13 +184,8 @@ export async function upsertContact(contact: Contact, familyId: string) {
 
         await AirTableInsert(tables.Contacts, newContacts);
     } else {
-        // First read the current contact:
-        const existingContact = await AirTableGet<Contact>(tables.Contacts, contact.id, contactAirtable2Contact);
-        if (existingContact.phone !== contact.phone) {
-            contact.manychatId = await updateManyChatSubscriber(contact.manychatId, contact.firstName, contact.lastName,
-                contact.gender == "אישה" ? "female" : "male", normilizePhone(contact.phone));
-        }
-
+        contact.manychatId = await updateManyChatSubscriber(contact.manychatId, contact.firstName, contact.lastName,
+            normilizePhone(contact.phone), contact.gender == "אישה" ? "female" : "male",);
 
         await AirTableUpdate(tables.Contacts, contact.id, {
             fields: {

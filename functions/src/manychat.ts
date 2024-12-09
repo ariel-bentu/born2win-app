@@ -1,6 +1,7 @@
 import axios from "axios";
 import { manyChatApiKey } from ".";
 import { normilizePhone } from "../../src/utils";
+import { logger } from "firebase-functions/v2";
 
 const manyChatToDeleteTag = 54902569;
 const manyChatWAIDFieldId = 9103827;
@@ -13,9 +14,10 @@ export async function findManyChatSubscriber(phone: string): Promise<string | un
         },
     };
 
+    logger.info("Search Manychat contact:", normilizePhone(phone));
 
     const res = await axios.get(`https://api.manychat.com/fb/subscriber/findByCustomField?field_id=${manyChatWAIDFieldId}&field_value=${normilizePhone(phone, false)}`, httpOptions);
-    if (res.data?.status != "success") {
+    if (res.data?.status != "success" || res.data?.data.length == 0) {
         return undefined;
     }
     return res.data.data[0].id;
@@ -33,12 +35,17 @@ export async function createManyChatSubscriber(first_name: string, last_name: st
     // verify if exists already
     const existingId = await findManyChatSubscriber(phone);
     if (existingId) {
-        // todo update details
-
         // remove deleted tag
         await axios.post("https://api.manychat.com/fb/subscriber/removeTag", {
             "subscriber_id": existingId,
             "tag_id": manyChatToDeleteTag,
+        }, httpOptions);
+
+        await axios.post("https://api.manychat.com/fb/subscriber/updateSubscriber", {
+            subscriber_id: existingId,
+            first_name,
+            last_name,
+            gender,
         }, httpOptions);
 
 

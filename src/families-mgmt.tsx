@@ -22,6 +22,7 @@ import { openWhatsApp } from './notification-actions';
 import { InProgress } from './common-ui';
 import dayjs from 'dayjs';
 import { confirmPopup } from 'primereact/confirmpopup';
+import { nicePhone } from './utils';
 
 
 
@@ -142,7 +143,7 @@ const ContactList: React.FC<ContactListProps> = ({ family, appServices, reload, 
                     rowData.role?.map((r: string) => (<span>-{r}<br /></span>))
                 } header="תפקיד" style={{ textAlign: "right" }} />
                 <Column field="email" header="Email" />
-                <Column field="phone" header="טלפון" />
+                <Column body={(rowData) => nicePhone(rowData.phone)} header="טלפון" />
                 <Column
                     header="פעולות"
                     body={(rowData) => (
@@ -193,7 +194,7 @@ const ContactList: React.FC<ContactListProps> = ({ family, appServices, reload, 
 
                 header={currentContact ? 'עריכת איש קשר' : 'הוספת איש קשר'}
                 visible={openForm}
-                style={{ width: '50vw', direction: "rtl" }}
+                style={{ width: '95vw', direction: "rtl" }}
                 onHide={() => handleFormClose(false)}
             >
                 <ContactForm
@@ -271,7 +272,9 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices
     };
 
     const validatePhone = (e: any) => {
-        const value = e.target && e.target.value || e.value || e;
+        let value = e.target && e.target.value ? e.target.value : (e.value ? e.value : e);
+        value = nicePhone(value);
+
         if (!value) return false;
         if (!value.startsWith("05")) return false;
         if (value.length !== 10) return false;
@@ -353,9 +356,9 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices
                         id="phone"
                         keyfilter="pint"
                         inputMode="numeric"
-                        value={formData.phone}
+                        value={nicePhone(formData.phone)}
                         onChange={(e) => {
-                            if (validatePhone(e)) {
+                            if (validatePhone(e.target.value)) {
                                 setPhoneInvalid(false)
                             } else {
                                 setPhoneInvalid(true)

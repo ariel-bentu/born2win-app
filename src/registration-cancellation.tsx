@@ -4,7 +4,7 @@ import { InputTextarea } from "primereact/inputtextarea";
 import { Button } from "primereact/button";
 import { updateFamilyDemand } from "./api";
 import { FamilyDemand, UserInfo } from "./types";
-import { InProgress } from "./common-ui";
+import { InProgress, WhatsAppButton } from "./common-ui";
 import dayjs from "dayjs";
 import { openWhatsApp, WhatsAppPhoneNumber } from "./notification-actions";
 import { userInfo } from "os";
@@ -14,7 +14,7 @@ interface RegistrationCancellationProps {
     onError: (err: Error) => void;
     onCancellationPerformed: () => void;
     registration: FamilyDemand;
-    userInfo:UserInfo|null;
+    userInfo: UserInfo | null;
 }
 
 export default function RegistrationCancellation({ onClose, onCancellationPerformed, registration, onError, userInfo }: RegistrationCancellationProps) {
@@ -47,14 +47,10 @@ export default function RegistrationCancellation({ onClose, onCancellationPerfor
                         <div className="p-col-12 p-text-center">
                             {blockCancellation ?
                                 <p>{`נותרו עוד ${-daysLeft} ימים בלבד עד התנדבות זו. ביטול כה מאוחר יש לתאם עם העמותה.`}<br />
-                                <div className="flex align-items-center justify-content-center m-3">
-                                    צור קשר
-                                    <Button
-                                        icon="pi pi-whatsapp"
-                                        className="p-button-rounded p-button-success p-mr-2"
-                                        onClick={() => openWhatsApp(WhatsAppPhoneNumber, "נדרשת עזרה בתיאום ביטול")}
-                                        aria-label="WhatsApp"
-                                    />
+                                    <div className="flex align-items-center justify-content-center m-3">
+                                        צור קשר
+                                        <WhatsAppButton getPhone={() => WhatsAppPhoneNumber}
+                                            getText={() => "נדרשת עזרה בתיאום ביטול"} />
                                     </div>
                                 </p> :
                                 <p>האם אתה בטוח שברצונך לבטל את הרישום?</p>

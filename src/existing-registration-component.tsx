@@ -17,7 +17,7 @@ const Filters = {
     FUTURE: 1,
     array: [
         { name: 'עתידי', value: 1 },
-        { name: 'הכל', value: 2 },
+        { name: 'מתחילת החודש', value: 2 },
     ]
 }
 interface ExistingRegistrationsComponentProps {
@@ -107,7 +107,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
     );
 
     if (registrations.length === 0) return (
-        <div className='text-xl'>אין שיבוצים רשומים</div>
+        <div className='text-xl'>אין התנדבויות רשומות</div>
     )
 
     if (currentRegistration) {

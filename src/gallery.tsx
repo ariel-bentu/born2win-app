@@ -125,6 +125,8 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
         confirmPopup({
             message: `האם למחוק תמונה -  ${folderObj.items[index].name}?`,
             icon: 'pi pi-exclamation-triangle',
+            acceptLabel: "כן",
+            rejectLabel: "לא",
             accept: async () => {
                 const imageRef = ref(storage, `${storagePath}/${currentFolder}/${folderObj.items[index].name}`);
                 await deleteObject(imageRef);
@@ -159,6 +161,8 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
         confirmPopup({
             message: `האם למחוק תיקיה '${folderObj.name}' וכל התמונות שבתוכה?`,
             icon: 'pi pi-exclamation-triangle',
+            acceptLabel: "כן",
+            rejectLabel: "לא",
             accept: async () => {
                 await deleteFolder(`${storagePath}/${currentFolder}`);
                 appServices.showMessage('success', 'תיקיה נמחקה בהצלחה', '')
@@ -175,6 +179,8 @@ export const Gallery: React.FC<GalleryProps> = ({ storagePath, userInfo, appServ
         confirmPopup({
             message: `האם לשנות שם לתיקיה '${folderObj.name}' ל-'${newFolderName}'?`,
             icon: 'pi pi-exclamation-triangle',
+            acceptLabel: "כן",
+            rejectLabel: "לא",
             accept: async () => {
                 try {
                     setBusy(true);

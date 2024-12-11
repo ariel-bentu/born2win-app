@@ -7,7 +7,7 @@ import { analyticLog, getFamilyDetails, getVolunteerInfo, impersonateUser, updat
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
-import { ChannelHeader, InProgress, PhoneNumber } from "./common-ui";
+import { ChannelHeader, InProgress, PhoneNumber, WhatsAppButton } from "./common-ui";
 import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails, VolunteerInfo, VolunteerType } from "./types";
 import { isNotEmpty, nicePhone } from "./utils";
 import { ProgressSpinner } from "primereact/progressspinner";
@@ -298,12 +298,9 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                         )}
                         {impersonateUser && impersonateUser.phone && (<li className="flex align-items-center">
                             <strong>שלח פרטים ל{impersonateUser.name}</strong>
-                            <Button
-                                icon="pi pi-whatsapp"
-                                className="p-button-rounded p-button-info m-2"
-                                onClick={() => openWhatsApp(impersonateUser!.phone!, generateDetailsForWhatapp(familyDetails, family.city, date, volunteerInfo, transportingVolunteer, actualUserId))}
-                                aria-label="WhatsApp"
-                            />
+                            <WhatsAppButton
+                                getPhone={() => impersonateUser!.phone}
+                                getText={() => generateDetailsForWhatapp(familyDetails, family.city, date, volunteerInfo, transportingVolunteer, actualUserId)} />
                         </li>)}
                     </>}
                 </ul>}

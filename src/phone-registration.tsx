@@ -3,7 +3,7 @@ import { InputText } from "primereact/inputtext";
 import { useCallback, useState } from "react";
 import { AppServices } from "./types";
 import { updateLoginInfo } from "./api";
-import { InProgress } from "./common-ui";
+import { InProgress, WhatsAppButton } from "./common-ui";
 import { isIOS } from "./App";
 import { openWhatsApp, WhatsAppPhoneNumber } from "./notification-actions";
 
@@ -112,17 +112,9 @@ export default function PhoneRegistration({ appServices, onPhoneRegistrationComp
                     </a>
                     {showTroubleshoot && <div>
                         <div>לעיתים הודעת הוואסטאפ לא נשלחת, במקרה כזה מומלץ לשלוח ״הי״ לבוט של העמותה ולנסות שוב. לחץ על איקון הווטסאפ.</div>
-                        <Button
-                            icon="pi pi-whatsapp"
-                            className="p-button-rounded p-button-info m-2"
-                            onClick={() => {
-                                openWhatsApp(
-                                    WhatsAppPhoneNumber,
-                                    "הי מחכה לקוד שלא מגיע..."
-                                );
-                            }}
-                            aria-label="WhatsApp"
-                        />
+                        <WhatsAppButton
+                            getPhone={() => WhatsAppPhoneNumber}
+                            getText={() => "הי מחכה לקוד שלא מגיע..."} />
                     </div>}
                 </>
             }

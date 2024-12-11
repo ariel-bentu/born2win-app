@@ -16,7 +16,7 @@ import {
 import { generateDetailsForWhatapp } from './family-registration-details';
 
 
-import { InProgress, PhoneNumber, WeekSelectorSlider } from './common-ui';
+import { InProgress, PhoneNumber, WeekSelectorSlider, WhatsAppButton } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
 import { simplifyFamilyName, sortByDate } from './utils';
 import { Button } from 'primereact/button';
@@ -25,7 +25,6 @@ import { FamilyDetailsComponent } from './family-registration-details';
 import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete';
 import { OverlayPanel } from 'primereact/overlaypanel';
 import { ProgressSpinner } from 'primereact/progressspinner';
-import { ProgressBar } from 'primereact/progressbar';
 import { confirmPopup } from 'primereact/confirmpopup';
 import { Recipient } from './types';
 import { Dialog } from "primereact/dialog";
@@ -461,45 +460,27 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
                             <div><strong>שם מבשל</strong>: {volunteerInfo.firstName + " " + volunteerInfo.lastName}</div>
                             <PhoneNumber phone={volunteerInfo.phone} label="טלפון מבשל" />
                             {volunteerInfo && volunteerInfo.phone && (<li className="flex align-items-center">
-                                <strong>שלח פרטים ל{volunteerInfo.firstName + " " + volunteerInfo.lastName}</strong>
-                                <Button
-                                    icon="pi pi-whatsapp"
-                                    className="p-button-rounded p-button-info m-2"
-                                    onClick={() => {
-                                        if (volunteerInfo?.phone && familyDetails && selectedDateInfo?.parentFamily) {
-                                            openWhatsApp(
-                                                volunteerInfo.phone,
-                                                generateDetailsForWhatapp(familyDetails, selectedDateInfo.parentFamily.city, selectedDateInfo.date, volunteerInfo, transportingVolunteer, volunteerInfo.id)
-                                            );
-                                        }
-                                    }}
-                                    aria-label="WhatsApp"
-                                />
+                                <strong>שלח פרטים ל{ volunteerInfo.firstName + " " + volunteerInfo.lastName}</strong>
+                                <WhatsAppButton
+                                    getPhone={() => volunteerInfo?.phone}
+                                    getText={() => familyDetails ? generateDetailsForWhatapp(familyDetails, selectedDateInfo.parentFamily.city, selectedDateInfo.date, volunteerInfo, transportingVolunteer, volunteerInfo.id) : ""} />
                             </li>)}
                             {transportingVolunteer &&
                                 <div><strong>שם משנע</strong>: {transportingVolunteer ? transportingVolunteer.firstName + " " + transportingVolunteer.lastName : undefined}</div>}
                             {transportingVolunteer && <PhoneNumber phone={transportingVolunteer.phone} label="טלפון משנע" />}
                             {transportingVolunteer && transportingVolunteer.phone && (<li className="flex align-items-center">
                                 <strong>שלח פרטים ל{transportingVolunteer.firstName + " " + transportingVolunteer.lastName}</strong>
-                                <Button
-                                    icon="pi pi-whatsapp"
-                                    className="p-button-rounded p-button-info m-2"
-                                    onClick={() => {
-                                        if (transportingVolunteer?.phone && familyDetails && selectedDateInfo?.parentFamily) {
-                                            openWhatsApp(
-                                                transportingVolunteer.phone,
-                                                generateDetailsForWhatapp(familyDetails, selectedDateInfo.parentFamily.city, selectedDateInfo.date, volunteerInfo, transportingVolunteer, transportingVolunteer.id)
-                                            );
-                                        }
-                                    }}
-
-                                    aria-label="WhatsApp"
-                                />
+                                <WhatsAppButton
+                                    getPhone={() => transportingVolunteer?.phone}
+                                    getText={() => familyDetails && selectedDateInfo?.parentFamily ?
+                                        generateDetailsForWhatapp(familyDetails, selectedDateInfo.parentFamily.city, selectedDateInfo.date, volunteerInfo, transportingVolunteer, transportingVolunteer.id) : ""} />
                             </li>)}
                             <Button label="מחק התנדבות" onClick={() => {
                                 confirmPopup({
                                     message: 'האם למחוק התנדבות זו?',
                                     icon: 'pi pi-exclamation-triangle',
+                                    acceptLabel: "כן",
+                                    rejectLabel: "לא",
                                     accept: async () => {
                                         setCancelInProgress(true);
                                         updateFamilyDemand(selectedDateInfo.demandId, selectedDateInfo.mainBaseFamilyId, "cityId(unknown)", false,

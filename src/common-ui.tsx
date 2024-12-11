@@ -52,13 +52,13 @@ export function PhoneNumber({ phone, label, hideText }: { phone: string; label: 
         {!hideText ? nicePhone(phone) : ""}
         <Button
             icon="pi pi-whatsapp"
-            className="p-button-rounded p-button-info m-2"
+            className="p-button-rounded p-button-info m-2 round-button"
             onClick={() => openWhatsApp(phone, "")}
             aria-label="WhatsApp"
         />
         <Button
             icon="pi pi-phone"
-            className="p-button-rounded p-button-success m-2"
+            className="p-button-rounded p-button-success m-2 round-button"
             onClick={() => openPhoneDialer(phone)}
             aria-label="Phone"
         />
@@ -77,7 +77,7 @@ interface WeekSelectorSliderProps {
     max: number;
 }
 
-export function WeekSelectorSlider({ selectedWeeks, setSelectedWeeks , min, max}: WeekSelectorSliderProps) {
+export function WeekSelectorSlider({ selectedWeeks, setSelectedWeeks, min, max }: WeekSelectorSliderProps) {
 
     const marks = Array.from({ length: max - min + 1 }, (_, i) => max - i);
 
@@ -150,4 +150,22 @@ export function ChannelHeader({ name, onBack, icon }: ChannelHeaderProps) {
         </div>}
         <div className='text-2xl mr-2'>{name}</div>
     </div>
+}
+
+interface WhatsAppButtonProps {
+    getPhone: () => string | undefined;
+    getText: () => string;
+}
+export function WhatsAppButton({ getPhone, getText }: WhatsAppButtonProps) {
+    return <Button
+        icon="pi pi-whatsapp"
+        className="p-button-rounded p-button-info m-2 round-button"
+        onClick={() => {
+            const phone = getPhone();
+            if (phone) {
+                openWhatsApp(phone, getText());
+            }
+        }}
+        aria-label="WhatsApp"
+    />
 }

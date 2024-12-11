@@ -167,17 +167,6 @@ function App() {
                     console.log("version Loaded:", data.version);
                     setLatestVersion(data.version);
                 } else if (data.version && data.version !== latestVersion) {
-                    // New version detected
-                    // confirmPopup({
-                    //     message: "קיימת גרסא חדשה לאפליקציה, האם לטעון כעת?",
-                    //     icon: 'pi pi-exclamation-triangle',
-                    //     accept: () => {
-                    //         window.location.reload();
-                    //     },
-                    //     acceptLabel: "לטעון עכשיו",
-                    //     rejectLabel: "לא עכשיו"
-
-                    // });
                     setNewVersionExists(true);
                 }
             } catch (error) {
@@ -522,16 +511,6 @@ function App() {
             } else {
                 navState.isExiting = true;
                 window.history.back();
-                // if (!exiting) {
-                //     confirmPopup({
-                //         message: "האם לצאת מהאפליקציה?",
-                //         icon: 'pi pi-exclamation-triangle',
-                //         accept: () => {
-                //             exiting = true;
-                //             window.history.go(-2);
-                //         }
-                //     });
-                // }
             }
 
         }
@@ -630,28 +609,6 @@ function App() {
             {blockUserWithMessage}
         </div>
     }
-
-    // if (oldUrlParamID) {
-
-    //     // OLD URL SUPPORT - to remove after app launch
-    //     return <div className="App">
-    //         <ConfirmPopup />
-    //         <Toast ref={toast} />
-
-    //         {(isNotEmpty(volunteerId) && !error) ?
-    //             <RegistrationComponent
-    //                 userInfo={userInfo}
-    //                 topPosition={tabContentsTop}
-    //                 standalone={true}
-    //                 openDemands={getCachedOpenDemands()}
-    //                 openDemandsTS={openDemands?.fetchedTS.toISOString() || ""} appServices={appServices} actualUserId={oldUrlParamID}
-    //                 reloadOpenDemands={() => {
-    //                     getCachedOpenDemands(true);
-    //                 }} /> :
-    //             <InProgress />
-    //         }
-    //     </div>
-    // }
 
     const settings = <div style={{ display: "flex", flexDirection: "column", textAlign: "left", alignItems: "flex-start" }}>
         <div><strong>Technical Status:</strong></div>

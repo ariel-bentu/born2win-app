@@ -10,6 +10,7 @@ import { impersonate, impersonateUser, resetImpersonation } from "./api";
 import { Divider } from "primereact/divider";
 import { ProgressSpinner } from "primereact/progressspinner";
 import { WhatsAppPhoneNumber } from "./notification-actions";
+import { WhatsAppButton } from "./common-ui";
 
 interface HeaderProps {
     version: string | undefined;
@@ -102,34 +103,29 @@ function Header({ userName, logoSrc, settingsComponent, onRefreshTokenClick, onS
                     position={"right"}
                     style={{ width: 350 }}
                 >
-                    <div className="p-mt-3 w-full flex flex-row justify-content-evenly">
+                    <div className="p-mt-3 w-full flex flex-row justify-content-evenly align-items-center">
                         <Button
                             icon="pi pi-facebook"
-                            className="p-button-rounded p-button-primary p-mr-2"
+                            className="p-button-rounded p-button-primary p-mr-2 round-button"
                             onClick={() => openLink('https://www.facebook.com/BornToWinCancer?mibextid=ZbWKwL')}
                             aria-label="Facebook"
                         />
                         <Button
                             icon="pi pi-linkedin"
-                            className="p-button-rounded p-button-help"
+                            className="p-button-rounded p-button-help round-button"
                             onClick={() => openLink('https://www.linkedin.com/company/born-to-win-n-g-o/?viewAsMember=true')}
                             aria-label="LinkedIn"
                         />
                         <Button
                             icon="pi pi-instagram"
-                            className="p-button-rounded p-button-danger p-mr-2"
+                            className="p-button-rounded p-button-danger p-mr-2 round-button"
                             onClick={() => openLink('https://www.instagram.com/borntowinas/')}
                             aria-label="Instagram"
                         />
-                        <Button
-                            icon="pi pi-whatsapp"
-                            className="p-button-rounded p-button-success p-mr-2"
-                            onClick={() => openLink(`https://wa.me/${WhatsAppPhoneNumber}`)}
-                            aria-label="WhatsApp"
-                        />
+                        <WhatsAppButton getPhone={()=>WhatsAppPhoneNumber} getText={()=>""}/>
                         <Button
                             icon="pi pi-globe"
-                            className="p-button-rounded p-button-info"
+                            className="p-button-rounded p-button-info round-button"
                             onClick={() => openLink('https://www.born2win.org.il')}
                             aria-label="Website"
                         />

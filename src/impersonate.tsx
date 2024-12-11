@@ -4,12 +4,12 @@ import { isNotEmpty } from "./utils";
 import { AppServices, ShowToast, UserInfo } from "./types";
 import { Button } from "primereact/button";
 import { generateInstallationLinkForUser, handleSearchUsers } from "./api";
-import { InProgress } from "./common-ui";
+import { InProgress, WhatsAppButton } from "./common-ui";
 import { openWhatsApp } from "./notification-actions";
 
 interface ImpersonateProps {
     userInfo: UserInfo | null;
-    onChange: (userId: string | undefined, name?: string, phone?:string) => void;
+    onChange: (userId: string | undefined, name?: string, phone?: string) => void;
     appServices: AppServices;
     isImpersonated: boolean;
 }
@@ -42,7 +42,7 @@ export default function Impersonate({ userInfo, onChange, appServices, isImperso
         }} />
         {loading && <InProgress />}
         <div className="flex flex-column">
-            <Button disabled={!selectedUser || !selectedUser.id} label={"פעל בשם" + (selectedUser && selectedUser.name ? ": " + selectedUser.name : "")} 
+            <Button disabled={!selectedUser || !selectedUser.id} label={"פעל בשם" + (selectedUser && selectedUser.name ? ": " + selectedUser.name : "")}
                 onClick={() => onChange(selectedUser.id, selectedUser.name, selectedUser.phone)} />
             <Button disabled={!isImpersonated} label="בטל פעולה בשם" onClick={() => onChange(undefined)} />
             <Button disabled={!selectedUser || !selectedUser.id} label="שלח לינק להתקנה" onClick={async () => {
@@ -56,12 +56,9 @@ export default function Impersonate({ userInfo, onChange, appServices, isImperso
             }} />
             {installLink && <div className="flex flex-row align-items-center">
                 <span>שלח בווטסאפ למשתמש</span>
-                <Button
-                    icon="pi pi-whatsapp"
-                    className="p-button-rounded p-button-info m-2"
-                    onClick={() => openWhatsApp(selectedUser.phone, "לינק להתקנה: " + installLink)}
-                    aria-label="WhatsApp"
-                />
+                <WhatsAppButton
+                    getPhone={() => selectedUser.phone}
+                    getText={() => "לינק להתקנה: " + installLink} />
             </div>}
         </div>
     </div>

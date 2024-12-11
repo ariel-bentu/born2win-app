@@ -19,7 +19,7 @@ import { InputNumber } from 'primereact/inputnumber';
 import { deleteContact, getFamilyContacts, handleSearchFamilies, upsertContact } from './api';
 import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete';
 import { openWhatsApp } from './notification-actions';
-import { InProgress } from './common-ui';
+import { InProgress, WhatsAppButton } from './common-ui';
 import dayjs from 'dayjs';
 import { confirmPopup } from 'primereact/confirmpopup';
 import { nicePhone } from './utils';
@@ -148,19 +148,10 @@ const ContactList: React.FC<ContactListProps> = ({ family, appServices, reload, 
                     header="פעולות"
                     body={(rowData) => (
                         <div>
-                            <Button
-                                icon="pi pi-whatsapp"
-                                className="p-button-text"
-                                onClick={() => {
-                                    if (rowData.phone) {
-                                        openWhatsApp(
-                                            rowData.phone,
-                                            ""
-                                        );
-                                    }
-                                }}
-                                aria-label="WhatsApp"
-                            />
+                            <WhatsAppButton
+                                getPhone={() => rowData.phone}
+                                getText={() => ""} />
+
                             <Button
                                 icon="pi pi-pencil"
                                 className="p-button-text p-mr-2"
@@ -173,6 +164,8 @@ const ContactList: React.FC<ContactListProps> = ({ family, appServices, reload, 
                                     confirmPopup({
                                         message: 'האם למחוק איש קשר?',
                                         icon: 'pi pi-exclamation-triangle',
+                                        acceptLabel: "כן",
+                                        rejectLabel: "לא",
                                         accept: async () => {
                                             setInProgress(true);
                                             deleteContact(rowData.id, family.id)

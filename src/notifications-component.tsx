@@ -122,6 +122,8 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
             target: event.currentTarget as any,
             message: 'האם למחוק את כל ההודעות?',
             icon: 'pi pi-exclamation-triangle',
+            acceptLabel: "כן",
+            rejectLabel: "לא",
             accept: async () => {
                 try {
                     await deleteAllNotifications();
@@ -223,6 +225,8 @@ const NotificationsComponent: React.FC<NotificationsComponentProps> = ({ updateU
                                                 target: event.currentTarget,
                                                 message: "האם למחוק הודעה זו?",
                                                 icon: 'pi pi-exclamation-triangle',
+                                                acceptLabel: "כן",
+                                                rejectLabel: "לא",
                                                 accept: () => {
                                                     deleteOne(notification.id)
                                                     analyticLog("Notifications", "delete one notification");

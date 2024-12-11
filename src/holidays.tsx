@@ -104,6 +104,8 @@ export const HolidaysAdmin = ({ userInfo, appServices }: HolidaysAdminProps) => 
             target: event.currentTarget as any,
             message: `'${holiday.name}' האם למחוק את ?`,
             icon: 'pi pi-exclamation-triangle',
+            acceptLabel: "כן",
+            rejectLabel: "לא",
             accept: async () => {
                 deleteHoliday(holiday.id)
                     .then(() => {

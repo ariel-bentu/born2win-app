@@ -39,14 +39,16 @@ export async function createManyChatSubscriber(first_name: string, last_name: st
         await axios.post("https://api.manychat.com/fb/subscriber/removeTag", {
             "subscriber_id": existingId,
             "tag_id": manyChatToDeleteTag,
-        }, httpOptions);
+        }, httpOptions).catch((e) => {
+            logger.warn("Cannot delete manychat deleted_tag", e, existingId);
+        });
 
         await axios.post("https://api.manychat.com/fb/subscriber/updateSubscriber", {
             subscriber_id: existingId,
             first_name,
             last_name,
             gender,
-        }, httpOptions);
+        }, httpOptions).catch((e) => logger.error("Cannot update manychat details", e, existingId, first_name, last_name, gender));
 
 
         return existingId;

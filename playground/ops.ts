@@ -6,6 +6,7 @@ export const DATE_AT = "YYYY-MM-DD";
 const DATE_TIME = "YYYY-MM-DD HH:mm";
 
 import { getFirestore, FieldValue, QueryDocumentSnapshot, DocumentSnapshot, FieldPath } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 var admin = require("firebase-admin");
 
 interface District {
@@ -24,9 +25,16 @@ const serviceAccountPath = "../creds.json";
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccountPath),
+    storageBucket: "born2win-prod.appspot.com",
 });
 
-export const db = getFirestore();
+const db = getFirestore();
+const bucket = getStorage().bucket();
+
+
+const logger = {
+    info: (...args: any[]) => { console.info(...args) }
+}
 
 
 class HttpsError extends Error {
@@ -176,31 +184,176 @@ class AirTableQuery<T> {
 }
 
 
-class CachedAirTable<T> {
+interface CacheMetadata {
+    lastFetched: number; // Timestamp in milliseconds
+    etag: string; // ETag for cache validation
+}
+
+export class CachedAirTable<T> {
     private cachedData: T[] | undefined = undefined;
-    private cacheDurationMinutes: number = 60;
     private lastFetched: number = 0;
     private filters: string[];
     private query: AirTableQuery<T>;
+    private cachedFilePath: string;
+    private cacheMetadata: CacheMetadata | undefined = undefined;
+    private isFetching: boolean = false;
+    private fetchPromise: Promise<T[]> | null = null;
 
-    constructor(tableName: string, mapper: (record: AirTableRecord) => T, filters: string[], cacheDurationMinutes?: number) {
+    /**
+     * Constructor for CachedAirTable
+     * @param tableName - Name of the Airtable table
+     * @param mapper - Function to map Airtable records to type T
+     * @param filters - Array of filter strings for Airtable queries
+     * @param cacheFileName - Optional custom cache file name
+     */
+    constructor(
+        tableName: string,
+        mapper: (record: AirTableRecord) => T,
+        filters: string[],
+        cacheFileName?: string
+    ) {
         this.filters = filters;
-
-        if (cacheDurationMinutes !== undefined) {
-            this.cacheDurationMinutes = cacheDurationMinutes;
-        }
         this.query = new AirTableQuery<T>(tableName, mapper);
+        this.cachedFilePath = cacheFileName
+            ? `cache/${cacheFileName}.json`
+            : `cache/${tableName}.json`; // Default cache file path
     }
 
+    /**
+     * Retrieves cached data or fetches new data from Airtable if cache is invalid or absent.
+     * Utilizes both Firebase Storage and in-memory caching.
+     * @param filterFromCache - Optional filter function to apply to cached data
+     * @returns Promise resolving to an array of type T
+     */
     async get(filterFromCache?: (t: T) => boolean): Promise<T[]> {
-        const now = dayjs();
-        if (this.cachedData && this.lastFetched && dayjs(this.lastFetched).add(this.cacheDurationMinutes, "minutes").isAfter(now)) {
-            return filterFromCache ? this.cachedData.filter(filterFromCache) : this.cachedData;
+        const file = bucket.file(this.cachedFilePath);
+
+        // read etag
+        const metadata = await file.getMetadata().catch(() => {
+            // kept blank as expected (file does not exists)
+        });
+
+        if (metadata) {
+            const currentETag = metadata[0].etag;
+            if (this.cachedData && this.cacheMetadata && currentETag === this.cacheMetadata.etag) {
+                // Cache is consistent
+                console.info(`In-memory cache valid for ${this.cachedFilePath}.`);
+                return filterFromCache ? this.cachedData.filter(filterFromCache) : this.cachedData;
+            } else {
+                console.info(`New Cached file inconsistency detected for ${this.cachedFilePath}. Reloading cache.`);
+                // Invalidate in-memory cache
+                this.cachedData = undefined;
+                this.cacheMetadata = undefined;
+            }
+        } else {
+            console.info(`Cache file ${this.cachedFilePath} no longer exists. Reloading cache.`);
+            // Invalidate in-memory cache
+            this.cachedData = undefined;
+            this.cacheMetadata = undefined;
         }
 
-        this.cachedData = await this.query.execute(this.filters);
+        // If a fetch is already in progress, wait for it
+        if (this.isFetching && this.fetchPromise) {
+            console.log(`Fetch in progress for ${this.cachedFilePath}. Waiting for existing fetch.`);
+            return this.fetchPromise;
+        }
+
+        // Start fetching data
+        this.isFetching = true;
+        this.fetchPromise = this.fetchData(metadata != undefined, filterFromCache)
+            .finally(() => {
+                // Reset fetching state
+                this.isFetching = false;
+                this.fetchPromise = null;
+            });
+        const result = await this.fetchPromise;
+        return result;
+    }
+
+
+    /**
+     * Fetches data from Firebase Storage or Airtable, updates in-memory cache.
+     * @param filterFromCache - Optional filter function
+     * @returns Promise resolving to an array of type T
+     */
+    private async fetchData(exists: boolean, filterFromCache?: (t: T) => boolean): Promise<T[]> {
+        const now = dayjs();
+        const file = bucket.file(this.cachedFilePath);
+        if (exists) {
+            // Fetch file metadata
+            const [metadata] = await file.getMetadata();
+            const fileUpdated = dayjs(metadata.updated);
+
+            // Download and parse cached data
+            console.log(`Loading cached data from ${this.cachedFilePath}.`);
+            const [contents] = await file.download();
+            const cacheJson = JSON.parse(contents.toString('utf-8')) as CacheMetadata & { data: T[] };
+
+            this.cachedData = cacheJson.data;
+            this.lastFetched = cacheJson.lastFetched;
+            this.cacheMetadata = {
+                lastFetched: cacheJson.lastFetched,
+                etag: metadata.etag || "",
+            };
+
+            return filterFromCache ? this.cachedData.filter(filterFromCache) : this.cachedData;
+        } else {
+            console.info(`Cache file ${this.cachedFilePath} does not exist. Fetching data from Airtable.`);
+        }
+
+        // Fetch data from Airtable
+        const fetchedData: T[] = await this.query.execute(this.filters);
+
+        // Prepare cache content
+        const cacheContent = {
+            data: fetchedData,
+            lastFetched: now.valueOf(), // Timestamp in milliseconds
+        };
+
+        // Save cache to Firebase Storage
+        await file.save(JSON.stringify(cacheContent), {
+            contentType: 'application/json',
+        });
+
+        // Fetch updated metadata
+        const [updatedMetadata] = await file.getMetadata();
+
+        // Update in-memory cache
+        this.cachedData = fetchedData;
         this.lastFetched = now.valueOf();
+        this.cacheMetadata = {
+            lastFetched: this.lastFetched,
+            etag: updatedMetadata.etag || "",
+        };
+
+        console.log(`Cache updated for ${this.cachedFilePath}.`);
+
         return filterFromCache ? this.cachedData.filter(filterFromCache) : this.cachedData;
+    }
+
+
+    /**
+     * Evicts the cached data by deleting the cache file from Firebase Storage and clearing in-memory cache.
+     */
+    async evict(): Promise<void> {
+        const file = bucket.file(this.cachedFilePath);
+
+        try {
+            await file.delete();
+            console.log(`Cache evicted: ${this.cachedFilePath} has been deleted.`);
+        } catch (error: any) {
+            if (error.code === 404) {
+                console.warn(`Cache file ${this.cachedFilePath} does not exist.`);
+            } else {
+                console.error(`Error evicting cache file ${this.cachedFilePath}:`, error);
+                throw error; // Rethrow to let the caller handle the error
+            }
+        }
+
+        // Clear in-memory cache
+        this.cachedData = undefined;
+        this.cacheMetadata = undefined;
+        this.lastFetched = 0;
     }
 }
 
@@ -229,13 +382,16 @@ interface City {
     district: string;
 }
 
-interface Holiday {
+export interface Holiday {
     id: string;
     date: string;
     name: string;
     familyId?: string;
+    familyName?: string;
     alternateDate?: string
-    addAvailability: boolean; // when true, it means the main "date" should be added to family
+    cityName?: string;
+    district?: string;
+    type: EventType;
 }
 
 function familyAirtable2Family(family: AirTableRecord): Family {
@@ -249,15 +405,18 @@ function familyAirtable2Family(family: AirTableRecord): Family {
     }
 }
 
-function holidayAirtable2Holiday(holiday: AirTableRecord): Holiday {
+function holidayAirtable2Holiday(holiday: AirTableRecord, cityName?: string, district?: string): Holiday {
     return {
         id: holiday.id,
         name: holiday.fields.Name,
         date: holiday.fields["תאריך"],
         alternateDate: holiday.fields["תאריך חלופי"],
-        addAvailability: holiday.fields["זמין"],
-        familyId: holiday.fields["משפחה"],
-    }
+        familyId: getSafeFirstArrayElement(holiday.fields["משפחה"], undefined),
+        familyName: getSafeFirstArrayElement(holiday.fields["שם משפחה"], undefined),
+        cityName,
+        district,
+        type: holiday.fields["סוג"],
+    };
 }
 
 const activeFamilies = new CachedAirTable<Family>("משפחות רשומות", familyAirtable2Family, [`{סטטוס בעמותה}='${Status.Active}'`]);
@@ -267,13 +426,13 @@ const cities = new CachedAirTable<City>("ערים", (city => {
         name: city.fields["שם"].replaceAll("\n", ""),
         district: city.fields["מחוז"][0],
     }
-}), ["{כמות משפחות פעילות בעיר}>0"], 60 * 24);
+}), ["{כמות משפחות פעילות בעיר}>0"]);
 
 function getCities() {
     return cities.get();
 }
 
-const holidays = new CachedAirTable<Holiday>("חגים וחריגים", holidayAirtable2Holiday, ["AND(IS_AFTER({תאריך}, DATEADD(TODAY(), -7, 'days')))"], 1);
+const holidays = new CachedAirTable<Holiday>("חגים וחריגים", holidayAirtable2Holiday, ["AND(IS_AFTER({תאריך}, DATEADD(TODAY(), -7, 'days')))"]);
 
 
 
@@ -1128,6 +1287,7 @@ function mealAirtable2FamilyDemand(demand: AirTableRecord, familyCityName: strin
         isFamilyActive: active,
         transpotingVolunteerId: getSafeFirstArrayElement(demand.fields["מתנדב משנע"], undefined),
         type: demand.fields["סוג"] || VolunteerType.Meal,
+        expandDays: [],
     };
 }
 
@@ -1138,11 +1298,12 @@ export async function getDemands(
     type: VolunteerType,
     dateStart: string,
     dateEnd: string,
-    volunteerId?: string
+    volunteerId?: string,
 ): Promise<FamilyDemand[]> {
     const checkDistrict = ((districtId: string) => Array.isArray(district) ? district.some(d => d == districtId) : !district || district == districtId);
 
     const families = await activeFamilies.get((f => checkDistrict(f.district)));
+
     const _cities = await getCities();
     const getCityName = (id: string) => _cities.find(c => c.id == id)?.name || "";
 
@@ -1155,19 +1316,24 @@ export async function getDemands(
     });
 
     const filters: string[] = [];
-    const startDateParam = dayjs(dateStart).format(DATE_AT);
-    const endDateParam = dayjs(dateEnd).format(DATE_AT);
 
     if (status != Status.OccupiedOrCancelled) {
         filters.push("{סטטוס}!='בוטל'");
     }
 
     if (type != VolunteerType.Any) {
-        //filters.push(`{סוג}='${type}'`);
+        filters.push(`{סוג}='${type}'`);
     }
-
+    // read meals from 5 days before the start date, to be able to find registered meals for a date on friday from begining of that week (sunday)
+    // or in case of a sunday, we will also have the friday before, to be able to provide 1 day margin (not have cooking on friday and sunday)
+    let startDateFilter = dayjs(dateStart);
+    let endDateFilter = dayjs(dateEnd).add(1, "day");
+    if (status != Status.Occupied && status != Status.OccupiedOrCancelled) {
+        startDateFilter = startDateFilter.subtract(5, "day"); // to include all week days before the day and even a friday before that week
+        endDateFilter = endDateFilter.add(2, "day"); // to include a sunday that may block a friday before
+    }
     // eslint-disable-next-line quotes
-    filters.push(`{DATE}>='${startDateParam}'`);
+    filters.push(`{DATE}>='${startDateFilter.format(DATE_AT)}'`);
     filters.push(`IS_BEFORE({DATE}, '${dayjs(dateEnd).add(1, "day").format(DATE_AT)}')`);
 
     if (volunteerId) {
@@ -1182,22 +1348,38 @@ export async function getDemands(
         return filteredMeals;
     }
 
+    // calculate dates
     const addedOpenDemands: FamilyDemand[] = [];
 
-
-    // calculate dates
-    let relevantHolidays = await holidays.get(h => (dateInRange(h.date, dateStart, dateEnd) || (!!h.alternateDate && dateInRange(h.alternateDate, dateStart, dateEnd))));
+    let holidaysInDateRange = await holidays.get(h => (dateInRange(h.date, dateStart, dateEnd) || (!!h.alternateDate && dateInRange(h.alternateDate, dateStart, dateEnd))));
 
     if (type == VolunteerType.HolidayTreat || type == VolunteerType.Any) {
-        const holidayTreats = relevantHolidays.filter(h => h.name.startsWith("פינוקי חג")); // todo make more structured
+        const holidayTreats = holidaysInDateRange.filter(h => h.type == EventType.HolidayTreats);
+
         holidayTreats.forEach(holidayTreat => {
+
+            const expandDays = [];
             // Calculate array of dates
             if (holidayTreat.alternateDate) {
-                const arrayOfDates = getDatesBetween(holidayTreat.date, holidayTreat.alternateDate);
+                const holidayEndDate = dayjs(holidayTreat.date);
+                let day = 0;
+                for (let date = dayjs(holidayTreat.date); holidayEndDate.isAfter(date); date = date.add(1, "day")) {
+                    if (dateInRange(date, dateStart, dateEnd)) {
+                        expandDays.push(day);
+                    }
+                    day++;
+                }
 
+            } else {
+                // this means the start holiday date is the only date so it is in range
+                expandDays.push(0);
+            }
+            if (expandDays.length > 0) {
                 for (const family of families) {
-                    arrayOfDates.forEach(date =>
-                        addMeal(addedOpenDemands, meals, families, family.id || "", date, getCityName, VolunteerType.HolidayTreat));
+                    if (holidayTreat.district && family.district != holidayTreat.district) continue;
+                    if (holidayTreat.familyId && family.id != holidayTreat.familyId) continue;
+
+                    addMeal(addedOpenDemands, meals, families, family.id || "", holidayTreat.date, getCityName, VolunteerType.HolidayTreat, expandDays);
                 }
             }
         });
@@ -1206,93 +1388,101 @@ export async function getDemands(
             if (status == Status.Available) {
                 return addedOpenDemands;
             }
-            return filteredMeals.concat(addedOpenDemands);
+            // here we remove meals that are before start date
+            return filteredMeals.filter(m => dateInRange(m.date, dateStart, dateEnd)).concat(addedOpenDemands);
         }
     }
-    relevantHolidays = relevantHolidays.filter(rh => !rh.name.startsWith("פינוקי חג")); // todo make more structured
 
-    const endDate = dayjs(dateEnd);
-    const startVacant = dayjs(dateStart);
-    for (let date = startVacant; endDate.isAfter(date); date = date.add(1, "day")) {
-        if (date.format(DATE_AT) < startDateParam) continue;
-        if (date.format(DATE_AT) > endDateParam) break;
-        const holidays = relevantHolidays.filter(h => dayjs(h.date).format(DATE_AT) == date.format(DATE_AT));
+    holidaysInDateRange = holidaysInDateRange.filter(rh => rh.type != EventType.HolidayTreats);
 
-        // Skip if this date is blocked for all and no alternate exists
-        if (holidays.length && holidays.some(h => !h.familyId && !h.alternateDate)) continue;
-
+    const dateEndJs = dayjs(dateEnd);
+    const dateStartJs = dayjs(dateStart).locale("he").startOf("week");
+    for (let date = dateStartJs; dateEndJs.isAfter(date); date = date.add(1, "day")) {
         const day = date.day();
         const familiesInDay = families.filter(f => f.days?.length > 0 && f.days[0] == day); // ignore more than one day of cooking - take the first
 
-        // Now check if this date for this family does not exist
         for (const family of familiesInDay) {
-            // skip if this family is blocked for this date with no alternate
-            if (holidays.length && holidays.some(h => h.familyId == family.id && !h.addAvailability && !h.alternateDate)) continue;
 
-            const alternate = holidays.length > 0 ? holidays.find(h => (!h.familyId || h.familyId == family.id) && !!h.alternateDate) : undefined;
-            const actualDate = alternate ?
-                dayjs(alternate.alternateDate).format(DATE_AT) :
-                date.format(DATE_AT);
-
-            if (!dateInRange(actualDate, startVacant, endDate)) continue;
-
-            addMeal(addedOpenDemands, meals, families, family.id || "", actualDate, getCityName, VolunteerType.Meal);
-        }
-
-        // Add special added days to family: (even if family already has committed date that week)
-        relevantHolidays.filter(h => dayjs(h.date).format(DATE_AT) == date.format(DATE_AT))
-            .forEach(holiday => {
-                if (holiday.addAvailability && holiday.familyId) {
-                    const holidayDate = dayjs(holiday.date).format(DATE_AT);
-                    addMeal(addedOpenDemands, meals, families, holiday.familyId || "", holidayDate, getCityName, VolunteerType.Meal, false);
+            // calculate the expand days
+            const expandDays = [] as number[];
+            for (let weekDay = 0; weekDay <= 5; weekDay++) {
+                const expandDay = -day + weekDay;
+                const expandDate = date.add(expandDay, "day");
+                if (dateInRange(expandDate, dateStart, dateEnd) && !inSpecialDays(expandDate, family, holidaysInDateRange)) {
+                    expandDays.push(expandDay);
                 }
-            });
-    }
-
-    // add alternate date for those families that their date is on the date being replaced, only if that date is out of the
-    // range (those in the range were dealt with in previous loop)
-    relevantHolidays.filter(h =>
-        !!h.alternateDate &&
-        dateInRange(h.alternateDate, dateStart, dateEnd) &&
-        !dateInRange(h.date, dateStart, dateEnd)
-    )
-        .forEach(holiday => {
-            const holidayDate = dayjs(holiday.alternateDate).format(DATE_AT);
-            if (!holiday.familyId) {
-                const day = dayjs(holiday.date).day();
-                const familiesInDay = families.filter(f => f.days?.length > 0 && f.days[0] == day); // ignore more than one day of cooking - take the first
-
-                for (const family of familiesInDay) {
-                    addMeal(addedOpenDemands, meals, families, family.id || "", holidayDate || "", getCityName, VolunteerType.Meal);
-                }
-            } else {
-                addMeal(addedOpenDemands, meals, families, holiday.familyId || "", holidayDate, getCityName, VolunteerType.Meal, false);
             }
-        });
+
+            addMeal(addedOpenDemands, meals, families, family.id || "", date.format(DATE_AT), getCityName, VolunteerType.Meal, expandDays);
+        }
+    }
 
     if (status == Status.Available) {
         return addedOpenDemands;
     }
-    return filteredMeals.concat(addedOpenDemands);
+
+    return filteredMeals.filter(m => dateInRange(m.date, dateStart, dateEnd)).concat(addedOpenDemands);
 }
 
+function inSpecialDays(date: Dayjs, family: Family, holidays: Holiday[]): boolean {
+    for (const holiday of holidays) {
+        if (holiday.familyId && holiday.familyId != family.id) continue;
+        if (holiday.district && holiday.district != family.district) continue;
+
+        if (holiday.alternateDate && dateInRange(date, holiday.date, holiday.alternateDate) ||
+            !holiday.alternateDate && date.isSame(holiday.date, "day")) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 function addMeal(demandsArray: FamilyDemand[], meals: FamilyDemand[], families: Family[], familyId: string, date: string, getCityName: (id: string) => string,
-    type: VolunteerType, uniqueInWeek = true) {
+    type: VolunteerType, expandDays: number[]) {
     const family = families.find(f => f.id == familyId);
-    if (!family) return;
+    if (!family || expandDays.length == 0) return;
 
     // Find meals in this day, or any other day in the same week.
+    // todo verify no registered meal already done withon range
+
     // The reason for the week range, is that when a family's cooking days change, and a meal is already scheduled, we
     // do not want another day to be openned
-    const filterDateExisting = uniqueInWeek ?
-        (m: FamilyDemand) => dayjs(m.date).locale("he").isSame(date, "week") :
-        (m: FamilyDemand) => dayjs(m.date).locale("he").isSame(date, "day")
+    // const filterDateExisting = uniqueInWeek ?
+    //     (m: FamilyDemand) => dayjs(m.date).locale("he").isSame(date, "week") :
+    //     (m: FamilyDemand) => dayjs(m.date).locale("he").isSame(date, "day");
+    const filterDateExisting = (m: FamilyDemand) => {
+        let found = false;
+        for (const dayOffset of expandDays) {
+            const expandedDate = dayjs(date).add(dayOffset, "day");
+            if (expandedDate.isSame(m.date)) {
+                found = true;
+                break;
+            }
+        }
+        return found;
+    }
+    const familyRelevantMeals = meals.filter(m => m.status == Status.Occupied && m.mainBaseFamilyId == family.id && type == m.type);
 
+    if (!familyRelevantMeals.find(m => filterDateExisting(m))) {
 
-    if (!meals.filter(m => m.status == Status.Occupied).find(m => filterDateExisting(m) &&
-        m.mainBaseFamilyId == family.id &&
-        type == m.type)) {
+        let filteredExpandDays = expandDays;
+        // filters out a sunday or a friday if another week's cooking is adjacent
+        const minDay = Math.min(...expandDays);
+        const maxDay = Math.max(...expandDays);
+
+        const minDate = dayjs(date).add(minDay, "day");
+        if (minDate.day() == 0 && familyRelevantMeals.find(m => minDate.subtract(2, "day").isSame(m.date, "day"))) {
+            // Sunday
+            filteredExpandDays = filteredExpandDays.filter(d => d != minDay);
+        }
+
+        const maxDate = dayjs(date).add(maxDay, "day");
+        if (maxDate.day() == 5 && familyRelevantMeals.find(m => minDate.add(2, "day").isSame(m.date, "day"))) {
+            // Friday
+            filteredExpandDays = filteredExpandDays.filter(d => d != maxDay);
+        }
+
         demandsArray.push({
             id: getCalcDemandID(family.id, date, family.cityId),
             date,
@@ -1306,9 +1496,12 @@ function addMeal(demandsArray: FamilyDemand[], meals: FamilyDemand[], families: 
             volunteerCityName: "",
             isFamilyActive: family.active,
             type,
+            expandDays: filteredExpandDays,
         });
     }
 }
+
+
 export function getDatesBetween(startDateIn: string, endDateIn: string) {
     const dates = [];
     let currentDate = dayjs(startDateIn);
@@ -1324,11 +1517,28 @@ export function getDatesBetween(startDateIn: string, endDateIn: string) {
 }
 
 
-// getDemands("recmLo9MWRxmrLEsM", Status.Available, VolunteerType.Any, dayjs().add(1, "day").format(DATE_AT),
-//     dayjs().add(15, "days").format(DATE_AT),
-
+// getDemands("recmLo9MWRxmrLEsM", Status.Available, VolunteerType.Meal,
+//     dayjs().add(1, "day").format(DATE_AT),
+//     dayjs().add(30, "days").format(DATE_AT),
 //     //    "2024-11-30", "2024-12-31"
 // ).then(demands => {
-//     console.log(demands.length)
-// }
-// )
+//     console.log(demands.map(m => m.familyLastName + ":" + dayjs(m.date).format("DD-MM") + ":" + m.expandDays?.map(d => `"${d}"`)).join("\n"))
+// })
+const getElapsedTime = (start: [number, number]): string => {
+    const elapsed = process.hrtime(start);
+    const elapsedMs = elapsed[0] * 1000 + elapsed[1] / 1e6;
+    return `${elapsedMs.toFixed(3)} ms`;
+};
+
+function testGetCities() {
+    const totalStart = process.hrtime();
+    return cities.get().then(cities => {
+        const totalElapsed = getElapsedTime(totalStart);
+
+        console.log("Families", cities.length, totalElapsed);
+    })
+}
+
+// testGetCities().then(() => testGetCities().then(() => {
+//     cities.evict().then(() => testGetCities())
+// }));

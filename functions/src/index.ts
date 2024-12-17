@@ -6,6 +6,7 @@ import { setGlobalOptions, logger } from "firebase-functions/v2";
 
 // Dependencies for the addMessage function.
 import { getFirestore, FieldValue, QueryDocumentSnapshot, DocumentSnapshot, FieldPath } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 // const sanitizer = require("./sanitizer");
 // import { initializeApp } from "firebase-admin";
 import admin = require("firebase-admin");
@@ -52,8 +53,8 @@ import { getSafeFirstArrayElement, IL_DATE, isValidIsraeliIdentificationNumber, 
 import localeData = require("dayjs/plugin/localeData");
 import { SendLinkOrInstall, weeklyNotifyFamilies } from "./scheduled-functions";
 import { AirTableQuery, AirTableUpdate, CachedAirTable } from "./airtable";
-import { getDemands, updateFamilyDemand } from "./demands";
-import { deleteContact, getFamilyContacts, getFamilyDetails2, searchFamilies, upsertContact } from "./families";
+import { getDemands, getDemands2, updateFamilyDemand } from "./demands";
+import { activeFamilies, deleteContact, getFamilyContacts, getFamilyDetails2, searchFamilies, upsertContact } from "./families";
 import { Lock } from "./lock";
 import { deleteHoliday, getHolidays, upsertHoliday } from "./holidays";
 import { sendOTPViaManychat } from "./manychat";
@@ -78,6 +79,8 @@ const DATE_TIME = "YYYY-MM-DD HH:mm";
 export const DATE_AT = "YYYY-MM-DD";
 const DATE_BIRTHDAY = "DD-MM";
 export const db = getFirestore();
+export const bucket = getStorage().bucket();
+
 
 const appHost = "app.born2win.org.il";
 
@@ -387,7 +390,7 @@ exports.UpdateIdentificationNumber = onCall({ cors: true }, async (request) => {
         },
     });
 
-    const docUpdate:any = {
+    const docUpdate: any = {
         missingIdentificationNumber: FieldValue.delete(),
     };
     if (doc.data().needToSignConfidentiality) {
@@ -1030,7 +1033,7 @@ const districts = new CachedAirTable<District>("מחוז", (district => {
         id: district.id,
         name: district.fields.Name,
     };
-}), [], 60 * 24);
+}), []);
 
 export async function getDestricts() {
     return districts.get();
@@ -1051,22 +1054,44 @@ const cities = new CachedAirTable<City>("ערים", (city => {
         district: city.fields["מחוז"][0],
         numOfFamilies: city.fields["כמות משפחות פעילות בעיר"],
     };
-}), [], 60 * 24); // "{כמות משפחות פעילות בעיר}>0"
+}), []); // "{כמות משפחות פעילות בעיר}>0"
 
 
 export async function getCities(): Promise<City[]> {
     return cities.get();
 }
 
+// Helper function to calculate elapsed time
+const getElapsedTime = (start: [number, number]): string => {
+    const elapsed = process.hrtime(start);
+    const elapsedMs = elapsed[0] * 1000 + elapsed[1] / 1e6;
+    return `${elapsedMs.toFixed(3)} ms`;
+};
+
 exports.GetOpenDemands_v3 = onCall({ cors: true }, async (request): Promise<OpenFamilyDemands> => {
+    const totalStart = process.hrtime();
     const doc = await authenticate(request);
+    const authElapsed = getElapsedTime(totalStart);
 
     const godp = request.data as GetOpenDemandPayload;
 
     const districts = doc.data().districts;
+    const citiesStart = process.hrtime();
     const cities = await getCities();
+    const citiesElapsed = getElapsedTime(citiesStart);
+
+    const demandsStart = process.hrtime();
     const demands = await getDemands(districts, Status.Available, godp.type, dayjs().add(1, "day").format(DATE_AT),
         dayjs().add(45, "days").format(DATE_AT));
+    const demandsElapsed = getElapsedTime(demandsStart);
+    const totalElapsed = getElapsedTime(totalStart);
+
+    logger.info("GetOpenDemands_v3.", {
+        totalElapsed,
+        authElapsed,
+        citiesElapsed,
+        demandsElapsed,
+    });
     return { demands, allDistrictCities: cities.filter(city => city.numOfFamilies > 0 && districts.some((d: string) => city.district === d)) };
 });
 
@@ -1080,6 +1105,43 @@ exports.GetDemandsNew = onCall({ cors: true }, async (request): Promise<FamilyDe
     throw new HttpsError("permission-denied", "Unauthorized user to read all demands");
 });
 
+
+exports.GetOpenDemands_v4 = onCall({ cors: true }, async (request): Promise<OpenFamilyDemands> => {
+    const totalStart = process.hrtime();
+    const doc = await authenticate(request);
+    const authElapsed = getElapsedTime(totalStart);
+
+    const godp = request.data as GetOpenDemandPayload;
+
+    const districts = doc.data().districts;
+    const citiesStart = process.hrtime();
+    const cities = await getCities();
+    const citiesElapsed = getElapsedTime(citiesStart);
+
+    const demandsStart = process.hrtime();
+    const demands = await getDemands2(districts, Status.Available, godp.type, dayjs().add(1, "day").format(DATE_AT),
+        dayjs().add(45, "days").format(DATE_AT));
+    const demandsElapsed = getElapsedTime(demandsStart);
+    const totalElapsed = getElapsedTime(totalStart);
+
+    logger.info("GetOpenDemands_v4.", {
+        totalElapsed,
+        authElapsed,
+        citiesElapsed,
+        demandsElapsed,
+    });
+    return { demands, allDistrictCities: cities.filter(city => city.numOfFamilies > 0 && districts.some((d: string) => city.district === d)) };
+});
+
+
+exports.GetDemands_v4 = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
+    const userInfo = await getUserInfo(request);
+    if (userInfo.isAdmin) {
+        const gdp = request.data as GetDemandsPayload;
+        return await getDemands2(gdp.districts, undefined, gdp.type || VolunteerType.Meal, gdp.from, gdp.to);
+    }
+    throw new HttpsError("permission-denied", "Unauthorized user to read all demands");
+});
 
 exports.GetUserRegistrations_v3 = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
     const doc = await authenticate(request);
@@ -1128,6 +1190,7 @@ exports.UpdateFamilyDemand_v3 = onCall({ cors: true }, async (request) => {
 
     const demandDistrictId = (fdup.district);
     const volunteerId = (fdup.volunteerId || userInfo.id);
+    const registrationDate = fdup.date;
 
     const demandDistrict = userInfo.districts.find(d => d.id == demandDistrictId);
     if (!demandDistrict) throw new HttpsError("not-found", "District " + demandDistrictId + " not in scope of the user");
@@ -1135,7 +1198,7 @@ exports.UpdateFamilyDemand_v3 = onCall({ cors: true }, async (request) => {
     if (!fdup.isRegistering && !(fdup.reason && fdup.reason.trim().length > 0)) {
         throw new HttpsError("invalid-argument", "Missing cancellation reason");
     }
-    return updateFamilyDemand(fdup.demandId, demandDistrictId, fdup.isRegistering, fdup.type || VolunteerType.Meal, volunteerId, userInfo.firstName + " " + userInfo.lastName, fdup.reason);
+    return updateFamilyDemand(fdup.demandId, registrationDate, demandDistrictId, fdup.isRegistering, fdup.type || VolunteerType.Meal, volunteerId, userInfo.firstName + " " + userInfo.lastName, fdup.reason);
 });
 
 exports.GetFamilyDetailsNew = onCall({ cors: true }, async (request): Promise<FamilyDetails> => {
@@ -1675,7 +1738,7 @@ async function syncBorn2WinFamilies() {
     const becameActive = [];
 
 
-    const cities = await getCities();
+    const _cities = await getCities();
     const districts = await getDestricts();
 
 
@@ -1742,7 +1805,7 @@ async function syncBorn2WinFamilies() {
 
             if (familyRecord.active && changedToActive) {
                 // A new active family, or a family that has changed to active
-                const city = cities.find(c => c.id === getSafeFirstArrayElement(family.fields["עיר"], ""));
+                const city = _cities.find(c => c.id === getSafeFirstArrayElement(family.fields["עיר"], ""));
                 becameActive.push({
                     name: family.fields["Name"],
                     city: city?.name || "",
@@ -1751,6 +1814,9 @@ async function syncBorn2WinFamilies() {
             }
         }
     } while (offset);
+
+    cities.evict();
+    activeFamilies.evict();
 
     await batch.commit().then(async () => {
         logger.info("Sync Families: observed modified:", count, "observed Active", countActive);

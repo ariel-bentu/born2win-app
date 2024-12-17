@@ -101,6 +101,7 @@ export enum VolunteerType {
 
 export interface FamilyDemandUpdatePayload {
     demandId: string;
+    date: string; // since demand has expandDays, the actual requested date. (needed for registration only)
     mainBaseFamilyId: string;
     cityId: string;
     isRegistering: boolean; // true means register, false mean unregister
@@ -205,6 +206,7 @@ export interface FamilyDemand {
     transpotingVolunteerId?: string
     isFamilyActive: boolean;
     type: VolunteerType;
+    expandDays: number[];
 }
 
 export interface OpenFamilyDemands {

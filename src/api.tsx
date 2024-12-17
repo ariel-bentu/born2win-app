@@ -283,14 +283,15 @@ function callFunctionWithImpersonation(functionName: string, payload?: any) {
 
 
 export function getOpenDemands(type: VolunteerType): Promise<OpenFamilyDemands> {
-    return callFunctionWithImpersonation('GetOpenDemands_v3', { type } as GetOpenDemandPayload).then((res: any) => res.data as OpenFamilyDemands);
+    return callFunctionWithImpersonation('GetOpenDemands_v4', { type } as GetOpenDemandPayload).then((res: any) => res.data as OpenFamilyDemands);
 }
 
-export function updateFamilyDemand(demandId: string, mainBaseFamilyId: string,
+export function updateFamilyDemand(demandId: string, date:string, mainBaseFamilyId: string,
     cityId: string, isRegistering: boolean, type: VolunteerType, reason: string,
     district: string, volunteerId?: string) {
     const payload = {
         demandId,
+        date,
         mainBaseFamilyId,
         isRegistering,
         cityId,
@@ -351,7 +352,7 @@ export async function getDemands(dateRange: [string, string], districts: string[
     if (!dateRange[0] || !dateRange[1]) return [];
 
     // No impersonation
-    const getDemandsFunc = httpsCallable(functions, 'GetDemandsNew');
+    const getDemandsFunc = httpsCallable(functions, 'GetDemands_v4');
     const payload = {
         from: dateRange[0],
         to: dateRange[1],

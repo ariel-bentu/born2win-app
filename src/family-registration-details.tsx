@@ -9,7 +9,7 @@ import { Nullable } from "primereact/ts-helpers";
 import dayjs from "dayjs";
 import { ChannelHeader, InProgress, PhoneNumber, WhatsAppButton } from "./common-ui";
 import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails, VolunteerInfo, VolunteerType } from "./types";
-import { isNotEmpty, nicePhone } from "./utils";
+import { DATE_AT, isNotEmpty, nicePhone } from "./utils";
 import { ProgressSpinner } from "primereact/progressspinner";
 import { SelectButton } from "primereact/selectbutton";
 import { PrimeIcons } from "primereact/api";
@@ -23,7 +23,7 @@ interface FamilyDetailsComponentProps {
     detailsOnly?: boolean;
     appServices: AppServices;
     onClose: () => void;
-    reloadOpenDemands: () => void;
+    reloadOpenDemands: () => Promise<void>;
     includeContacts: boolean;
     date?: string //used to include it in the message to impersonated users
     analyticComponent: string;
@@ -57,15 +57,30 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
     const [volunteerInfo, setVolunteerInfo] = useState<VolunteerInfo | undefined>();
     const [saving, setSaving] = useState<boolean>(false);
     const [viewDate, setViewDate] = useState(new Date());
+    const [availableDates, setAvailableDates] = useState<string[]>([]);
+
 
     const months = useMemo(() => {
         const today = dayjs();
         const nextMonth = today.add(1, "month");
         const twoMonthsAhead = today.add(2, "month");
 
-        const thisMonthCount = demands.filter(d => dayjs(d.date).month() === today.month()).length;
-        const nextMonthCount = demands.filter(d => dayjs(d.date).month() === nextMonth.month()).length;
-        const twoMonthsAheadCount = demands.filter(d => dayjs(d.date).month() === twoMonthsAhead.month()).length;
+        const countDemands = (month: number) => {
+            return demands.filter(d => {
+                for (const day of d.expandDays) {
+                    const expandDate = dayjs(d.date).add(day, "day");
+                    if (expandDate.month() == month) {
+                        return true;
+                    }
+                }
+            }).length;
+        }
+
+
+        const thisMonthCount = countDemands(today.month());
+        const nextMonthCount = countDemands(nextMonth.month());
+        const twoMonthsAheadCount = countDemands(twoMonthsAhead.month());
+        //demands.filter(d => dayjs(d.date).month() === twoMonthsAhead.month()).length;
 
         const res = [{
             name: today.format("MMMM"),
@@ -95,11 +110,6 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
     const [viewVisibleMonth, setViewVisibleMonth] = useState<CalendarMonthChangeEvent>({ year: dayjs().year(), month: dayjs().month() });
     const divRef = useRef<HTMLUListElement>(null);
 
-    // const handleMonthChange = (e: CalendarMonthChangeEvent) => {
-    //     console.log("Month changed", e)
-    //     setViewVisibleMonth(e);
-    // };
-
     useEffect(() => {
         if (mainBaseFamilyId) {
             setLoading(true);
@@ -125,9 +135,26 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [mainBaseFamilyId, familyDemandId, detailsOnly, reload]);
+    }, [mainBaseFamilyId, familyDemandId, detailsOnly, reload, demands]);
 
-    const availableDates = demands.map(demand => new Date(demand.date));
+    useEffect(() => {
+        const _availableDates = [] as string[];
+
+        for (const demand of demands) {
+            if (demand.expandDays) {
+                demand.expandDays.forEach(dayOffset => {
+                    _availableDates.push(dayjs(demand.date).add(dayOffset, 'day').format(DATE_AT));
+                });
+            } else {
+                _availableDates.push(demand.date);
+            }
+        }
+        setAvailableDates(_availableDates);
+        console.log("recalc available dates")
+    }, [mainBaseFamilyId, reload, demands]);
+
+
+
 
     const handleScrollToDetails = () => {
         if (divRef.current) {
@@ -143,7 +170,7 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
         }
 
         const eventDate = `${event.year}-${event.month + 1}-${event.day}`;
-        if (demands.find(d => dayjs(d.date).isSame(eventDate))) {
+        if (availableDates.find(d => dayjs(d).isSame(eventDate))) {
             return (
                 <span className={"available-day " + (isSameDate(selectedDate, event) ? "selected-day" : "")}>
                     {event.day}
@@ -151,15 +178,14 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
             );
         }
         return event.day;
-    }, [viewVisibleMonth, selectedDate, demands])
+    }, [viewVisibleMonth, selectedDate, demands, availableDates, reload])
 
     const minDate = dayjs();
-    const alergies = familyDetails?.alergies;
 
-    const isAvailableDatesVisible = demands.some(av => {
-        const availableDate = dayjs(av.date);
-        return availableDate.year() === viewVisibleMonth.year && availableDate.month() === viewVisibleMonth.month;
-    });
+    const alergies = familyDetails?.alergies;
+    const currMonth = months.find(m => viewVisibleMonth.year == m.year && viewVisibleMonth.month == m.month);
+    const isAvailableDatesVisible = (currMonth && currMonth.count > 0);
+
 
     return (
         <div className="flex flex-column relative justify-content-center w-full p-3" style={{ maxWidth: 700 }}>
@@ -167,12 +193,18 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
             {additionalHeader && <div className="family-additional-header">{additionalHeader}</div>}
             <div className="flex flex-row w-12 justify-content-end mb-2">
                 {!detailsOnly &&
-                    <div className="flex flex-column justify-content-start align-items-start w-12 pr-3">
+                    <div className="flex flex-column justify-content-start align-items-start w-12 pr-3 text-align-start">
                         {loading && <ProgressSpinner style={{ height: 20, width: 20 }} />}
                         {familyDetails && <>
                             <li><strong>עיר:</strong>{family.city}</li>
-                            <li>המשפחה בת <strong> {familyDetails.adultsCount}</strong> נפשות</li>
-                            <li><strong>הרכב בני המשפחה:</strong> {familyDetails.familyStructure}</li>
+                            <li>המשפחה בת <strong> {familyDetails.adultsCount}</strong> נפשות, יום מומלץ (לא חובה) לבישול: <strong>{familyDetails.cookingDays}</strong></li>
+                            <li>
+                                {isNotEmpty(alergies) ? <label className="alergies">נא לשים לב לאלרגיה! {alergies}</label> :
+                                    <label><strong>אלרגיות:</strong> אין</label>}
+                            </li>
+                            {isNotEmpty(familyDetails.importantNotice) && <li>
+                                <label className="alergies"><strong>נא לשים לב:</strong> {familyDetails.importantNotice}</label>
+                            </li>}
                             <li><strong>גילאי בני המשפחה:</strong> {familyDetails.familyMembersAge}</li>
                             <li><strong>גיל החולה:</strong> {familyDetails.patientAge}</li>
                         </>}
@@ -201,11 +233,12 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                     />
 
                 </div>
+                <div style={{ marginBottom: 2 }}>פתחנו לכם את הבחירה באיזה יום בשבוע לחבק</div>
                 <Calendar
                     viewDate={viewDate}
                     className={!isAvailableDatesVisible ? 'watermarked-no-dates' : ''}
                     value={selectedDate}
-                    enabledDates={availableDates}
+                    enabledDates={availableDates.map(d => new Date(d))}
                     onChange={(e) => {
                         console.log("date selected", e.value)
                         setSelectedDate(e.value)
@@ -225,17 +258,27 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
 
                         label={"שבצו אותי" + (selectedDate ? (" ב- " + dayjs(selectedDate).format("DD-MMM") + "׳") : "")}
                         onClick={() => {
-                            const availabilityRecord = demands.find(a => dayjs(a.date).diff(selectedDate, "days") === 0);
+                            if (!selectedDate) return;
+
+                            const registrationDate = dayjs(selectedDate).format(DATE_AT);
+                            const availabilityRecord = demands.find(demand => {
+                                for (const day of demand.expandDays) {
+                                    if (dayjs(demand.date).add(day, "day").isSame(registrationDate)) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            });
+
                             // to avoid double click
                             setSelectedDate(null);
                             if (availabilityRecord && familyDetails) {
                                 setSaving(true);
                                 analyticLog(analyticComponent, "save new Registration");
-                                updateFamilyDemand(availabilityRecord.id, familyDetails.mainBaseFamilyId, familyDetails.cityId, true,
+                                updateFamilyDemand(availabilityRecord.id, registrationDate, familyDetails.mainBaseFamilyId, familyDetails.cityId, true,
                                     type, "", availabilityRecord.district).then(() => {
                                         appServices.showMessage("success", "שיבוץ נקלט בהצלחה", "");
-                                        reloadOpenDemands();
-                                        setReload(prev => prev + 1);
+                                        reloadOpenDemands().then(() => setReload(prev => prev + 1))
                                     }).catch((err) => appServices.showMessage("error", "תקלה ברישום (1) - ", err.message))
                                     .finally(() => setSaving(false));
                             }
@@ -251,6 +294,13 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                     <div className="tm-5 pb-1 underline text-lg">פרטים</div>
                     <li><strong>עיר:</strong>{family.city}</li>
                     <li>המשפחה בת <strong> {familyDetails.adultsCount}</strong> נפשות</li>
+                    <li>
+                        {isNotEmpty(alergies) ? <div className="alergies">נא לשים לב לאלרגיה! {alergies}</div> :
+                            <div><strong>אלרגיות:</strong> אין</div>}
+                    </li>
+                    {isNotEmpty(familyDetails.importantNotice) && <li>
+                        <div className="alergies"><strong>נא לשים לב:</strong> {familyDetails.importantNotice}</div>
+                    </li>}
                     <li><strong>הרכב בני המשפחה:</strong> {familyDetails.familyStructure}</li>
                     <li><strong>גילאי בני המשפחה:</strong> {familyDetails.familyMembersAge}</li>
                     <li><strong>גיל החולה:</strong> {familyDetails.patientAge}</li>
@@ -260,14 +310,7 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                     <li><strong>העדפות דגים:</strong> {familyDetails.fishPreferences}</li>
                     <li><strong>לא אוכלים:</strong> {isNotEmpty(familyDetails.avoidDishes) ? familyDetails.avoidDishes : "אין העדפה"}</li>
                     <li><strong>תוספות:</strong> {familyDetails.sideDishes}</li>
-                    <li>
-                        {isNotEmpty(alergies) ? <div className="alergies">נא לשים לב לאלרגיה! {alergies}</div> :
-                            <div><strong>אלרגיות:</strong> אין</div>}
-                    </li>
-                    {isNotEmpty(familyDetails.importantNotice) && <li>
-                        <div className="alergies"><strong>נא לשים לב:</strong> {familyDetails.importantNotice}</div>
-                    </li>}
-                    <li><strong>שימו לב! ימי הבישול הם:</strong> {familyDetails.cookingDays?.join(", ") || ""}</li>
+                    <li><strong>יום מומלץ (לא חובה) לבישול:</strong>{familyDetails.cookingDays?.join(", ") || ""}</li>
                     {includeContacts && <>
                         <li><strong>כתובת:</strong>{getAddress(familyDetails)}</li>
                         {isNotEmpty(familyDetails.contactName) && (

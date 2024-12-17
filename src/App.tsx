@@ -226,6 +226,8 @@ function App() {
             return openDemands.data;
         }
 
+        console.log("Reloading demands...");
+
         // Store the promise and make the API call
         const fetchPromise = api.getOpenDemands(VolunteerType.Any)
             .then((openDemandsResponse) => {
@@ -678,9 +680,7 @@ function App() {
                             openDemands={getCachedOpenDemands()} openDemandsTS={openDemands?.fetchedTS.toISOString() || ""}
                             appServices={appServices} actualUserId={actualUserId}
                             topPosition={tabContentsTop}
-                            reloadOpenDemands={() => {
-                                getCachedOpenDemands(true);
-                            }} />}
+                            reloadOpenDemands={() => getCachedOpenDemands(true).then(()=>{})} />}
                     </TabPanel>
                     <TabPanel headerStyle={{ fontSize: 20 }} header="התנדבויות">
                         {activeIndex === 2 && <ExistingRegistrationsComponent

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Chart } from 'primereact/chart';
 import { MultiSelect } from 'primereact/multiselect';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import minMax from 'dayjs/plugin/minMax'; // Plugin to find min and max dates
 
 import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails, Status, UserInfo, VolunteerInfo, VolunteerType } from './types';
@@ -18,7 +18,7 @@ import { generateDetailsForWhatapp } from './family-registration-details';
 
 import { InProgress, PhoneNumber, WeekSelectorSlider, WhatsAppButton } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
-import { simplifyFamilyName, sortByDate } from './utils';
+import { dateInRange, simplifyFamilyName, sortByDate } from './utils';
 import { Button } from 'primereact/button';
 import "./charts.css"
 import { FamilyDetailsComponent } from './family-registration-details';
@@ -71,6 +71,7 @@ interface StatsProps {
 
 interface DateInfo {
     date: string;
+    expandDays: number[];
     volunteerId: string;
     demandId: string;
     mainBaseFamilyId: string;
@@ -155,37 +156,62 @@ export function Stats({ userInfo, appServices }: StatsProps) {
     const prepareMessageToSend = (groupedData: GroupedData, mode: number) => {
         const sortedCities = Object.keys(groupedData).sort();
 
+        const getMessageForDates = (startDate: Dayjs, endDate: Dayjs) => {
+            let message = ""
+            for (const city of sortedCities) {
+                // Sort families alphabetically within each city
+                const sortedFamilies = sortFamilies(groupedData[city]);
+                let familiesMsg = "";
+
+                sortedFamilies.forEach((family) => {
+                        const dates = family.dates.filter(d=>dateInRange(d.date, startDate, endDate));
+                        if (dates.length>0) {
+                            if (familiesMsg.length>0) {
+                                familiesMsg+=", ";
+                            }
+                            familiesMsg += `${family.familyLastName}`;
+                        }
+                });
+                if (familiesMsg.length > 0) {
+                    message += `* ${city}\n* > ${familiesMsg}\n\n`;
+                }
+            }
+            return message;
+        }
+
+
         let message = "היי קהילת נולדת לנצח💜\n";
         message += mode == Modes.Open ?
             "מי יכול.ה לסייע בבישול בחודש הקרוב 🙏\n" :
             "מי יכול.ה לסייע ב'פינוקי חג' לקראת החג 🙏\n"
 
-        for (const city of sortedCities) {
-            // Sort families alphabetically within each city
-            const sortedFamilies = sortFamilies(groupedData[city]);
+        const startDate = dayjs().locale("he").startOf("week");
+        const startDayInMonth = startDate.date();
 
-            if (sortedCities.length == 1 && sortedFamilies.length == 1) {
-                // only one family
-                message += `*משפחת ${sortedFamilies[0].familyLastName}*\n`;
-                message += `עיר: ${city}\n`;
-                const dates = mode == Modes.Open ?
-                    sortedFamilies[0].dates.map(d => dayjs(d.date).format("DD.MM")).join(', ') :
-                    minMaxDates(sortedFamilies[0].dates.map(d => d.date));
+        // message += "*החודש 🍲*\n"
+        if (startDayInMonth > 23) {
+            message += getMessageForDates(dayjs(), dayjs().endOf("month"));
+        } else if (startDayInMonth > 15) {
+            message += "> השבוע 🍲:\n";
+            message += getMessageForDates(dayjs(), startDate.add(1, "week"));
 
-                message += `תאריכים: ${dates}\n`;
-                break;
-            }
+            message += `> שאר חודש ${startDate.format("MMMM")}  🍲:\n`;
+            message += getMessageForDates(startDate.add(1, "week"), startDate.endOf("month"));
+        } else {
+            message += "> השבוע 🍲:\n";
+            message += getMessageForDates(dayjs(), startDate.add(1, "week"));
 
-            message += `*${city}*\n`;
-            sortedFamilies.forEach((family) => {
-                const dates = mode == Modes.Open ?
-                    family.dates.map(d => dayjs(d.date).format("DD.MM")).join(', ') :
-                    minMaxDates(family.dates.map(d => d.date));
-                message += `${family.familyLastName} - ${dates}\n`;
-            });
+            message += "> שבוע הבא 🍲:\n";
+            message += getMessageForDates(startDate.add(1, "week"), startDate.add(2, "week"));
 
-            message += '\n'; // Add an extra newline after each city's group
+            message += `> שאר חודש ${startDate.format("MMMM")}  🍲:\n`;
+            message += getMessageForDates(startDate.add(1, "week"), startDate.endOf("month"));
         }
+
+        message += `> חודש ${startDate.add(1, "month").format("MMMM")}🍲:\n`;
+        message += getMessageForDates(startDate.add(1, "month").startOf("month"), startDate.add(1, "month").endOf("month"));
+
+
 
         message += `ניתן להשתבץ באפליקציה ב🤖
 מסתבכים? אני פה כדי לעזור`;
@@ -382,7 +408,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
                 if (onSelectFamily) onSelectFamily(undefined);
 
                 // todo push nav state
-            }} reloadOpenDemands={() => { }} detailsOnly={true} actualUserId={""} />;
+            }} reloadOpenDemands={async () => { }} detailsOnly={true} actualUserId={""} />;
     }
 
     const handleDateClick = (e: any, city: string, familyId: string, date: string) => {
@@ -428,7 +454,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
                                             }}> {family.familyLastName}{family.active ? "" : "-לא פעילה"}:</span>
                                         <div className='flex w-12 flex-wrap'>{
                                             mode == Modes.Open ?
-                                                family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map(d => dayjs(d.date).format("DD.MM")).join(" | ") :
+                                                family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map(d => (<AvailableDate key={d.date} date={d} />)) :
                                                 (mode == Modes.HolidayTreats ?
                                                     minMaxDates(family.dates.map(d => d.date)) :
                                                     family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map((d, k) => (
@@ -460,7 +486,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
                             <div><strong>שם מבשל</strong>: {volunteerInfo.firstName + " " + volunteerInfo.lastName}</div>
                             <PhoneNumber phone={volunteerInfo.phone} label="טלפון מבשל" />
                             {volunteerInfo && volunteerInfo.phone && (<li className="flex align-items-center">
-                                <strong>שלח פרטים ל{ volunteerInfo.firstName + " " + volunteerInfo.lastName}</strong>
+                                <strong>שלח פרטים ל{volunteerInfo.firstName + " " + volunteerInfo.lastName}</strong>
                                 <WhatsAppButton
                                     getPhone={() => volunteerInfo?.phone}
                                     getText={() => familyDetails ? generateDetailsForWhatapp(familyDetails, selectedDateInfo.parentFamily.city, selectedDateInfo.date, volunteerInfo, transportingVolunteer, volunteerInfo.id) : ""} />
@@ -483,7 +509,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
                                     rejectLabel: "לא",
                                     accept: async () => {
                                         setCancelInProgress(true);
-                                        updateFamilyDemand(selectedDateInfo.demandId, selectedDateInfo.mainBaseFamilyId, "cityId(unknown)", false,
+                                        updateFamilyDemand(selectedDateInfo.demandId, "", selectedDateInfo.mainBaseFamilyId, "cityId(unknown)", false,
                                             selectedDateInfo.type, `מנהל ${userInfo.firstName} ביטל.ה`, selectedDateInfo.district, selectedDateInfo.volunteerId)
                                             .then(onCancellationPerformed)
                                             .catch(err => appServices.showMessage("error", "ביטול נכשל", err.message))
@@ -653,6 +679,7 @@ const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {
             districtBaseFamilyId: family.districtBaseFamilyId,
             mainBaseFamilyId: family.mainBaseFamilyId,
             date: family.date,
+            expandDays: family.expandDays,
             volunteerId: family.volunteerId,
             parentFamily: groupedByCityAndFamily[city][family.mainBaseFamilyId],
             transportingVolunteerId: family.transpotingVolunteerId,
@@ -675,4 +702,20 @@ function sortFamilies(familiesMap: { [mainBaseFamilyId: string]: GroupedFamily }
             }
             return 0;
         });
+}
+const DAYS = {
+    0: "א",
+    1: "ב",
+    2: "ג",
+    3: "ד",
+    4: "ה",
+    5: "ו",
+    6: "ש",
+}
+function AvailableDate({ date }: { date: DateInfo }) {
+    const d = dayjs(date.date).locale("he");
+    return <div className='available-date-host'>
+        <div className='available-date'>{d.format("DD-MM")}</div>
+        <div className="available-dates-weekdays">{date.expandDays.map(day => DAYS[d.add(day, "day").day()] + " ")}</div>
+    </div>
 }

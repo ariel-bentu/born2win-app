@@ -22,7 +22,7 @@ function holidayAirtable2Holiday(holiday: AirTableRecord, cityName?: string, dis
 // Holidays cache - 5 min
 export const holidays = new CachedAirTable<Holiday>("חגים וחריגים", (rec) => {
     return holidayAirtable2Holiday(rec);
-}, ["AND(IS_AFTER({תאריך}, DATEADD(TODAY(), -8, 'days')))"], 5);
+}, ["AND(IS_AFTER({תאריך}, DATEADD(TODAY(), -8, 'days')))"]);
 
 
 export async function upsertHoliday(holiday: Holiday) {
@@ -49,6 +49,7 @@ export async function upsertHoliday(holiday: Holiday) {
     } else {
         await AirTableInsert("חגים וחריגים", upsertHolidayFields);
     }
+    holidays.evict();
 }
 
 export async function getHolidays(from: string, to: string): Promise<Holiday[]> {
@@ -65,5 +66,6 @@ export async function getHolidays(from: string, to: string): Promise<Holiday[]> 
 }
 
 export async function deleteHoliday(id: string) {
-    return AirTableDelete("חגים וחריגים", id);
+    await AirTableDelete("חגים וחריגים", id);
+    holidays.evict();
 }

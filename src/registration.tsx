@@ -43,7 +43,7 @@ interface RegistrationComponentProps {
     actualUserId: string
     appServices: AppServices;
     openDemandsTS: string;
-    reloadOpenDemands: () => void;
+    reloadOpenDemands: () => Promise<void>;
     topPosition: number;
 }
 
@@ -151,16 +151,6 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
             }
             <Dialog style={{ direction: "rtl", width:"95%" }} visible={showWhatsHolidayTreats} onHide={() => setShowWhatsHolidayTreats(false)}>
                 <img src={whatIsTreats} alt="פינוקי חג" style={{ maxWidth: "100%" }} />
-
-                {/* <div className='registration-explain'>
-                    גם השנה ממשיכים במסורת של נולדת לנצח ונשלח למשפחות שלנו פינוקים לכבוד החג.💜
-                    <br /><br />
-                    מה זה פינוקים?! עוגה/עוגיות/ מארז טעים וכל מה שבא לכם להכין באווירת החג שיהיה להם מתוק בנשמה .
-                    אפשרי לשתף את הילדים להכין ברכה מהממת 💞🌟
-                    <br /><br />
-                    מתי?<br />
-                    בשבוע של החג מוסרים בתיאום מראש לפי מה שנוח לכם
-                </div> */}
             </Dialog>
 
 

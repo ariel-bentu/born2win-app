@@ -18,6 +18,8 @@ import { Calendar } from 'primereact/calendar';
 import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete';
 import { confirmPopup } from 'primereact/confirmpopup';
 import { MultiSelect } from 'primereact/multiselect';
+import { SelectItem } from 'primereact/selectitem';
+import { Dropdown } from 'primereact/dropdown';
 export const getPotentialHolidays = ({ from, to }: { from: Dayjs, to: Dayjs }): Holiday[] => {
     const options: CalOptions = {
         start: from.toDate(),
@@ -252,7 +254,7 @@ interface EditHolidayProps {
 
 const typeArray = [
     { name: 'חג', value: EventType.Holiday },
-    { name: 'הוספת תאריך למשפחה', value: EventType.Add },
+    // { name: 'הוספת תאריך למשפחה', value: EventType.Add },
     { name: 'חסימה/החלפה תאריך למשפחה', value: EventType.Block },
     { name: 'פינוקי חג', value: EventType.HolidayTreats },
 ];
@@ -260,13 +262,15 @@ const typeArray = [
 
 function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices }: EditHolidayProps) {
     const [name, setName] = useState<string>(holiday.name);
-    const [type, setType] = useState<EventType>(holiday.familyId ? holiday.type : EventType.Block);
+    const [type, setType] = useState<EventType>(holiday.type);
     const [alternateDate, setAlternateDate] = useState<string | undefined>(holiday.alternateDate);
     const [date, setDate] = useState<string>(holiday.date);
     const [family, setFamily] = useState<IdName | undefined>(holiday.familyId && holiday.familyName ? ({
         id: holiday.familyId,
         name: holiday.familyName
     }) : undefined);
+    const [district, setDistrict] = useState<string | undefined>(holiday.district);
+
     const [filteredFamilies, setFilteredFamilies] = useState<any[]>([]);
     console.log("Holiday in edit", holiday, name, family)
 
@@ -278,12 +282,12 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
     switch (type) {
         case EventType.Holiday:
             labelDate = "תאריך החג לחסום";
-            labelAlternativeDate = "תאריך חלופי (לא חובה)";
+            labelAlternativeDate = "עד תאריך (אם ריק אז רק יום אחד)"
             alternativeVisible = true;
             break;
         case EventType.Block:
             labelDate = "תאריך לחסום";
-            labelAlternativeDate = "תאריך חלופי (לא חובה)";
+            labelAlternativeDate = "עד תאריך (אם ריק אז רק יום אחד)"
             alternativeVisible = true;
             break;
         case EventType.Add:
@@ -350,6 +354,18 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
             </div>
         }
 
+        {type == EventType.HolidayTreats && <div className="flex flex-column p-2 align-items-start">
+            <label htmlFor="family" className="font-bold block mt-5 mb-2">מחוז (השאירו ריק לכל המחוזות)
+            </label>
+            <Dropdown
+                value={district}
+                options={userInfo?.districts?.map(d => ({ label: d.name, value: d.id })) || []}
+                onChange={(e) => setDistrict(e.value)}
+                placeholder="בחר מחוז"
+                className="w-18rem md:w-20rem mt-3"
+            />
+        </div>}
+
 
         {alternativeVisible &&
             <div className="flex-auto">
@@ -365,12 +381,17 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
 
         <div className='mt-5'>
             <Button label='שמירה' onClick={() => {
+
+                const isValid = (d: string | undefined) => {
+                    return d && d.length > 0 && !d.includes("Invalid");
+                }
+
                 if (name.length == 0) {
                     appServices.showMessage("error", "חסר תיאור", "יש להוסיף תיאור");
                     return;
                 }
 
-                if (date.length == 0) {
+                if (!isValid(date)) {
                     appServices.showMessage("error", "חסר תאריך", "יש לבחור תאריך");
                     return;
                 }
@@ -387,15 +408,36 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
                         appServices.showMessage("error", "חסר משפחה", "יש לבחור משפחה");
                         return;
                     }
+                }
+                if (family) {
                     holidayToSave.familyId = family.id;
                 }
 
+                if (district) {
+                    holidayToSave.district = district;
+                }
+
+
                 holidayToSave.alternateDate = alternativeVisible ? alternateDate : undefined;
+                if (!isValid(holidayToSave.alternateDate)) {
+                    holidayToSave.alternateDate = undefined;
+                }
+
+                if (holidayToSave.alternateDate && dayjs(holidayToSave.alternateDate).isBefore(date, "day")) {
+                    appServices.showMessage("error", "תאריך סיום לא חוקי", "יש לבחור תאריך סיום מאוחר מתאריך התחלה");
+                    return;
+                }
 
                 if (alternativeMandatory && !holidayToSave.alternateDate) {
                     appServices.showMessage("error", "חסר תאריך סיום", "יש לבחור תאריך סיום");
                     return;
                 }
+
+                if (type == EventType.HolidayTreats && !dayjs(holidayToSave.alternateDate).isSame(date, "week")) {
+                    appServices.showMessage("error", "תאריך סיום לא חוקי", "פינוקי חג לא יכולים להתפרס על תאריכים משבועות שונים");
+                    return;
+                }
+
                 onSave(holidayToSave);
 
             }}></Button>

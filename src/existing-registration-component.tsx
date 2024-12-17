@@ -128,7 +128,7 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
                 setCurrentRegistration(undefined)
                 appServices.popNavigationStep();
             }}
-            appServices={appServices} demands={registrations} reloadOpenDemands={() => { }} includeContacts={true} actualUserId={actualUserId} />
+            appServices={appServices} demands={registrations} reloadOpenDemands={async () => { }} includeContacts={true} actualUserId={actualUserId} />
     }
 
     if (showCancellationDialog) {

@@ -18,7 +18,7 @@ import { generateDetailsForWhatapp } from './family-registration-details';
 
 import { InProgress, PhoneNumber, WeekSelectorSlider, WhatsAppButton } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
-import { dateInRange, simplifyFamilyName, sortByDate } from './utils';
+import { dateInRange, simplifyFamilyName, sortByDate, toSunday } from './utils';
 import { Button } from 'primereact/button';
 import "./charts.css"
 import { FamilyDetailsComponent } from './family-registration-details';
@@ -173,7 +173,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
                         }
                 });
                 if (familiesMsg.length > 0) {
-                    message += `* ${city}\n* > ${familiesMsg}\n\n`;
+                    message += `* *${city}*\n* > ${familiesMsg}\n\n`;
                 }
             }
             return message;
@@ -185,7 +185,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
             "מי יכול.ה לסייע בבישול בחודש הקרוב 🙏\n" :
             "מי יכול.ה לסייע ב'פינוקי חג' לקראת החג 🙏\n"
 
-        const startDate = dayjs().locale("he").startOf("week");
+        const startDate = toSunday(dayjs());
         const startDayInMonth = startDate.date();
 
         // message += "*החודש 🍲*\n"
@@ -712,6 +712,7 @@ const DAYS = {
     5: "ו",
     6: "ש",
 }
+
 function AvailableDate({ date }: { date: DateInfo }) {
     const d = dayjs(date.date).locale("he");
     return <div className='available-date-host'>

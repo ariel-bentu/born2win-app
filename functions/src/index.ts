@@ -1152,7 +1152,7 @@ exports.GetUserRegistrations_v3 = onCall({ cors: true }, async (request): Promis
 
     const districts = doc.data().districts;
     const volunteerId = doc.id;
-    return getDemands(districts, Status.OccupiedOrCancelled, type, dayjs().startOf("month").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT), volunteerId);
+    return getDemands2(districts, Status.OccupiedOrCancelled, type, dayjs().startOf("month").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT), volunteerId);
 });
 
 
@@ -1492,7 +1492,7 @@ async function alertOpenDemands() {
     let notifyAdmins = false;
 
     for (let i = 0; i < districts.length; i++) {
-        const openDemands = await getDemands(districts[i].id, Status.Available, VolunteerType.Meal, dayjs().add(1, "day").format(DATE_AT), dayjs().add(5, "days").format(DATE_AT));
+        const openDemands = await getDemands2(districts[i].id, Status.Available, VolunteerType.Meal, dayjs().add(1, "day").format(DATE_AT), dayjs().add(5, "days").format(DATE_AT));
         let msgBody = "מחוז: " + districts[i].name + "\n";
         if (openDemands.length > 0) {
             let found = false;
@@ -1815,8 +1815,11 @@ async function syncBorn2WinFamilies() {
         }
     } while (offset);
 
-    cities.evict();
-    activeFamilies.evict();
+    if (count > 0) {
+        logger.info("Evicting cities and activeFamilies cache, due to changes in Families");
+        cities.evict();
+        activeFamilies.evict();
+    }
 
     await batch.commit().then(async () => {
         logger.info("Sync Families: observed modified:", count, "observed Active", countActive);

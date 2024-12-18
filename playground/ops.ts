@@ -1396,7 +1396,7 @@ export async function getDemands(
     holidaysInDateRange = holidaysInDateRange.filter(rh => rh.type != EventType.HolidayTreats);
 
     const dateEndJs = dayjs(dateEnd);
-    const dateStartJs = dayjs(dateStart).locale("he").startOf("week");
+    const dateStartJs = toSunday(dateStart);
     for (let date = dateStartJs; dateEndJs.isAfter(date); date = date.add(1, "day")) {
         const day = date.day();
         const familiesInDay = families.filter(f => f.days?.length > 0 && f.days[0] == day); // ignore more than one day of cooking - take the first
@@ -1438,33 +1438,23 @@ function inSpecialDays(date: Dayjs, family: Family, holidays: Holiday[]): boolea
     return false;
 }
 
+function toSunday(date:Dayjs | string):Dayjs {
+    const _date = dayjs(date);
+    return _date.subtract(_date.day(), "day");
+}
+
 function addMeal(demandsArray: FamilyDemand[], meals: FamilyDemand[], families: Family[], familyId: string, date: string, getCityName: (id: string) => string,
     type: VolunteerType, expandDays: number[]) {
     const family = families.find(f => f.id == familyId);
     if (!family || expandDays.length == 0) return;
+    const mealDate = dayjs(date);
+    const checkRangeStart = toSunday(mealDate);
+    const checkRangeEnd = checkRangeStart.add(5, "day");
 
-    // Find meals in this day, or any other day in the same week.
-    // todo verify no registered meal already done withon range
 
-    // The reason for the week range, is that when a family's cooking days change, and a meal is already scheduled, we
-    // do not want another day to be openned
-    // const filterDateExisting = uniqueInWeek ?
-    //     (m: FamilyDemand) => dayjs(m.date).locale("he").isSame(date, "week") :
-    //     (m: FamilyDemand) => dayjs(m.date).locale("he").isSame(date, "day");
-    const filterDateExisting = (m: FamilyDemand) => {
-        let found = false;
-        for (const dayOffset of expandDays) {
-            const expandedDate = dayjs(date).add(dayOffset, "day");
-            if (expandedDate.isSame(m.date)) {
-                found = true;
-                break;
-            }
-        }
-        return found;
-    }
     const familyRelevantMeals = meals.filter(m => m.status == Status.Occupied && m.mainBaseFamilyId == family.id && type == m.type);
 
-    if (!familyRelevantMeals.find(m => filterDateExisting(m))) {
+    if (!familyRelevantMeals.find(m => dateInRange(m.date, checkRangeStart, checkRangeEnd))) {
 
         let filteredExpandDays = expandDays;
         // filters out a sunday or a friday if another week's cooking is adjacent

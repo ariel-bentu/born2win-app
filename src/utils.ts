@@ -165,3 +165,8 @@ export function isValidIsraeliIdentificationNumber(id: string | undefined) {
         return counter + (step > 9 ? step - 9 : step);
     }) % 10 === 0;
 }
+
+export function toSunday(date:Dayjs | string):Dayjs {
+    const _date = dayjs(date);
+    return _date.subtract(_date.day(), "day");
+}

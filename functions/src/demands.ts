@@ -5,7 +5,7 @@ import {
     AirTableRecord, Collections, EventType, FamilyDemand, Holiday, NotificationChannels, Status,
     VolunteerType,
 } from "../../src/types";
-import { airtableArrayCondition, dateInRange, getDatesBetween, getSafeFirstArrayElement } from "../../src/utils";
+import { airtableArrayCondition, dateInRange, getDatesBetween, getSafeFirstArrayElement, toSunday } from "../../src/utils";
 import { AirTableGet, AirTableInsert, AirTableQuery, AirTableUpdate } from "./airtable";
 import { activeFamilies, Family } from "./families";
 import { Lock } from "./lock";
@@ -134,7 +134,7 @@ export async function getDemands2(
     holidaysInDateRange = holidaysInDateRange.filter(rh => rh.type != EventType.HolidayTreats);
 
     const dateEndJs = dayjs(dateEnd);
-    const dateStartJs = dayjs(dateStart).locale("he").startOf("week");
+    const dateStartJs = toSunday(dateStart);
     for (let date = dateStartJs; dateEndJs.isAfter(date); date = date.add(1, "day")) {
         const day = date.day();
         const familiesInDay = families.filter(f => f.days?.length > 0 && f.days[0] == day); // ignore more than one day of cooking - take the first
@@ -179,29 +179,14 @@ function addMeal2(demandsArray: FamilyDemand[], meals: FamilyDemand[], families:
     type: VolunteerType, expandDays: number[]) {
     const family = families.find(f => f.id == familyId);
     if (!family || expandDays.length == 0) return;
+    const mealDate = dayjs(date);
+    const checkRangeStart = toSunday(mealDate);
+    const checkRangeEnd = checkRangeStart.add(5, "day");
 
-    // Find meals in this day, or any other day in the same week.
-    // todo verify no registered meal already done withon range
 
-    // The reason for the week range, is that when a family's cooking days change, and a meal is already scheduled, we
-    // do not want another day to be openned
-    // const filterDateExisting = uniqueInWeek ?
-    //     (m: FamilyDemand) => dayjs(m.date).locale("he").isSame(date, "week") :
-    //     (m: FamilyDemand) => dayjs(m.date).locale("he").isSame(date, "day");
-    const filterDateExisting = (m: FamilyDemand) => {
-        let found = false;
-        for (const dayOffset of expandDays) {
-            const expandedDate = dayjs(date).add(dayOffset, "day");
-            if (expandedDate.isSame(m.date)) {
-                found = true;
-                break;
-            }
-        }
-        return found;
-    };
     const familyRelevantMeals = meals.filter(m => m.status == Status.Occupied && m.mainBaseFamilyId == family.id && type == m.type);
 
-    if (!familyRelevantMeals.find(m => filterDateExisting(m))) {
+    if (!familyRelevantMeals.find(m => dateInRange(m.date, checkRangeStart, checkRangeEnd))) {
         let filteredExpandDays = expandDays;
         // filters out a sunday or a friday if another week's cooking is adjacent
         const minDay = Math.min(...expandDays);
@@ -236,7 +221,6 @@ function addMeal2(demandsArray: FamilyDemand[], meals: FamilyDemand[], families:
         });
     }
 }
-
 
 export async function getDemands(
     district: string | string[] | undefined,
@@ -453,10 +437,10 @@ export async function updateFamilyDemand(demandId: string, registrationDate: str
     if (isCalcDemandId(demandId)) {
         const { familyId, date } = parseDemandID(demandId);
         // expand the date to sunday - friday - must avoid holiday-treats that span more than one week!!
-        const startDate = dayjs(date).locale("he").startOf("week").format(DATE_AT);
+        const startDate = toSunday(date).format(DATE_AT);
         const endDate = dayjs(startDate).add(5, "day").format(DATE_AT);
 
-        const possibleDemands = await getDemands(demandDistrict, Status.Occupied, type, startDate, endDate);
+        const possibleDemands = await getDemands2(demandDistrict, Status.Occupied, type, startDate, endDate);
         demand = possibleDemands.find(d => d.mainBaseFamilyId == familyId);
     } else {
         const _cities = await getCities();

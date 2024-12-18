@@ -49,7 +49,11 @@ export async function upsertHoliday(holiday: Holiday) {
     } else {
         await AirTableInsert("חגים וחריגים", upsertHolidayFields);
     }
-    holidays.evict();
+
+    return holidays.evict().then(()=>{
+        // Reload cache
+        return holidays.get().then(()=>undefined);
+    });
 }
 
 export async function getHolidays(from: string, to: string): Promise<Holiday[]> {
@@ -67,5 +71,7 @@ export async function getHolidays(from: string, to: string): Promise<Holiday[]> 
 
 export async function deleteHoliday(id: string) {
     await AirTableDelete("חגים וחריגים", id);
-    holidays.evict();
+    return holidays.evict().then(()=>{
+        return holidays.get();
+    });
 }

@@ -255,7 +255,7 @@ interface EditHolidayProps {
 const typeArray = [
     { name: 'חג', value: EventType.Holiday },
     // { name: 'הוספת תאריך למשפחה', value: EventType.Add },
-    { name: 'חסימה/החלפה תאריך למשפחה', value: EventType.Block },
+    { name: 'חסימת תאריך למשפחה', value: EventType.Block },
     { name: 'פינוקי חג', value: EventType.HolidayTreats },
 ];
 
@@ -327,6 +327,7 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
                 {labelDate}
             </label>
             <Calendar
+                maxDate={dayjs().add(3, "month").toDate()}
                 locale="he"
                 id="date" value={dayjs(date).toDate()}
                 onChange={(e) => setDate(dayjs(e.value).format(DATE_AT))} showIcon />
@@ -373,6 +374,7 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
                     {labelAlternativeDate}
                 </label>
                 <Calendar
+                    maxDate={dayjs().add(3, "month").toDate()}
                     locale="he"
                     id="altDate" value={alternateDate ? dayjs(alternateDate).toDate() : undefined}
                     onChange={(e) => setAlternateDate(dayjs(e.value).format(DATE_AT))} showIcon />

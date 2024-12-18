@@ -164,57 +164,54 @@ export function Stats({ userInfo, appServices }: StatsProps) {
                 let familiesMsg = "";
 
                 sortedFamilies.forEach((family) => {
-                        const dates = family.dates.filter(d=>dateInRange(d.date, startDate, endDate));
-                        if (dates.length>0) {
-                            if (familiesMsg.length>0) {
-                                familiesMsg+=", ";
-                            }
-                            familiesMsg += `${family.familyLastName}`;
+                    const dates = family.dates.filter(d => dateInRange(d.date, startDate, endDate));
+                    if (dates.length > 0) {
+                        if (familiesMsg.length > 0) {
+                            familiesMsg += ", ";
                         }
+                        familiesMsg += `${family.familyLastName}`;
+                    }
                 });
                 if (familiesMsg.length > 0) {
-                    message += `* *${city}*\n* > ${familiesMsg}\n\n`;
+                    message += `* *${city}*: ${familiesMsg}\n`;
                 }
             }
             return message;
         }
 
+        const addWeekMessage = (title: string, msg: string) => {
+            if (msg.length > 0) {
+                return `🍲 *${title}*\n${msg}`;
+            }
+            return "";
+        }
+
 
         let message = "היי קהילת נולדת לנצח💜\n";
         message += mode == Modes.Open ?
-            "מי יכול.ה לסייע בבישול בחודש הקרוב 🙏\n" :
-            "מי יכול.ה לסייע ב'פינוקי חג' לקראת החג 🙏\n"
+            "מחפשים מתנדבים לסיוע בבישול 🙏\n" :
+            "מחפשים מתנדבים לסיוע בפינוקי חג 🙏\n"
 
         const startDate = toSunday(dayjs());
         const startDayInMonth = startDate.date();
 
-        // message += "*החודש 🍲*\n"
         if (startDayInMonth > 23) {
             message += getMessageForDates(dayjs(), dayjs().endOf("month"));
         } else if (startDayInMonth > 15) {
-            message += "> השבוע 🍲:\n";
-            message += getMessageForDates(dayjs(), startDate.add(1, "week"));
-
-            message += `> שאר חודש ${startDate.format("MMMM")}  🍲:\n`;
-            message += getMessageForDates(startDate.add(1, "week"), startDate.endOf("month"));
+            message += addWeekMessage("השבוע", getMessageForDates(dayjs(), startDate.add(1, "week")));
+            message += addWeekMessage("שאר חודש", getMessageForDates(startDate.add(1, "week"), startDate.endOf("month")));
         } else {
-            message += "> השבוע 🍲:\n";
-            message += getMessageForDates(dayjs(), startDate.add(1, "week"));
-
-            message += "> שבוע הבא 🍲:\n";
-            message += getMessageForDates(startDate.add(1, "week"), startDate.add(2, "week"));
-
-            message += `> שאר חודש ${startDate.format("MMMM")}  🍲:\n`;
-            message += getMessageForDates(startDate.add(1, "week"), startDate.endOf("month"));
+            message += addWeekMessage("השבוע", getMessageForDates(dayjs(), startDate.add(1, "week")));
+            message += addWeekMessage("שבוע הבא", getMessageForDates(startDate.add(1, "week"), startDate.add(2, "week")));
+            message += addWeekMessage("שאר החודש", getMessageForDates(startDate.add(2, "week"), startDate.endOf("month")));
         }
 
-        message += `> חודש ${startDate.add(1, "month").format("MMMM")}🍲:\n`;
-        message += getMessageForDates(startDate.add(1, "month").startOf("month"), startDate.add(1, "month").endOf("month"));
+        message += addWeekMessage(`חודש ${startDate.add(1, "month").format("MMMM")}`,
+            getMessageForDates(startDate.add(1, "month").startOf("month"), startDate.add(1, "month").endOf("month")));
 
 
-
-        message += `ניתן להשתבץ באפליקציה ב🤖
-מסתבכים? אני פה כדי לעזור`;
+        message += `השתבצו באפליקציה 📱
+צריכים  עזרה? אנחנו כאן!`;
         navigator.clipboard.writeText(message)
         appServices.showMessage("success", "הודעה הוכנה והועתקה - הדבקו היכן שתרצו", "");
     }

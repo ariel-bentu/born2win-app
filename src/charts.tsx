@@ -189,7 +189,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
 
         let message = "היי קהילת נולדת לנצח💜\n";
         message += mode == Modes.Open ?
-            "מחפשים מתנדבים לסיוע בבישול 🙏\n" :
+            "מחפשים מתנדבים לסיוע בבישול 🙏\n\n*שימו 💚 כל הימים פתוחים לכם לשיבוץ*\n\n" :
             "מחפשים מתנדבים לסיוע בפינוקי חג 🙏\n"
 
         const startDate = toSunday(dayjs());
@@ -210,7 +210,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
             getMessageForDates(startDate.add(1, "month").startOf("month"), startDate.add(1, "month").endOf("month")));
 
 
-        message += `השתבצו באפליקציה 📱
+        message += `\nהשתבצו באפליקציה 📱
 צריכים  עזרה? אנחנו כאן!`;
         navigator.clipboard.writeText(message)
         appServices.showMessage("success", "הודעה הוכנה והועתקה - הדבקו היכן שתרצו", "");

@@ -43,6 +43,8 @@ interface DemandChartProps {
     onSelectFamily?: (family: GroupedFamily | undefined) => void,
     setLoading: (isLoading: boolean) => void;
     setReload: (reload: number | ((prev: number) => number)) => void;
+    startDate: Dayjs;
+    endDate: Dayjs;
 }
 
 const Modes = {
@@ -220,6 +222,8 @@ export function Stats({ userInfo, appServices }: StatsProps) {
         setSelectedDistricts(e.value);
     };
 
+    const startDate = dayjs().add(selectedWeeks[0], 'week');
+    const endDate = dayjs().add(selectedWeeks[1], 'week');
     return (
         <div>
             <div className='flex flex-row  justify-content-center align-items-start' style={{ height: 75 }}>
@@ -271,8 +275,14 @@ export function Stats({ userInfo, appServices }: StatsProps) {
                         appServices.showMessage("success", "בוטל בהצלחה", "")
                         setReload(prev => prev + 1)
                     }
-                    } /> :
-                <DemandChart setReload={setReload} setLoading={setLoading} data={data} mode={mode} appServices={appServices} userInfo={userInfo} />
+
+                    }
+                    startDate={startDate} endDate={endDate}
+                /> :
+                <DemandChart
+                    setReload={setReload} setLoading={setLoading} data={data} mode={mode} appServices={appServices} userInfo={userInfo}
+                    startDate={startDate} endDate={endDate}
+                />
             }
         </div>
     );
@@ -574,17 +584,31 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
     );
 };
 
+export const DemandChart: React.FC<DemandChartProps> = ({ data, startDate, endDate }) => {
+    const labels: string[] = [];
+    const fulfilledDemands: number[] = [];
+    const totalDemands: number[] = [];
+    const weekdayCounts: { [key: string]: number[] } = {
+        ראשון: [],
+        שני: [],
+        שלישי: [],
+        רביעי: [],
+        חמישי: [],
+        שישי: [],
+    };
 
-export const DemandChart: React.FC<DemandChartProps> = ({ data }) => {
-    const labels: string[] = []
-    const fulfilledDemands: number[] = []
-    const totalDemands: number[] = []
     const today = dayjs().startOf("day");
+
     data.forEach(demand => {
+        if (!dateInRange(demand.date, startDate, endDate)) return;
+
         const recordDate = dayjs(demand.date).startOf("day");
         const daysDiff = recordDate.diff(today, "days");
         const daysRound2Week = Math.floor(daysDiff / 7);
-        const weekLabel = daysDiff >= 0 && daysDiff <= 6 ? "היום" : today.add(daysRound2Week * 7, "days").format("DD-MM");
+        const weekLabel =
+            daysDiff >= 0 && daysDiff <= 6
+                ? "היום"
+                : today.add(daysRound2Week * 7, "days").format("DD-MM");
 
         let index = labels.findIndex(l => l === weekLabel);
         if (index < 0) {
@@ -592,30 +616,49 @@ export const DemandChart: React.FC<DemandChartProps> = ({ data }) => {
             fulfilledDemands.push(0);
             totalDemands.push(0);
             index = labels.length - 1;
+
+            // Initialize weekday counts for this week
+            Object.keys(weekdayCounts).forEach(day => {
+                weekdayCounts[day].push(0);
+            });
         }
 
         totalDemands[index]++;
         if (demand.status === "תפוס") {
             fulfilledDemands[index]++;
         }
+
+        // Increment weekday count
+        const weekday = recordDate.format("dddd"); // Get the weekday name
+        weekdayCounts[weekday][index]++;
     });
+
     const chartData = {
         labels: labels,
         datasets: [
             {
-                label: 'סה״כ',
+                type: "line",
+                label: "סה״כ",
                 data: totalDemands,
                 fill: false,
-                borderColor: '#42A5F5',
+                borderColor: "#42A5F5",
                 tension: 0.1,
             },
             {
-                label: 'שובצו',
+                type: "line",
+                label: "שובצו",
                 data: fulfilledDemands,
                 fill: false,
-                borderColor: '#66BB6A',
+                borderColor: "#66BB6A",
                 tension: 0.1,
             },
+            // Add datasets for weekdays
+            ...Object.keys(weekdayCounts).map(day => ({
+                type: "bar",
+                label: day,
+                data: weekdayCounts[day],
+                backgroundColor: getColorForDay(day), // Assign a unique color to each weekday
+            })),
         ],
     };
 
@@ -623,25 +666,45 @@ export const DemandChart: React.FC<DemandChartProps> = ({ data }) => {
         responsive: true,
         plugins: {
             legend: {
-                position: 'top',
-            }
+                position: "top",
+            },
+            tooltip: {
+                mode: "index",
+                intersect: false,
+            },
         },
         scales: {
+            x: {
+                stacked: false, // Disable stacking to display bars side by side
+            },
             y: {
+                stacked: false, // Ensure side-by-side behavior for y-axis as well
                 beginAtZero: true,
                 ticks: {
-                    stepSize: 1,  // Forces the y-axis to increment by 1
+                    stepSize: 1,
                     callback: function (value: number) {
                         return Number.isInteger(value) ? value : null;
-                    }
-                }
-            }
-        }
+                    },
+                },
+            },
+        },
     };
 
-    return <Chart type="line" data={chartData} options={options} />;
+    return <Chart type="bar" data={chartData} options={options} />;
 };
 
+// Utility function to assign colors to weekdays
+function getColorForDay(day: string): string {
+    const colors: { [key: string]: string } = {
+        ראשון: "#FF6384",
+        שני: "#36A2EB",
+        שלישי: "#FFCE56",
+        רביעי: "#4BC0C0",
+        חמישי: "#9966FF",
+        שישי: "#FF9F40",
+    };
+    return colors[day] || "#CCCCCC"; // Default color if day not recognized
+}
 
 // Function to group the data by city and family, with multiple dates for each family
 const groupByCityAndFamily = (familyDemands: FamilyDemand[]): GroupedData => {

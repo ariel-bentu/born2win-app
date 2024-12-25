@@ -1786,6 +1786,9 @@ async function syncBorn2WinFamilies() {
             let changedToActive = false;
             if (familyDoc && familyDoc.exists) {
                 const prevFamilyRecord = familyDoc.data();
+                if (familyRecord.active || prevFamilyRecord?.active) {
+                    count++;
+                }
                 if (prevFamilyRecord &&
                     familyRecord.active === prevFamilyRecord.active &&
                     familyRecord.manychat_id === prevFamilyRecord.manychat_id &&
@@ -1794,7 +1797,7 @@ async function syncBorn2WinFamilies() {
                     // No change!
                     continue;
                 }
-                count++;
+
                 changedToActive = (prevFamilyRecord ? familyRecord.active != prevFamilyRecord.active : true);
                 batch.update(familyDoc.ref, familyRecord);
             } else {

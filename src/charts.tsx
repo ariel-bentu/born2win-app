@@ -31,6 +31,7 @@ import { Dialog } from "primereact/dialog";
 import { openWhatsApp } from "./notification-actions";
 import { GiPartyHat } from 'react-icons/gi';
 
+
 dayjs.extend(minMax);
 
 interface DemandChartProps {
@@ -125,6 +126,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
     const [reload, setReload] = useState<number>(0);
     const [selectedFamily, setSelectedFamily] = useState<GroupedFamily | undefined>();
     const [holidayTreatsExist, setHolidayTreatsExist] = useState<boolean>(false);
+    const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
 
     useEffect(() => {
         if (userInfo?.isAdmin && selectedWeeks && selectedDistricts.length > 0) {
@@ -157,66 +159,152 @@ export function Stats({ userInfo, appServices }: StatsProps) {
     // Function to prepare the message using the structured data, including all dates per family
     const prepareMessageToSend = (groupedData: GroupedData, mode: number) => {
         const sortedCities = Object.keys(groupedData).sort();
-
         const getMessageForDates = (startDate: Dayjs, endDate: Dayjs) => {
-            let message = ""
+            let cityMessages: string[] = [];
+            let totalMissingVolunteers = 0;
+
             for (const city of sortedCities) {
-                // Sort families alphabetically within each city
                 const sortedFamilies = sortFamilies(groupedData[city]);
                 let familiesMsg = "";
 
                 sortedFamilies.forEach((family) => {
                     const dates = family.dates.filter(d => dateInRange(d.date, startDate, endDate));
                     if (dates.length > 0) {
-                        if (familiesMsg.length > 0) {
-                            familiesMsg += ", ";
+                        if (familiesMsg.length > 0) familiesMsg += ", ";
+                        if (!selectedFamily) {
+                            familiesMsg += `${family.familyLastName}`;
                         }
-                        familiesMsg += `${family.familyLastName}`;
+                        totalMissingVolunteers += dates.length;
                     }
                 });
-                if (familiesMsg.length > 0) {
-                    message += `* *${city}*: ${familiesMsg}\n`;
+                if (familiesMsg.length > 0 || selectedFamily) {
+                    if (!selectedFamily) {
+                        cityMessages.push(`* *${city}*: ${familiesMsg}`);
+                    } else {
+                        cityMessages.push(`${familiesMsg}`);
+                    }
                 }
             }
-            return message;
-        }
+            return { cityMessages, totalMissingVolunteers };
+        };
 
-        const addWeekMessage = (title: string, msg: string) => {
-            if (msg.length > 0) {
-                return `🍲 *${title}*\n${msg}`;
+        if (selectedFamily) {
+            // Check if selectedFamily is different from familyDetails
+            if (familyDetails && familyDetails.mainBaseFamilyId === selectedFamily.mainBaseFamilyId) {
+                const familyMessage = createSelectedFamilyMsg(
+                    selectedFamily,
+                    familyDetails,
+                    groupedData,
+                    sortedCities,
+                    getMessageForDates // Pass explicitly
+                );
+                navigator.clipboard.writeText(familyMessage);
+                appServices.showMessage("success", "הודעה הוכנה והועתקה - הדבקו היכן שתרצו", "");
+                return;
+            } else {
+                // Fetch new family details if the selectedFamily has changed
+                getFamilyDetails(
+                    selectedFamily?.districtBaseFamilyId as string,
+                    selectedFamily?.district as string,
+                    selectedFamily?.mainBaseFamilyId as string,
+                    selectedFamily?.mainBaseFamilyId as string,
+                    true
+                ).then(res => {
+                    setFamilyDetails(res); // Update familyDetails state
+                    // Now that familyDetails is updated, generate the message
+                    const familyMessage = createSelectedFamilyMsg(
+                        selectedFamily,
+                        res, // Use the newly fetched family details
+                        groupedData,
+                        sortedCities,
+                        getMessageForDates
+                    );
+                    navigator.clipboard.writeText(familyMessage);
+                    appServices.showMessage("success", "הודעה הוכנה והועתקה - הדבקו היכן שתרצו", "");
+                }).catch(() =>
+                    appServices.showMessage("error", "אירעה שגיאה בעת שליפת פרטי המשפחה", "")
+                ).finally(() => setLoading(false));
+                return; // Wait for the family details to be fetched before proceeding
             }
-            return "";
         }
-
-
-        let message = "היי קהילת נולדת לנצח💜\n";
-        message += mode == Modes.Open ?
-            "מחפשים מתנדבים לסיוע בבישול 🙏\n\n*שימו 💚 כל הימים פתוחים לכם לשיבוץ*\n\n" :
-            "מחפשים מתנדבים לסיוע בפינוקי חג 🙏\n"
+        let message = "היי קהילת נולדת לנצח💜\n\n";
+        message += mode == Modes.Open
+            ? "מחפשים מתנדבים לסיוע בבישול 🙏\n\n*שימו 💚 כל הימים פתוחים לכם לשיבוץ*\n\n"
+            : "מחפשים מתנדבים לסיוע בפינוקי חג 🙏\n";
 
         const startDate = toSunday(dayjs());
-        const startDayInMonth = startDate.date();
+        const currentMonth = startDate.format("MMMM");
+        const nextMonth = startDate.add(1, "month").format("MMMM");
 
-        if (startDayInMonth > 23) {
-            message += getMessageForDates(dayjs(), dayjs().endOf("month"));
-        } else if (startDayInMonth > 15) {
-            message += addWeekMessage("השבוע", getMessageForDates(dayjs(), startDate.add(1, "week")));
-            message += addWeekMessage("שאר חודש", getMessageForDates(startDate.add(1, "week"), startDate.endOf("month")));
-        } else {
-            message += addWeekMessage("השבוע", getMessageForDates(dayjs(), startDate.add(1, "week")));
-            message += addWeekMessage("שבוע הבא", getMessageForDates(startDate.add(1, "week"), startDate.add(2, "week")));
-            message += addWeekMessage("שאר החודש", getMessageForDates(startDate.add(2, "week"), startDate.endOf("month")));
+        const addMonthMessage = (title: string, startDate: Dayjs, endDate: Dayjs) => {
+            const { cityMessages, totalMissingVolunteers } = getMessageForDates(startDate, endDate);
+            if (cityMessages.length > 0) {
+                return `🍲 *${title}* חסרים ${totalMissingVolunteers} מתנדבים\n${cityMessages.join("\n")}\n\n`;
+            }
+            return "";
+        };
+        message += addMonthMessage(
+            `חודש ${currentMonth}`,
+            startDate.startOf("month"),
+            startDate.endOf("month")
+        );
+        message += addMonthMessage(
+            `חודש ${nextMonth}`,
+            startDate.add(1, "month").startOf("month"),
+            startDate.add(1, "month").endOf("month")
+        );
+        message += `השתבצו באפליקציה 📱\n\nצריכים עזרה? אנחנו כאן!`;
+        navigator.clipboard.writeText(message);
+        appServices.showMessage("success", "הודעה הוכנה והועתקה - הדבקו היכן שתרצו", "");
+    };
+    const createSelectedFamilyMsg = (
+        selectedFamily: GroupedFamily,
+        familyDetails: FamilyDetails,
+        groupedData: GroupedData,
+        sortedCities: string[],
+        getMessageForDates?: (startDate: Dayjs, endDate: Dayjs) => { cityMessages: string[]; totalMissingVolunteers: number }
+    ) => {
+        // Validate the existence of getMessageForDates
+        if (!getMessageForDates) {
+            throw new Error("getMessageForDates function is required.");
         }
 
-        message += addWeekMessage(`חודש ${startDate.add(1, "month").format("MMMM")}`,
-            getMessageForDates(startDate.add(1, "month").startOf("month"), startDate.add(1, "month").endOf("month")));
+        let familyMessage = `ב${familyDetails.city}\n\n`; // Add city at the top
+        familyMessage += `משפחת ${selectedFamily.familyLastName}\n\n`;
+        familyMessage += `חולה בגיל ${familyDetails.patientAge}\n\n`;
+        familyMessage += `משפחה בת ${familyDetails.adultsCount} נפשות\n\n`;
 
+        if (familyDetails.kosherLevel) {
+            familyMessage += `${familyDetails.kosherLevel}\n\n`;
+        }
+        familyMessage += "מי יכול.ה לבשל🍲\n\n";
 
-        message += `\nהשתבצו באפליקציה 📱
-צריכים  עזרה? אנחנו כאן!`;
-        navigator.clipboard.writeText(message)
-        appServices.showMessage("success", "הודעה הוכנה והועתקה - הדבקו היכן שתרצו", "");
-    }
+        const startDate = toSunday(dayjs());
+        const currentMonth = startDate.format("MMMM");
+        const nextMonth = startDate.add(1, "month").format("MMMM");
+        const addMonthMessage = (title: string, startDate: Dayjs, endDate: Dayjs) => {
+            const { cityMessages, totalMissingVolunteers } = getMessageForDates(startDate, endDate);
+            if (cityMessages.length > 0 && totalMissingVolunteers > 0) {
+                return `🍲 *${title}* ${
+                    totalMissingVolunteers === 1 ? "חסר מתנדב" : `חסרים ${totalMissingVolunteers} מתנדבים`
+                }\n${cityMessages.join("\n")}\n\n`;
+            }
+            return "";
+        };
+
+        familyMessage += addMonthMessage(
+            `חודש ${currentMonth}`,
+            startDate.startOf("month"),
+            startDate.endOf("month")
+        );
+        familyMessage += addMonthMessage(
+            `חודש ${nextMonth}`,
+            startDate.add(1, "month").startOf("month"),
+            startDate.add(1, "month").endOf("month")
+        );
+        familyMessage += `השתבצו באפליקציה 📱\n\nצריכים עזרה? אנחנו כאן!`;
+        return familyMessage;
+    };
 
     const handleDistrictChange = (e: any) => {
         setSelectedDistricts(e.value);
@@ -373,7 +461,6 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
                     .then(res => setFamilyDetails(res))
                     .catch(err => setError(err))
                     .finally(() => setLoading(false));
-
 
                 if (demand.transpotingVolunteerId) {
                     getVolunteerInfo(demand.transpotingVolunteerId).then(v => {

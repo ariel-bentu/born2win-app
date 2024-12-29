@@ -269,10 +269,10 @@ export function Stats({ userInfo, appServices }: StatsProps) {
             throw new Error("getMessageForDates function is required.");
         }
 
-        let familyMessage = `ב${familyDetails.city}\n\n`; // Add city at the top
-        familyMessage += `משפחת ${selectedFamily.familyLastName}\n\n`;
-        familyMessage += `חולה בגיל ${familyDetails.patientAge}\n\n`;
-        familyMessage += `משפחה בת ${familyDetails.adultsCount} נפשות\n\n`;
+        let familyMessage = `*ב${familyDetails.city}*\n`; // Add city at the top in bold
+        familyMessage += `*משפחת ${selectedFamily.familyLastName}*\n\n`; // Make family name bold
+        familyMessage += `חולה בגיל ${familyDetails.patientAge}\n`;
+        familyMessage += `משפחה בת ${familyDetails.adultsCount} נפשות\n`; // Remove extra empty line
 
         if (familyDetails.kosherLevel) {
             familyMessage += `${familyDetails.kosherLevel}\n\n`;
@@ -287,7 +287,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
             if (cityMessages.length > 0 && totalMissingVolunteers > 0) {
                 return `🍲 *${title}* ${
                     totalMissingVolunteers === 1 ? "חסר מתנדב" : `חסרים ${totalMissingVolunteers} מתנדבים`
-                }\n${cityMessages.join("\n")}\n\n`;
+                }\n${cityMessages.join("\n")}\n`;
             }
             return "";
         };

@@ -269,10 +269,10 @@ export function Stats({ userInfo, appServices }: StatsProps) {
             throw new Error("getMessageForDates function is required.");
         }
 
-        let familyMessage = `*ב${familyDetails.city}*\n`; // Add city at the top in bold
-        familyMessage += `*משפחת ${selectedFamily.familyLastName}*\n\n`; // Make family name bold
+        let familyMessage = `*ב${familyDetails.city}*\n`;
+        familyMessage += `*משפחת ${selectedFamily.familyLastName}*\n\n`;
         familyMessage += `חולה בגיל ${familyDetails.patientAge}\n`;
-        familyMessage += `משפחה בת ${familyDetails.adultsCount} נפשות\n`; // Remove extra empty line
+        familyMessage += `משפחה בת ${familyDetails.adultsCount} נפשות\n`;
 
         if (familyDetails.kosherLevel) {
             familyMessage += `${familyDetails.kosherLevel}\n\n`;

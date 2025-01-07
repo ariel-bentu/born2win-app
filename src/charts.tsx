@@ -239,7 +239,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
         const addMonthMessage = (title: string, startDate: Dayjs, endDate: Dayjs) => {
             const { cityMessages, totalMissingVolunteers } = getMessageForDates(startDate, endDate);
             if (cityMessages.length > 0) {
-                return `🍲 *${title}* חסרים ${totalMissingVolunteers} מתנדבים\n${cityMessages.join("\n")}\n\n`;
+                return `🍲 *${title}* נותרו עוד ${totalMissingVolunteers} תאריכים פנויים\n${cityMessages.join("\n")}\n\n`;
             }
             return "";
         };
@@ -286,7 +286,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
             const { cityMessages, totalMissingVolunteers } = getMessageForDates(startDate, endDate);
             if (cityMessages.length > 0 && totalMissingVolunteers > 0) {
                 return `🍲 *${title}* ${
-                    totalMissingVolunteers === 1 ? "חסר מתנדב" : `חסרים ${totalMissingVolunteers} מתנדבים`
+                    totalMissingVolunteers === 1 ? "נותר תאריך פנוי אחד" : `נותרו ${totalMissingVolunteers} תאריכים פנויים`
                 }\n${cityMessages.join("\n")}\n`;
             }
             return "";

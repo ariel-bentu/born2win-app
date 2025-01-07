@@ -228,32 +228,27 @@ export function Stats({ userInfo, appServices }: StatsProps) {
             }
         }
         let message = "היי קהילת נולדת לנצח💜\n\n";
-        message += mode == Modes.Open
-            ? "מחפשים מתנדבים לסיוע בבישול 🙏\n\n*שימו 💚 כל הימים פתוחים לכם לשיבוץ*\n\n"
-            : "מחפשים מתנדבים לסיוע בפינוקי חג 🙏\n";
 
         const startDate = toSunday(dayjs());
         const currentMonth = startDate.format("MMMM");
         const nextMonth = startDate.add(1, "month").format("MMMM");
-
-        const addMonthMessage = (title: string, startDate: Dayjs, endDate: Dayjs) => {
+        const addMonthMessage = (title: string, startDate: Dayjs, endDate: Dayjs, isFirstMonth = false) => {
             const { cityMessages, totalMissingVolunteers } = getMessageForDates(startDate, endDate);
             if (cityMessages.length > 0) {
-                return `🍲 *${title}* נותרו עוד ${totalMissingVolunteers} תאריכים פנויים\n${cityMessages.join("\n")}\n\n`;
+                let monthMessage = `🍲 *${title}* נותרו עוד ${totalMissingVolunteers} תאריכים פנויים\n\n`;
+                if (isFirstMonth) {
+                    // Add the special line immediately after the first month's header
+                    monthMessage += "*שימו 💚 כל הימים פתוחים לכם לשיבוץ*\n\n";
+                }
+                monthMessage += `${cityMessages.join("\n")}\n\n`;
+                return monthMessage;
             }
             return "";
         };
-        message += addMonthMessage(
-            `חודש ${currentMonth}`,
-            startDate.startOf("month"),
-            startDate.endOf("month")
-        );
-        message += addMonthMessage(
-            `חודש ${nextMonth}`,
-            startDate.add(1, "month").startOf("month"),
-            startDate.add(1, "month").endOf("month")
-        );
-        message += `השתבצו באפליקציה 📱\n\nצריכים עזרה? אנחנו כאן!`;
+        message += addMonthMessage(`חודש ${currentMonth}`, startDate, startDate.endOf("month"), true);
+        message += addMonthMessage(`חודש ${nextMonth}`, startDate.add(1, "month").startOf("month"), startDate.add(1, "month").endOf("month"));
+        message += "השתבצו באפליקציה 📱\n\nצריכים עזרה? אנחנו כאן!";
+
         navigator.clipboard.writeText(message);
         appServices.showMessage("success", "הודעה הוכנה והועתקה - הדבקו היכן שתרצו", "");
     };

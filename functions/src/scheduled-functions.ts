@@ -169,7 +169,7 @@ async function sendToManychat(manySubscriberId: string, manyChatFlowId: string, 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 
-export async function SendLinkOrInstall() {
+export async function SendReminderOrInstallMsg() {
     const date = dayjs().format(DATE_AT);
 
     const query = new AirTableQuery<{ id: string, familyCount: number }>("מחוז", (rec) => ({
@@ -179,17 +179,16 @@ export async function SendLinkOrInstall() {
     const districtsIdsWithFamilies = (await query.execute()).filter(d => d.familyCount > 0).map(d => d.id);
 
     const users = await db.collection(Collections.Users).where("active", "==", true).get();
-    let relevantUsers = users.docs.filter(u =>
-        u.data().uid == undefined &&
-        u.data().manychat_id !== undefined &&
-        u.data().sendWeeklyMessage !== date);
-    const potentialUsers = relevantUsers.length;
-    relevantUsers = relevantUsers.filter(u => districtsIdsWithFamilies.some((did: string) => u.data().districts.includes(did)));
-    const usersWithNoAvtiveFamilies = potentialUsers - relevantUsers.length;
+
+    const usersWithNoActiveFamilies = users.docs.filter(u => !districtsIdsWithFamilies.some((did: string) => u.data().districts.includes(did)));
+    const allUsersInActiveDistricts = users.docs.filter(u => districtsIdsWithFamilies.some((did: string) => u.data().districts.includes(did)) &&
+        u.data().manychat_id !== undefined);
+
+    const usersNotInApp = users.docs.filter(u => u.data().uid == undefined);
+    const usersInApp = allUsersInActiveDistricts.filter(u => u.data().uid != undefined);
 
     let bulk: Promise<any>[] = [];
-    let totalInstall = 0;
-    for (const user of relevantUsers) {
+    for (const user of usersNotInApp) {
         if (bulk.length == 10) {
             await Promise.all(bulk);
             await delay(1000);
@@ -198,37 +197,33 @@ export async function SendLinkOrInstall() {
         bulk.push(sendToManychat(user.data().manychat_id, ManyChatFlows.SendInstallMessage, {})
             .then(() => user.ref.update({ sendWeeklyMessage: date }))
             .catch(error => {
-                console.log("Error sending install app message", error.message, "man_id", user.data().manychat_id);
+                console.log("Error sending install whatsApp message", error.message, "man_id", user.data().manychat_id);
                 return { user, error };
             }));
-
-        totalInstall++;
     }
     await Promise.all(bulk);
-    // bulk = [];
-    // for (const user of usersForLink) {
-    //     if (bulk.length == 10) {
-    //         await Promise.all(bulk);
-    //         await delay(1000);
-    //         console.log("10 more send", totalLinks, "of", usersForLink.length);
-    //         bulk = [];
-    //     }
-    //     bulk.push(sendToManychat(user.data().manychat_id, ManyChatFlows.SendOldLink, {})
-    //         .then(() => user.ref.update({ sendWeeklyMessage: date }))
-    //         .catch(error => {
-    //             console.log("Error sending old link", error.message, "man_id", user.data().manychat_id);
-    //             return { user, error };
-    //         }));
 
-    //     totalLinks++;
-    // }
-    // await Promise.all(bulk);
+    bulk = [];
+    for (const user of usersInApp) {
+        if (bulk.length == 10) {
+            await Promise.all(bulk);
+            await delay(1000);
+            bulk = [];
+        }
+        bulk.push(sendToManychat(user.data().manychat_id, ManyChatFlows.SendInstallMessage, {})
+            .then(() => user.ref.update({ sendWeeklyMessage: date }))
+            .catch(error => {
+                console.log("Error sending reminder whatsApp message", error.message, "man_id", user.data().manychat_id);
+                return { user, error };
+            }));
+    }
+    await Promise.all(bulk);
+
 
     const admins = await db.collection(Collections.Admins).get();
     const adminsIds = admins.docs.map(doc => doc.id);
 
-    await addNotificationToQueue("נשלחו הודעות בווטסאפ!", `סה״כ הודעות התקנה: ${totalInstall}
-סה״כ לינקים: 0
-מותקני אפליקציה: ${users.docs.length - totalInstall - usersWithNoAvtiveFamilies}
-מתנדבים במחוז ללא משפחות: ${usersWithNoAvtiveFamilies}`, NotificationChannels.Alerts, [], adminsIds);
+    await addNotificationToQueue("נשלחו הודעות בווטסאפ!", `סה״כ הודעות התקנה: ${usersNotInApp.length}
+סה״כ הודעות תזכורת למותקני אפליקציה: ${usersInApp.length}
+מתנדבים במחוז ללא משפחות: ${usersWithNoActiveFamilies.length}`, NotificationChannels.Alerts, [], adminsIds);
 }

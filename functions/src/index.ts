@@ -51,7 +51,7 @@ import crypto = require("crypto");
 import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { getSafeFirstArrayElement, IL_DATE, isValidIsraeliIdentificationNumber, replaceAll, simplifyFamilyName } from "../../src/utils";
 import localeData = require("dayjs/plugin/localeData");
-import { SendLinkOrInstall, weeklyNotifyFamilies } from "./scheduled-functions";
+import { SendReminderOrInstallMsg, weeklyNotifyFamilies } from "./scheduled-functions";
 import { AirTableQuery, AirTableUpdate, CachedAirTable } from "./airtable";
 import { getDemands, getDemands2, updateFamilyDemand } from "./demands";
 import { activeFamilies, deleteContact, getFamilyContacts, getFamilyDetails2, searchFamilies, upsertContact } from "./families";
@@ -1375,7 +1375,7 @@ exports.httpApp = onRequest(app);
  * desc: for logs
  * min: the minute in the hour, or * for every minute
  * hour: a number or an array of numbers - the hour in the day to run the scheduled task, * for every hour
- * weekday: day in the week 0-Sun, 2-Mon,...6-Sat, * for every day
+ * weekday: day in the week 0-Sun, 1-Mon,...6-Sat, * for every day
  * callback: an async function to call at the scheduled time
 */
 
@@ -1387,8 +1387,10 @@ const schedules = [
     { desc: "Alert 72 hours before cooking", min: 0, hour: [10], weekDay: "*", callback: alertUpcomingCooking },
     { desc: "Birthdays greeting", min: 0, hour: [10], weekDay: "*", callback: greetingsToBirthdays },
     { desc: "Weekly Message to Families", min: 0, hour: [20], weekDay: "6", callback: weeklyNotifyFamilies },
-    { desc: "Links to install or old-link on Sunday at 09:00", min: 0, hour: [9], weekDay: 0, callback: SendLinkOrInstall },
-    { desc: "Reminder to all volunteers via app", min: 0, hour: [10], weekDay: 0, callback: remindVolunteersToRegister },
+    { desc: "Links to install or reminder on WhatsApp - Sunday at 09:00", min: 0, hour: [9], weekDay: 0, callback: SendReminderOrInstallMsg },
+    { desc: "Links to install or reminder on WhatsApp - Wed at 20:00", min: 0, hour: [9], weekDay: 0, callback: SendReminderOrInstallMsg },
+    { desc: "Reminder to all volunteers via app - Sunday at 10", min: 0, hour: [10], weekDay: 0, callback: remindVolunteersToRegister },
+    { desc: "Reminder to all volunteers via app - Wed at 20", min: 0, hour: [20], weekDay: 3, callback: remindVolunteersToRegister },
     { desc: "Deffered Notifications", min: [0, 30], hour: "*", weekDay: "*", callback: checkDeferredNotifications },
     // todo - archive notifications
 ];

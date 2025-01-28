@@ -5,3 +5,10 @@
 .contact-edit  .p-field {
     padding: 5px;
 }
+
+.mandatory-field {
+    color: red; 
+    vertical-align: super; 
+    font-size:0.8em; 
+    margin-right: 2px;
+}

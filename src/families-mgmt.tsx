@@ -18,7 +18,6 @@ import { Calendar } from 'primereact/calendar';
 import { InputNumber } from 'primereact/inputnumber';
 import { deleteContact, getFamilyContacts, handleSearchFamilies, upsertContact } from './api';
 import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete';
-import { openWhatsApp } from './notification-actions';
 import { InProgress, WhatsAppButton } from './common-ui';
 import dayjs from 'dayjs';
 import { confirmPopup } from 'primereact/confirmpopup';
@@ -98,10 +97,11 @@ interface ContactListProps {
     appServices: AppServices;
     reload: number;
     setReload: any;
-    setInProgress: (inprog: boolean) => void
+    setInProgress: (inprog: boolean) => void;
+    inProgress: boolean;
 }
 
-const ContactList: React.FC<ContactListProps> = ({ family, appServices, reload, setReload, setInProgress }) => {
+const ContactList: React.FC<ContactListProps> = ({ family, appServices, reload, setReload, setInProgress, inProgress }) => {
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [openForm, setOpenForm] = useState<boolean>(false);
     const [currentContact, setCurrentContact] = useState<Contact | null>(null);
@@ -196,6 +196,7 @@ const ContactList: React.FC<ContactListProps> = ({ family, appServices, reload, 
                     onClose={handleFormClose}
                     familyId={family.id}
                     setInProgress={setInProgress}
+                    inProgress={inProgress}
                 />
             </Dialog>
         </div>
@@ -224,7 +225,7 @@ const ContactsManager = ({ userInfo, appServices }: ContactsManagerProps) => {
             </div>
             <div className="p-col-12 p-md-8">
                 {selectedFamily && (
-                    <ContactList family={selectedFamily} appServices={appServices} reload={reload} setReload={setReload} setInProgress={setInProgress} />
+                    <ContactList family={selectedFamily} appServices={appServices} reload={reload} setReload={setReload} setInProgress={setInProgress} inProgress={inProgress} />
                 )}
             </div>
         </div>
@@ -239,8 +240,9 @@ export interface ContactFormProps {
     onClose: (reload: boolean) => void;
     familyId: string;
     setInProgress: (inprog: boolean) => void;
+    inProgress:boolean;
 }
-const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices, familyId, setInProgress }) => {
+const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices, familyId, setInProgress, inProgress }) => {
     const [phoneInvalid, setPhoneInvalid] = useState<boolean | undefined>();
     const [formData, setFormData] = useState<Contact>(
         contact || {
@@ -286,9 +288,19 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices
             appServices.showMessage("error", "חובה למלא שם", "");
             return;
         }
+        
+        if (contact.role.length == 0) {
+            appServices.showMessage("error", "חובה למלא תפקיד", "");
+            return;
+        }
+
+        if (contact.relationToPatient.length == 0) {
+            appServices.showMessage("error", "חובה למלא קשר לחולה", "");
+            return;
+        }
 
         setInProgress(true);
-        upsertContact(contact, familyId)
+        return upsertContact(contact, familyId)
             .then(() => {
                 appServices.showMessage("success", "נשמר בהצלחה", "");
                 onClose(true);
@@ -302,7 +314,7 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices
             <div className="p-grid">
                 {/* First Name */}
                 <div className="p-field p-col-12 p-md-6">
-                    <label htmlFor="firstName">שם פרטי</label>
+                    <label htmlFor="firstName">שם פרטי<span className='mandatory-field'>*</span></label>
                     <InputText
                         id="firstName"
                         value={formData.firstName}
@@ -311,7 +323,7 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices
                 </div>
                 {/* Last Name */}
                 <div className="p-field p-col-12 p-md-6">
-                    <label htmlFor="lastName">שם משפחה</label>
+                    <label htmlFor="lastName">שם משפחה<span className='mandatory-field'>*</span></label>
                     <InputText
                         id="lastName"
                         value={formData.lastName}
@@ -320,7 +332,7 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices
                 </div>
                 {/* Role */}
                 <div className="p-field p-col-12">
-                    <label htmlFor="role">תפקיד</label>
+                    <label htmlFor="role">תפקיד<span className='mandatory-field'>*</span></label>
                     <MultiSelect
                         id="role"
                         value={formData.role}
@@ -342,7 +354,7 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices
                 </div>
                 {/* Phone */}
                 <div className="p-field p-col-12 p-md-6 w-8 mt-2">
-                    <label htmlFor="phone">טלפון</label>
+                    <label htmlFor="phone">טלפון<span className='mandatory-field'>*</span></label>
                     <InputText
                         invalid={phoneInvalid}
                         dir='ltr'
@@ -413,7 +425,7 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices
                 </div>
                 {/* Relation to Patient */}
                 <div className="p-field p-col-12 p-md-6">
-                    <label htmlFor="relationToPatient">סוג הקשר לחולה</label>
+                    <label htmlFor="relationToPatient">סוג הקשר לחולה<span className='mandatory-field'>*</span></label>
                     <Dropdown
                         id="relationToPatient"
                         value={formData.relationToPatient}
@@ -435,6 +447,7 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices
                 {/* Submit and Cancel Buttons */}
                 <div className="p-field p-col-12">
                     <Button
+                        disabled={inProgress}
                         label={contact ? 'עדכן' : 'הוסף'}
                         icon="pi pi-check"
                         onClick={() => handleSubmit(formData, familyId)}

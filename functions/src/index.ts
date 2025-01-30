@@ -224,6 +224,8 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
     }
 
     const uulp = request.data as UpdateUserLoginPayload;
+
+    logger.info("UpdateUserLogin", uid, uulp);
     const now = dayjs().utc().tz(JERUSALEM);
 
     let doc;
@@ -1388,7 +1390,7 @@ const schedules = [
     { desc: "Birthdays greeting", min: 0, hour: [10], weekDay: "*", callback: greetingsToBirthdays },
     { desc: "Weekly Message to Families", min: 0, hour: [20], weekDay: "6", callback: weeklyNotifyFamilies },
     { desc: "Links to install or reminder on WhatsApp - Sunday at 09:00", min: 0, hour: [9], weekDay: 0, callback: SendReminderOrInstallMsg },
-    { desc: "Links to install or reminder on WhatsApp - Wed at 20:00", min: 0, hour: [9], weekDay: 0, callback: SendReminderOrInstallMsg },
+    { desc: "Links to install or reminder on WhatsApp - Wed at 20:00", min: 25, hour: [20], weekDay: 3, callback: SendReminderOrInstallMsg },
     { desc: "Reminder to all volunteers via app - Sunday at 10", min: 0, hour: [10], weekDay: 0, callback: remindVolunteersToRegister },
     { desc: "Reminder to all volunteers via app - Wed at 20", min: 0, hour: [20], weekDay: 3, callback: remindVolunteersToRegister },
     { desc: "Deffered Notifications", min: [0, 30], hour: "*", weekDay: "*", callback: checkDeferredNotifications },

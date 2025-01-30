@@ -4,9 +4,9 @@ import axios from "axios";
 import { addNotificationToQueue, chunkArray, DATE_AT, db, manyChatApiKey } from ".";
 import { FieldPath } from "firebase-admin/firestore";
 import localeData = require("dayjs/plugin/localeData");
-import { Collections, NotificationChannels, VolunteerType } from "../../src/types";
+import { Collections, NotificationChannels, Status, VolunteerType } from "../../src/types";
 import { AirTableQuery } from "./airtable";
-import { getDemands2 } from "./demands";
+import { getDemands, getDemands2 } from "./demands";
 
 require("dayjs/locale/he");
 dayjs.extend(localeData);
@@ -172,16 +172,33 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export async function SendReminderOrInstallMsg() {
     const date = dayjs().format(DATE_AT);
 
-    const query = new AirTableQuery<{ id: string, familyCount: number }>("מחוז", (rec) => ({
+    const openMeals = await getDemands(undefined, Status.Available, VolunteerType.Meal, dayjs().add(1, "day").format(DATE_AT),
+        dayjs().add(30, "days").format(DATE_AT));
+
+    const query = new AirTableQuery<{ id: string, familyCount: number, name: string }>("מחוז", (rec) => ({
         id: rec.id,
         familyCount: rec.fields["כמות משפחות פעילות במחוז"],
+        name: rec.fields.Name,
     }));
-    const districtsIdsWithFamilies = (await query.execute()).filter(d => d.familyCount > 0).map(d => d.id);
+    const districtsIdsWithFamilies = (await query.execute()).filter(d => d.familyCount > 0);
+
+    // remove districts with too few open meals: les than 1/2 meal per family
+    const districtsWithEnoughOpenMeals = [] as string[];
+    const districtsWithTooFewOpenMeals = [] as any[];
+    for (const district of districtsIdsWithFamilies) {
+        const openMealsInDistrict = openMeals.filter(om => om.district == district.id).length;
+        if (openMealsInDistrict > 0 && district.familyCount / openMealsInDistrict > .5) {
+            districtsWithEnoughOpenMeals.push(district.id);
+        } else {
+            const ratio = openMealsInDistrict == 0 ? 0 : parseFloat((district.familyCount / openMealsInDistrict).toFixed(1));
+            districtsWithTooFewOpenMeals.push(`${district.name}: ${ratio} ארוחה לכל משפחה`);
+        }
+    }
 
     const users = await db.collection(Collections.Users).where("active", "==", true).get();
 
-    const usersWithNoActiveFamilies = users.docs.filter(u => !districtsIdsWithFamilies.some((did: string) => u.data().districts.includes(did)));
-    const allUsersInActiveDistricts = users.docs.filter(u => districtsIdsWithFamilies.some((did: string) => u.data().districts.includes(did)) &&
+    const usersWithNoActiveFamilies = users.docs.filter(u => !districtsWithEnoughOpenMeals.some((did: string) => u.data().districts.includes(did)));
+    const allUsersInActiveDistricts = users.docs.filter(u => districtsWithEnoughOpenMeals.some((did: string) => u.data().districts.includes(did)) &&
         u.data().manychat_id !== undefined);
 
     const usersNotInApp = users.docs.filter(u => u.data().uid == undefined);
@@ -225,5 +242,7 @@ export async function SendReminderOrInstallMsg() {
 
     await addNotificationToQueue("נשלחו הודעות בווטסאפ!", `סה״כ הודעות התקנה: ${usersNotInApp.length}
 סה״כ הודעות תזכורת למותקני אפליקציה: ${usersInApp.length}
-מתנדבים במחוז ללא משפחות: ${usersWithNoActiveFamilies.length}`, NotificationChannels.Alerts, [], adminsIds);
+מתנדבים במחוז ללא משפחות: ${usersWithNoActiveFamilies.length}
+מחוזות שלא נשלחה הודעה: ${districtsWithTooFewOpenMeals.map(d=>`\n - ${d}`)}
+`, NotificationChannels.Alerts, [], adminsIds);
 }

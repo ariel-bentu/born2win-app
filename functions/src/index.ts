@@ -53,7 +53,7 @@ import { getSafeFirstArrayElement, IL_DATE, isValidIsraeliIdentificationNumber, 
 import localeData = require("dayjs/plugin/localeData");
 import { SendReminderOrInstallMsg, weeklyNotifyFamilies } from "./scheduled-functions";
 import { AirTableQuery, AirTableUpdate, CachedAirTable } from "./airtable";
-import { getDemands, getDemands2, updateFamilyDemand } from "./demands";
+import { getDemands2, updateFamilyDemand } from "./demands";
 import { activeFamilies, deleteContact, getFamilyContacts, getFamilyDetails2, searchFamilies, upsertContact } from "./families";
 import { Lock } from "./lock";
 import { deleteHoliday, getHolidays, upsertHoliday } from "./holidays";
@@ -1070,43 +1070,6 @@ const getElapsedTime = (start: [number, number]): string => {
     return `${elapsedMs.toFixed(3)} ms`;
 };
 
-exports.GetOpenDemands_v3 = onCall({ cors: true }, async (request): Promise<OpenFamilyDemands> => {
-    const totalStart = process.hrtime();
-    const doc = await authenticate(request);
-    const authElapsed = getElapsedTime(totalStart);
-
-    const godp = request.data as GetOpenDemandPayload;
-
-    const districts = doc.data().districts;
-    const citiesStart = process.hrtime();
-    const cities = await getCities();
-    const citiesElapsed = getElapsedTime(citiesStart);
-
-    const demandsStart = process.hrtime();
-    const demands = await getDemands(districts, Status.Available, godp.type, dayjs().add(1, "day").format(DATE_AT),
-        dayjs().add(45, "days").format(DATE_AT));
-    const demandsElapsed = getElapsedTime(demandsStart);
-    const totalElapsed = getElapsedTime(totalStart);
-
-    logger.info("GetOpenDemands_v3.", {
-        totalElapsed,
-        authElapsed,
-        citiesElapsed,
-        demandsElapsed,
-    });
-    return { demands, allDistrictCities: cities.filter(city => city.numOfFamilies > 0 && districts.some((d: string) => city.district === d)) };
-});
-
-
-exports.GetDemandsNew = onCall({ cors: true }, async (request): Promise<FamilyDemand[]> => {
-    const userInfo = await getUserInfo(request);
-    if (userInfo.isAdmin) {
-        const gdp = request.data as GetDemandsPayload;
-        return await getDemands(gdp.districts, undefined, gdp.type || VolunteerType.Meal, gdp.from, gdp.to);
-    }
-    throw new HttpsError("permission-denied", "Unauthorized user to read all demands");
-});
-
 
 exports.GetOpenDemands_v4 = onCall({ cors: true }, async (request): Promise<OpenFamilyDemands> => {
     const totalStart = process.hrtime();
@@ -1127,6 +1090,7 @@ exports.GetOpenDemands_v4 = onCall({ cors: true }, async (request): Promise<Open
     const totalElapsed = getElapsedTime(totalStart);
 
     logger.info("GetOpenDemands_v4.", {
+        type: godp.type,
         totalElapsed,
         authElapsed,
         citiesElapsed,
@@ -1526,7 +1490,7 @@ async function alertOpenDemands() {
 
 async function alertUpcomingCooking() {
     const daysBefore = 3;
-    const upcomingDemands = await getDemands(undefined, Status.Occupied, VolunteerType.Meal, dayjs().format(DATE_AT), dayjs().add(daysBefore + 1, "days").format(DATE_AT));
+    const upcomingDemands = await getDemands2(undefined, Status.Occupied, VolunteerType.Meal, dayjs().format(DATE_AT), dayjs().add(daysBefore + 1, "days").format(DATE_AT));
     for (let j = 0; j < upcomingDemands.length; j++) {
         const demand = upcomingDemands[j];
 

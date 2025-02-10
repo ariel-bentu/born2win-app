@@ -117,7 +117,7 @@ function RegistrationComponent({ openDemands, appServices, actualUserId, openDem
 
 
 
-            {!selectedFamily && userInfo?.isAdmin && holidayTreatsExists &&
+            {!selectedFamily && holidayTreatsExists &&
 
                 <div className='flex flex-row justify-content-center relative'>
 

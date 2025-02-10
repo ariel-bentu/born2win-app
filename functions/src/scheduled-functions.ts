@@ -6,7 +6,7 @@ import { FieldPath } from "firebase-admin/firestore";
 import localeData = require("dayjs/plugin/localeData");
 import { Collections, NotificationChannels, Status, VolunteerType } from "../../src/types";
 import { AirTableQuery } from "./airtable";
-import { getDemands, getDemands2 } from "./demands";
+import { getDemands2 } from "./demands";
 
 require("dayjs/locale/he");
 dayjs.extend(localeData);
@@ -172,7 +172,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export async function SendReminderOrInstallMsg() {
     const date = dayjs().format(DATE_AT);
 
-    const openMeals = await getDemands(undefined, Status.Available, VolunteerType.Meal, dayjs().add(1, "day").format(DATE_AT),
+    const openMeals = await getDemands2(undefined, Status.Available, VolunteerType.Meal, dayjs().add(1, "day").format(DATE_AT),
         dayjs().add(30, "days").format(DATE_AT));
 
     const query = new AirTableQuery<{ id: string, familyCount: number, name: string }>("מחוז", (rec) => ({
@@ -243,6 +243,6 @@ export async function SendReminderOrInstallMsg() {
     await addNotificationToQueue("נשלחו הודעות בווטסאפ!", `סה״כ הודעות התקנה: ${usersNotInApp.length}
 סה״כ הודעות תזכורת למותקני אפליקציה: ${usersInApp.length}
 מתנדבים במחוז ללא משפחות: ${usersWithNoActiveFamilies.length}
-מחוזות שלא נשלחה הודעה: ${districtsWithTooFewOpenMeals.map(d=>`\n - ${d}`)}
+מחוזות שלא נשלחה הודעה: ${districtsWithTooFewOpenMeals.map(d => `\n - ${d}`)}
 `, NotificationChannels.Alerts, [], adminsIds);
 }

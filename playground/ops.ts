@@ -1361,7 +1361,7 @@ export async function getDemands(
             const expandDays = [];
             // Calculate array of dates
             if (holidayTreat.alternateDate) {
-                const holidayEndDate = dayjs(holidayTreat.date);
+                const holidayEndDate = dayjs(holidayTreat.alternateDate);
                 let day = 0;
                 for (let date = dayjs(holidayTreat.date); holidayEndDate.isAfter(date); date = date.add(1, "day")) {
                     if (dateInRange(date, dateStart, dateEnd)) {

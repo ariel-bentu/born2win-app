@@ -280,9 +280,8 @@ export function Stats({ userInfo, appServices }: StatsProps) {
         const addMonthMessage = (title: string, startDate: Dayjs, endDate: Dayjs) => {
             const { cityMessages, totalMissingVolunteers } = getMessageForDates(startDate, endDate);
             if (cityMessages.length > 0 && totalMissingVolunteers > 0) {
-                return `🍲 *${title}* ${
-                    totalMissingVolunteers === 1 ? "נותר תאריך פנוי אחד" : `נותרו ${totalMissingVolunteers} תאריכים פנויים`
-                }\n${cityMessages.join("\n")}\n`;
+                return `🍲 *${title}* ${totalMissingVolunteers === 1 ? "נותר תאריך פנוי אחד" : `נותרו ${totalMissingVolunteers} תאריכים פנויים`
+                    }\n${cityMessages.join("\n")}\n`;
             }
             return "";
         };
@@ -382,7 +381,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
 
     const overlayPanelRef = useRef<any>(null);
 
-    const [selectedMeal, setSelectedMeal] = useState<{ city: string, familyId: string, date: string } | undefined>();
+    const [selectedMeal, setSelectedMeal] = useState<{ city: string, familyId: string, date: string, type: VolunteerType } | undefined>();
     const [volunteerInfo, setVolunteerInfo] = useState<VolunteerInfo | undefined>();
     // Existing state declarations...
     const [showRecipientModal, setShowRecipientModal] = useState(false);
@@ -447,7 +446,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
             setTransportingVolunteer(undefined);
             setVolunteerInfo(undefined);
             // find demand
-            const demand = data.find(d => d.date == selectedMeal.date && d.mainBaseFamilyId == selectedMeal.familyId)
+            const demand = data.find(d => d.date == selectedMeal.date && d.mainBaseFamilyId == selectedMeal.familyId && d.type == selectedMeal.type)
             if (demand) {
                 getVolunteerInfo(demand.volunteerId).then(info => {
                     setVolunteerInfo(info);
@@ -480,7 +479,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
 
     let selectedDateInfo: DateInfo | undefined = undefined;
     if (selectedMeal) {
-        selectedDateInfo = groupedData[selectedMeal.city] && groupedData[selectedMeal.city][selectedMeal.familyId]?.dates.find(d => d.date == selectedMeal.date);
+        selectedDateInfo = groupedData[selectedMeal.city] && groupedData[selectedMeal.city][selectedMeal.familyId]?.dates.find(d => d.date == selectedMeal.date && d.type == selectedMeal.type);
     }
 
     if (showFamilyDetails) {
@@ -500,9 +499,9 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
             }} reloadOpenDemands={async () => { }} detailsOnly={true} actualUserId={""} />;
     }
 
-    const handleDateClick = (e: any, city: string, familyId: string, date: string) => {
+    const handleDateClick = (e: any, city: string, familyId: string, date: string, type: VolunteerType) => {
         setVolunteerInfo(undefined);
-        setSelectedMeal({ city, familyId, date }); // Store the date info to render in the OverlayPanel
+        setSelectedMeal({ city, familyId, date, type }); // Store the date info to render in the OverlayPanel
         overlayPanelRef.current.toggle(e); // Open the OverlayPanel next to the clicked element
     };
 
@@ -548,7 +547,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
                                                     minMaxDates(family.dates.map(d => d.date)) :
                                                     family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map((d, k) => (
                                                         <span key={k}>
-                                                            <span className='clickable-span position-relative' onClick={(e) => handleDateClick(e, city, family.mainBaseFamilyId, d.date)}>{dayjs(d.date).format("DD.MM")}
+                                                            <span className='clickable-span position-relative' onClick={(e) => handleDateClick(e, city, family.mainBaseFamilyId, d.date, d.type)}>{dayjs(d.date).format("DD.MM")}
                                                                 {d.type == VolunteerType.HolidayTreat && <GiPartyHat className='position-absolute ' style={{ color: "var(--born2win-button-color)", top: -5 }} />}</span>
                                                             <span className='m-1'>|</span>
                                                         </span>

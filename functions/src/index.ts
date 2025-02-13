@@ -1077,6 +1077,11 @@ exports.GetOpenDemands_v4 = onCall({ cors: true }, async (request): Promise<Open
     const authElapsed = getElapsedTime(totalStart);
 
     const godp = request.data as GetOpenDemandPayload;
+    let demantType = godp.type;
+
+    if (!request.data?.impersonateUser && !doc.data().isAdmin) {
+        demantType = VolunteerType.Meal;
+    }
 
     const districts = doc.data().districts;
     const citiesStart = process.hrtime();
@@ -1084,13 +1089,13 @@ exports.GetOpenDemands_v4 = onCall({ cors: true }, async (request): Promise<Open
     const citiesElapsed = getElapsedTime(citiesStart);
 
     const demandsStart = process.hrtime();
-    const demands = await getDemands2(districts, Status.Available, godp.type, dayjs().add(1, "day").format(DATE_AT),
+    const demands = await getDemands2(districts, Status.Available, demantType, dayjs().add(1, "day").format(DATE_AT),
         dayjs().add(45, "days").format(DATE_AT));
     const demandsElapsed = getElapsedTime(demandsStart);
     const totalElapsed = getElapsedTime(totalStart);
 
     logger.info("GetOpenDemands_v4.", {
-        type: godp.type,
+        type: demantType,
         totalElapsed,
         authElapsed,
         citiesElapsed,

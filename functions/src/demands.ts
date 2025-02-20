@@ -113,11 +113,20 @@ export async function getDemands2(
                 expandDays.push(0);
             }
             if (expandDays.length > 0) {
+                const otherHolidays = holidaysInDateRange.filter(rh => rh.type != EventType.HolidayTreats);
+
                 for (const family of families) {
                     if (holidayTreat.district && family.district != holidayTreat.district) continue;
                     if (holidayTreat.familyId && family.id != holidayTreat.familyId) continue;
 
-                    addMeal2(addedOpenDemands, meals, families, family.id || "", holidayTreat.date, getCityName, VolunteerType.HolidayTreat, expandDays);
+                    // Check the date and family is not overruled by other holiday records
+                    const theHolidayDate = dayjs(holidayTreat.date);
+                    const filteredExpandDays = expandDays.filter(expandDay => {
+                        const expandDate = theHolidayDate.add(expandDay, "day");
+                        return !inSpecialDays(expandDate, family, otherHolidays);
+                    });
+
+                    addMeal2(addedOpenDemands, meals, families, family.id || "", holidayTreat.date, getCityName, VolunteerType.HolidayTreat, filteredExpandDays);
                 }
             }
         });

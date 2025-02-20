@@ -1291,8 +1291,11 @@ function mealAirtable2FamilyDemand(demand: AirTableRecord, familyCityName: strin
     };
 }
 
+// let families = (await activeFamilies.get((f => checkDistrict(f.district))))
+// families = families.filter(f=>f.name.indexOf("שלח")>=0);
 
-export async function getDemands(
+
+export async function getDemands2(
     district: string | string[] | undefined,
     status: Status.Occupied | Status.Available | undefined | Status.OccupiedOrCancelled,
     type: VolunteerType,
@@ -1302,7 +1305,9 @@ export async function getDemands(
 ): Promise<FamilyDemand[]> {
     const checkDistrict = ((districtId: string) => Array.isArray(district) ? district.some(d => d == districtId) : !district || district == districtId);
 
-    const families = await activeFamilies.get((f => checkDistrict(f.district)));
+    //  const families = await activeFamilies.get((f => checkDistrict(f.district)));
+    let families = (await activeFamilies.get((f => checkDistrict(f.district))))
+    families = families.filter(f => f.name.indexOf("שלח") >= 0);
 
     const _cities = await getCities();
     const getCityName = (id: string) => _cities.find(c => c.id == id)?.name || "";
@@ -1334,7 +1339,7 @@ export async function getDemands(
     }
     // eslint-disable-next-line quotes
     filters.push(`{DATE}>='${startDateFilter.format(DATE_AT)}'`);
-    filters.push(`IS_BEFORE({DATE}, '${dayjs(dateEnd).add(1, "day").format(DATE_AT)}')`);
+    filters.push(`IS_BEFORE({DATE}, '${endDateFilter.format(DATE_AT)}')`);
 
     if (volunteerId) {
         filters.push(`OR(${airtableArrayCondition("vol_id", volunteerId)}, ${airtableArrayCondition("transport_vol_id", volunteerId)})`);
@@ -1357,7 +1362,6 @@ export async function getDemands(
         const holidayTreats = holidaysInDateRange.filter(h => h.type == EventType.HolidayTreats);
 
         holidayTreats.forEach(holidayTreat => {
-
             const expandDays = [];
             // Calculate array of dates
             if (holidayTreat.alternateDate) {
@@ -1369,17 +1373,25 @@ export async function getDemands(
                     }
                     day++;
                 }
-
             } else {
                 // this means the start holiday date is the only date so it is in range
                 expandDays.push(0);
             }
             if (expandDays.length > 0) {
+                const otherHolidays = holidaysInDateRange.filter(rh => rh.type != EventType.HolidayTreats);
+
                 for (const family of families) {
                     if (holidayTreat.district && family.district != holidayTreat.district) continue;
                     if (holidayTreat.familyId && family.id != holidayTreat.familyId) continue;
 
-                    addMeal(addedOpenDemands, meals, families, family.id || "", holidayTreat.date, getCityName, VolunteerType.HolidayTreat, expandDays);
+                    // Check the date and family is not overruled by other holiday records
+                    const theHolidayDate = dayjs(holidayTreat.date);
+                    const filteredExpandDays = expandDays.filter(expandDay => {
+                        const expandDate = theHolidayDate.add(expandDay, "day");
+                        return !inSpecialDays(expandDate, family, otherHolidays);
+                    });
+
+                    addMeal2(addedOpenDemands, meals, families, family.id || "", holidayTreat.date, getCityName, VolunteerType.HolidayTreat, filteredExpandDays);
                 }
             }
         });
@@ -1402,7 +1414,6 @@ export async function getDemands(
         const familiesInDay = families.filter(f => f.days?.length > 0 && f.days[0] == day); // ignore more than one day of cooking - take the first
 
         for (const family of familiesInDay) {
-
             // calculate the expand days
             const expandDays = [] as number[];
             for (let weekDay = 0; weekDay <= 5; weekDay++) {
@@ -1413,7 +1424,7 @@ export async function getDemands(
                 }
             }
 
-            addMeal(addedOpenDemands, meals, families, family.id || "", date.format(DATE_AT), getCityName, VolunteerType.Meal, expandDays);
+            addMeal2(addedOpenDemands, meals, families, family.id || "", date.format(DATE_AT), getCityName, VolunteerType.Meal, expandDays);
         }
     }
 
@@ -1424,7 +1435,7 @@ export async function getDemands(
     return filteredMeals.filter(m => dateInRange(m.date, dateStart, dateEnd)).concat(addedOpenDemands);
 }
 
-function inSpecialDays(date: Dayjs, family: Family, holidays: Holiday[]): boolean {
+function inSpecialDays(date: dayjs.Dayjs, family: Family, holidays: Holiday[]): boolean {
     for (const holiday of holidays) {
         if (holiday.familyId && holiday.familyId != family.id) continue;
         if (holiday.district && holiday.district != family.district) continue;
@@ -1438,12 +1449,7 @@ function inSpecialDays(date: Dayjs, family: Family, holidays: Holiday[]): boolea
     return false;
 }
 
-function toSunday(date:Dayjs | string):Dayjs {
-    const _date = dayjs(date);
-    return _date.subtract(_date.day(), "day");
-}
-
-function addMeal(demandsArray: FamilyDemand[], meals: FamilyDemand[], families: Family[], familyId: string, date: string, getCityName: (id: string) => string,
+function addMeal2(demandsArray: FamilyDemand[], meals: FamilyDemand[], families: Family[], familyId: string, date: string, getCityName: (id: string) => string,
     type: VolunteerType, expandDays: number[]) {
     const family = families.find(f => f.id == familyId);
     if (!family || expandDays.length == 0) return;
@@ -1455,7 +1461,6 @@ function addMeal(demandsArray: FamilyDemand[], meals: FamilyDemand[], families: 
     const familyRelevantMeals = meals.filter(m => m.status == Status.Occupied && m.mainBaseFamilyId == family.id && type == m.type);
 
     if (!familyRelevantMeals.find(m => dateInRange(m.date, checkRangeStart, checkRangeEnd))) {
-
         let filteredExpandDays = expandDays;
         // filters out a sunday or a friday if another week's cooking is adjacent
         const minDay = Math.min(...expandDays);
@@ -1491,6 +1496,11 @@ function addMeal(demandsArray: FamilyDemand[], meals: FamilyDemand[], families: 
     }
 }
 
+function toSunday(date: Dayjs | string): Dayjs {
+    const _date = dayjs(date);
+    return _date.subtract(_date.day(), "day");
+}
+
 
 export function getDatesBetween(startDateIn: string, endDateIn: string) {
     const dates = [];
@@ -1507,13 +1517,13 @@ export function getDatesBetween(startDateIn: string, endDateIn: string) {
 }
 
 
-// getDemands("recmLo9MWRxmrLEsM", Status.Available, VolunteerType.Meal,
-//     dayjs().add(1, "day").format(DATE_AT),
-//     dayjs().add(30, "days").format(DATE_AT),
-//     //    "2024-11-30", "2024-12-31"
-// ).then(demands => {
-//     console.log(demands.map(m => m.familyLastName + ":" + dayjs(m.date).format("DD-MM") + ":" + m.expandDays?.map(d => `"${d}"`)).join("\n"))
-// })
+getDemands2("recP17rsfOseG3Frx", Status.Available, VolunteerType.HolidayTreat,
+    dayjs().add(1, "day").format(DATE_AT),
+    dayjs().add(45, "days").format(DATE_AT),
+    //    "2024-11-30", "2024-12-31"
+).then(demands => {
+    console.log(demands.map(m => m.familyLastName + ":" + dayjs(m.date).format("DD-MM") + ":" + m.expandDays?.map(d => `"${d}"`)).join("\n"))
+})
 const getElapsedTime = (start: [number, number]): string => {
     const elapsed = process.hrtime(start);
     const elapsedMs = elapsed[0] * 1000 + elapsed[1] / 1e6;

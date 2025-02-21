@@ -1297,17 +1297,17 @@ function mealAirtable2FamilyDemand(demand: AirTableRecord, familyCityName: strin
 
 export async function getDemands2(
     district: string | string[] | undefined,
+    familyId: string | undefined,
     status: Status.Occupied | Status.Available | undefined | Status.OccupiedOrCancelled,
     type: VolunteerType,
     dateStart: string,
     dateEnd: string,
     volunteerId?: string,
 ): Promise<FamilyDemand[]> {
+
     const checkDistrict = ((districtId: string) => Array.isArray(district) ? district.some(d => d == districtId) : !district || district == districtId);
 
-    //  const families = await activeFamilies.get((f => checkDistrict(f.district)));
-    let families = (await activeFamilies.get((f => checkDistrict(f.district))))
-    families = families.filter(f => f.name.indexOf("שלח") >= 0);
+    const families = await activeFamilies.get(f => checkDistrict(f.district) && (!familyId || f.id == familyId));
 
     const _cities = await getCities();
     const getCityName = (id: string) => _cities.find(c => c.id == id)?.name || "";

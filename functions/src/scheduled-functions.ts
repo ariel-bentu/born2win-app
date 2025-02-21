@@ -37,7 +37,7 @@ export async function weeklyNotifyFamilies() {
     const tomorrow = dayjs().add(1, "days");
     const notifications: Notification[] = [];
     const volunteers: { [key: string]: string } = {};
-    const upcomingDemands = await getDemands2(undefined, undefined, VolunteerType.Meal, tomorrow.format(DATE_AT), tomorrow.add(28, "days").format(DATE_AT));
+    const upcomingDemands = await getDemands2(undefined, undefined, undefined, VolunteerType.Meal, tomorrow.format(DATE_AT), tomorrow.add(28, "days").format(DATE_AT));
     for (const demand of upcomingDemands) {
         let notification = notifications.find(n => n.mainBaseFamilyId === demand.mainBaseFamilyId);
         if (!notification) {
@@ -172,7 +172,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export async function SendReminderOrInstallMsg() {
     const date = dayjs().format(DATE_AT);
 
-    const openMeals = await getDemands2(undefined, Status.Available, VolunteerType.Meal, dayjs().add(1, "day").format(DATE_AT),
+    const openMeals = await getDemands2(undefined, undefined, Status.Available, VolunteerType.Meal, dayjs().add(1, "day").format(DATE_AT),
         dayjs().add(30, "days").format(DATE_AT));
 
     const query = new AirTableQuery<{ id: string, familyCount: number, name: string }>("מחוז", (rec) => ({

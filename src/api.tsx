@@ -239,7 +239,7 @@ export function updateLoginInfo(volunteerId: string | null | undefined, otp: str
     return updateLoginInfoFunc(uulp).then(res => res.data);
 }
 
-export function updateIdentificationNumber(identificationNumber:string) {
+export function updateIdentificationNumber(identificationNumber: string) {
     const updateIdentificationNumberFunc = httpsCallable(functions, 'UpdateIdentificationNumber');
     const uulp = { identificationNumber } as UpdateIdentificationNumberPayload;
 
@@ -286,7 +286,7 @@ export function getOpenDemands(type: VolunteerType): Promise<OpenFamilyDemands> 
     return callFunctionWithImpersonation('GetOpenDemands_v4', { type } as GetOpenDemandPayload).then((res: any) => res.data as OpenFamilyDemands);
 }
 
-export function updateFamilyDemand(demandId: string, date:string, mainBaseFamilyId: string,
+export function updateFamilyDemand(demandId: string, date: string, mainBaseFamilyId: string,
     cityId: string, isRegistering: boolean, type: VolunteerType, reason: string,
     district: string, volunteerId?: string) {
     const payload = {
@@ -348,7 +348,7 @@ export async function getVolunteerInfo(volunteerId: string): Promise<VolunteerIn
 }
 
 
-export async function getDemands(dateRange: [string, string], districts: string[], type = VolunteerType.Meal): Promise<FamilyDemand[]> {
+export async function getDemands(dateRange: [string, string], districts: string[] | undefined, familyId: string | undefined, type = VolunteerType.Meal): Promise<FamilyDemand[]> {
     if (!dateRange[0] || !dateRange[1]) return [];
 
     // No impersonation
@@ -357,6 +357,7 @@ export async function getDemands(dateRange: [string, string], districts: string[
         from: dateRange[0],
         to: dateRange[1],
         districts,
+        familyId,
         type,
     } as GetDemandsPayload;
     return getDemandsFunc(payload).then(res => res.data as FamilyDemand[]);

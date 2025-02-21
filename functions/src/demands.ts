@@ -34,6 +34,7 @@ function mealAirtable2FamilyDemand(demand: AirTableRecord, familyCityName: strin
 
 export async function getDemands2(
     district: string | string[] | undefined,
+    familyId: string | undefined,
     status: Status.Occupied | Status.Available | undefined | Status.OccupiedOrCancelled,
     type: VolunteerType,
     dateStart: string,
@@ -41,8 +42,9 @@ export async function getDemands2(
     volunteerId?: string,
 ): Promise<FamilyDemand[]> {
     const checkDistrict = ((districtId: string) => Array.isArray(district) ? district.some(d => d == districtId) : !district || district == districtId);
+    const checkFamily = ((fId: string) => !familyId || fId == familyId);
 
-    const families = await activeFamilies.get((f => checkDistrict(f.district)));
+    const families = await activeFamilies.get(f => checkDistrict(f.district) && (!familyId || f.id == familyId));
 
     const _cities = await getCities();
     const getCityName = (id: string) => _cities.find(c => c.id == id)?.name || "";
@@ -81,7 +83,7 @@ export async function getDemands2(
     }
 
     const meals = await mealsQuery.execute(filters);
-    const filteredMeals = meals.filter(m => checkDistrict(m.district));
+    const filteredMeals = meals.filter(m => checkDistrict(m.district) && checkFamily(m.mainBaseFamilyId));
 
     if (status === Status.Occupied || status === Status.OccupiedOrCancelled) {
         // no need to calculate dates
@@ -269,7 +271,7 @@ export async function updateFamilyDemand(demandId: string, registrationDate: str
         const startDate = toSunday(date).format(DATE_AT);
         const endDate = dayjs(startDate).add(5, "day").format(DATE_AT);
 
-        const possibleDemands = await getDemands2(demandDistrict, Status.Occupied, type, startDate, endDate);
+        const possibleDemands = await getDemands2(demandDistrict, undefined, Status.Occupied, type, startDate, endDate);
         demand = possibleDemands.find(d => d.mainBaseFamilyId == familyId);
     } else {
         const _cities = await getCities();

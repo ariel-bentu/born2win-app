@@ -5,7 +5,7 @@ import 'primeicons/primeicons.css';
 import 'primeflex/primeflex.css';  // For grid and flex utilities
 
 import './families-mgmt.css'
-import { AppServices, City, Contact, FamilyCompact, UserInfo } from './types';
+import { AppServices, City, Contact, FamilyCompact, IdName, UserInfo } from './types';
 import { useEffect, useState } from 'react';
 import { Button } from 'primereact/button';
 import { DataTable } from 'primereact/datatable';
@@ -52,40 +52,59 @@ const relations = [
 
 interface FamilyListProps {
     userInfo: UserInfo;
-    selectedFamily: FamilyCompact | null;
-    onSelectFamily: (family: FamilyCompact | null) => void;
+    selectedFamily: IdName | null;
+    onSelectFamily: (family: IdName | null) => void;
 }
 
-const FamilyList: React.FC<FamilyListProps> = ({ selectedFamily, onSelectFamily, userInfo }) => {
+export const FamilyList: React.FC<FamilyListProps> = ({ selectedFamily, onSelectFamily, userInfo }) => {
     const [filteredFamilies, setFilteredFamilies] = useState<any[]>([]);
-    const [shownFamily, setShownFamily] = useState<string | FamilyCompact | null>(selectedFamily);
+    const [shownFamily, setShownFamily] = useState<string | IdName | null>(selectedFamily);
 
-    return <div dir="rtl" className="flex-auto m-2">
-        <h3>משפחה</h3>
-        <AutoComplete
-            id="family"
-            inputClassName="w-17rem md:w-20rem flex flex-row flex-wrap"
-            placeholder={!selectedFamily ? "חיפוש לפי שם משפחה" : undefined}
-            delay={500}
-            value={shownFamily}
-            field="name"
-            optionGroupLabel="districtName"
-            optionGroupChildren="families"
-            suggestions={filteredFamilies}
-            completeMethod={async (event: AutoCompleteCompleteEvent) => {
-                const newFilter = await handleSearchFamilies(userInfo, event.query);
-                setFilteredFamilies(newFilter);
-            }}
-            onChange={(e) => {
-                setShownFamily(e.value);
-                if (e.value?.name) {
-                    console.log("search family", e.value);
-                    onSelectFamily(e.value)
-                } else {
-                    onSelectFamily(null);
-                }
+    return <div dir="rtl" style={{ justifyContent: "flex-start", marginTop: 4, marginBottom: 4, width: "100%" }}>
+        <div style={{ position: 'relative', display: 'inline-block', width: "100%" }}>
+            <AutoComplete
+                className="w-full"
+                inputStyle={{ width: "100%", marginLeft: 4, marginRight: 4 }}
+                id="family"
+                inputClassName=" flex flex-row flex-wrap"
+                placeholder={!selectedFamily ? "חיפוש לפי שם משפחה" : undefined}
+                delay={500}
+                value={shownFamily}
+                field="name"
+                optionGroupLabel="districtName"
+                optionGroupChildren="families"
+                suggestions={filteredFamilies}
+                completeMethod={async (event: AutoCompleteCompleteEvent) => {
+                    const newFilter = await handleSearchFamilies(userInfo, event.query);
+                    setFilteredFamilies(newFilter);
+                }}
+                onChange={(e) => {
+                    setShownFamily(e.value);
+                    if (e.value?.name) {
+                        console.log("search family", e.value);
+                        onSelectFamily(e.value)
+                    } else {
+                        onSelectFamily(null);
+                    }
 
-            }} />
+                }} />
+            {shownFamily && (
+                <i
+                    className="pi pi-times"
+                    style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '0.5em',
+                        transform: 'translateY(-50%)',
+                        cursor: 'pointer'
+                    }}
+                    onClick={() => {
+                        setShownFamily(null)
+                        onSelectFamily(null);
+                    }}
+                />
+            )}
+        </div>
     </div>
 };
 
@@ -209,7 +228,7 @@ interface ContactsManagerProps {
 }
 
 const ContactsManager = ({ userInfo, appServices }: ContactsManagerProps) => {
-    const [selectedFamily, setSelectedFamily] = useState<FamilyCompact | null>(null);
+    const [selectedFamily, setSelectedFamily] = useState<IdName | null>(null);
     const [inProgress, setInProgress] = useState<boolean>(false);
     const [reload, setReload] = useState<number>(0);
 
@@ -217,6 +236,7 @@ const ContactsManager = ({ userInfo, appServices }: ContactsManagerProps) => {
         <div className="p-grid">
             {inProgress && <InProgress />}
             <div className="p-col-12 p-md-4">
+                <h3>משפחה</h3>
                 <FamilyList
                     userInfo={userInfo}
                     selectedFamily={selectedFamily}
@@ -240,7 +260,7 @@ export interface ContactFormProps {
     onClose: (reload: boolean) => void;
     familyId: string;
     setInProgress: (inprog: boolean) => void;
-    inProgress:boolean;
+    inProgress: boolean;
 }
 const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices, familyId, setInProgress, inProgress }) => {
     const [phoneInvalid, setPhoneInvalid] = useState<boolean | undefined>();
@@ -288,7 +308,7 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onClose, appServices
             appServices.showMessage("error", "חובה למלא שם", "");
             return;
         }
-        
+
         if (contact.role.length == 0) {
             appServices.showMessage("error", "חובה למלא תפקיד", "");
             return;

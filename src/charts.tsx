@@ -4,11 +4,12 @@ import { MultiSelect } from 'primereact/multiselect';
 import dayjs, { Dayjs } from 'dayjs';
 import minMax from 'dayjs/plugin/minMax'; // Plugin to find min and max dates
 
-import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails, Status, UserInfo, VolunteerInfo, VolunteerType } from './types';
+import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails, IdName, Status, UserInfo, VolunteerInfo, VolunteerType } from './types';
 import {
     getDemands,
     getFamilyDetails,
     getVolunteerInfo,
+    handleSearchFamilies,
     handleSearchUsers, impersonateUser,
     updateDemandTransportation,
     updateFamilyDemand
@@ -28,8 +29,9 @@ import { ProgressSpinner } from 'primereact/progressspinner';
 import { confirmPopup } from 'primereact/confirmpopup';
 import { Recipient } from './types';
 import { Dialog } from "primereact/dialog";
-import { openWhatsApp } from "./notification-actions";
 import { GiPartyHat } from 'react-icons/gi';
+import { RadioButton } from 'primereact/radiobutton';
+import { FamilyList } from './families-mgmt';
 
 
 dayjs.extend(minMax);
@@ -53,14 +55,17 @@ const Modes = {
     Fulfilled: 2,
     HolidayTreats: 3,
     Chart: 4,
+    All: 5,
     array: [
         { name: 'חסרים', value: 1 },
         { name: 'משובצים', value: 2 },
+        { name: 'הכל', value: 5 },
         { name: 'גרף', value: 4 },
     ],
     array2: [
         { name: 'חסרים', value: 1 },
         { name: 'משובצים', value: 2 },
+        { name: 'הכל', value: 5 },
         { name: 'פינוקי חג', value: 3 },
         { name: 'גרף', value: 4 },
     ]
@@ -97,6 +102,7 @@ interface GroupedData {
 
 
 const filterOnlyOpen = (f: FamilyDemand) => f.status === Status.Available && f.isFamilyActive === true && f.type == VolunteerType.Meal;
+const filterAllButHolidayTreats = (f: FamilyDemand) => f.isFamilyActive === true && f.type == VolunteerType.Meal;
 const filterOnlyOpenHolidayTreats = (f: FamilyDemand) => f.status === Status.Available && f.isFamilyActive === true && f.type == VolunteerType.HolidayTreat;
 const filterOnlyFulfilled = (f: FamilyDemand) => f.status === Status.Occupied;
 
@@ -125,23 +131,28 @@ export function Stats({ userInfo, appServices }: StatsProps) {
     const [showFilterByVolunteer, setShowFilterByVolunteer] = useState<boolean>(false);
     const [reload, setReload] = useState<number>(0);
     const [selectedFamily, setSelectedFamily] = useState<GroupedFamily | undefined>();
+    const [filterByFamily, setFilterByFamily] = useState<IdName | null>(null);
     const [holidayTreatsExist, setHolidayTreatsExist] = useState<boolean>(false);
     const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
+    const [filterBy, setFilterBy] = useState<"משפחה" | "מחוזות">("מחוזות");
 
     useEffect(() => {
-        if (userInfo?.isAdmin && selectedWeeks && selectedDistricts.length > 0) {
+        if (userInfo?.isAdmin && selectedWeeks && (filterBy == "מחוזות" && selectedDistricts.length > 0 || filterBy == "משפחה" && filterByFamily)) {
             setLoading(true);
 
             const range = selectedWeeks.map(d => dayjs().add(d, "week").toISOString()) as [string, string];
-            getDemands(range, selectedDistricts, VolunteerType.Any).then(demands => {
-                demands.sort((a, b) => sortByDate(a.date, b.date));
-                setHolidayTreatsExist(demands.some(d => d.type == VolunteerType.HolidayTreat))
-                setData(demands);
-            }).finally(() => setLoading(false));
+            getDemands(range,
+                filterBy == "מחוזות" ? selectedDistricts : undefined,
+                filterBy == "משפחה" && filterByFamily ? filterByFamily.id : undefined,
+                VolunteerType.Any).then(demands => {
+                    demands.sort((a, b) => sortByDate(a.date, b.date));
+                    setHolidayTreatsExist(demands.some(d => d.type == VolunteerType.HolidayTreat))
+                    setData(demands);
+                }).finally(() => setLoading(false));
         } else {
             setData([]);
         }
-    }, [selectedWeeks, selectedDistricts, userInfo, reload]);
+    }, [selectedWeeks, selectedDistricts, filterByFamily, userInfo, reload, filterBy]);
 
     useEffect(() => {
         if (userInfo?.isAdmin && userInfo.districts?.length === 1) {
@@ -149,6 +160,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
         }
     }, [userInfo]);
 
+    console.log("data", data.length)
 
     const handlePrepareMessageToSend = (familyId: string | undefined, mode: number) => {
         const filteredData = data.filter(mode == Modes.Open ? filterOnlyOpen : filterOnlyOpenHolidayTreats);
@@ -308,33 +320,51 @@ export function Stats({ userInfo, appServices }: StatsProps) {
     const endDate = dayjs().add(selectedWeeks[1], 'week');
     return (
         <div>
-            <div className='flex flex-row  justify-content-center align-items-start' style={{ height: 75 }}>
+            <div className='flex flex-row  justify-content-center align-items-center' style={{ height: 75 }}>
                 <WeekSelectorSlider min={-4} max={6} setSelectedWeeks={setSelectedWeeks} selectedWeeks={selectedWeeks} />
                 <Button label="חודש קדימה" unstyled icon="pi pi-calendar" className="icon-btn icon-btn-withLabel text-xs mr-3"
                     onClick={() => {
                         setSelectedWeeks([0, 4]);
                     }} />
             </div>
+            {/** Filter by */}
+            <div className="flex flex-wrap gap-3">
+                <div className="flex align-items-center">
+                    <RadioButton name="מחוזות" value="מחוזות" onChange={(e) => setFilterBy(e.value)} checked={filterBy === 'מחוזות'} />
+                    <label htmlFor="ingredient1" className="ml-2">מחוזות</label>
+                </div>
+                <div className="flex align-items-center">
+                    <RadioButton name="משפחה" value="משפחה" onChange={(e) => setFilterBy(e.value)} checked={filterBy === 'משפחה'} />
+                    <label htmlFor="ingredient2" className="ml-2">משפחה</label>
+                </div>
+            </div>
 
             {loading && <InProgress />}
             {userInfo && userInfo.districts && userInfo.districts.length > 1 &&
-                <div className='flex flex-row w-full align-items-center'>
-                    <MultiSelect
+                <div className='flex flex-row w-9 align-items-center justify-content-start'>
+                    {filterBy == "מחוזות" && <MultiSelect
                         value={selectedDistricts}
                         options={userInfo?.districts?.map(d => ({ label: d.name.replace("מחוז ", ""), value: d.id })) || []}
                         onChange={handleDistrictChange}
                         placeholder="בחר מחוזות"
                         display="chip"
-                        className="w-9 md:w-20rem m-2 flex justify-content-center"
-                    />
-                    {(mode === Modes.Open || mode === Modes.HolidayTreats) && <Button disabled={!data.some(filterOnlyOpen)}
+                        className="w-11 md:w-20rem m-2 flex justify-content-center"
+                    />}
+
+                    {filterBy == "משפחה" && <FamilyList
+                        userInfo={userInfo}
+                        selectedFamily={filterByFamily}
+                        onSelectFamily={setFilterByFamily}
+                    />}
+
+                    {data.length > 0 && (mode === Modes.Open || mode === Modes.HolidayTreats) && <Button disabled={!data.some(filterOnlyOpen)}
                         className="btn-on-the-right" label="הכן הודעה"
                         onClick={() => handlePrepareMessageToSend(selectedFamily?.mainBaseFamilyId, mode)} />}
-                    {mode === Modes.Fulfilled && <Button unstyled label="סנן" icon={"pi pi-filter" + (showFilterByVolunteer ? "-slash" : "")} className={"icon-btn icon-btn-withLabel"} onClick={(e) => {
+                    {mode === Modes.Fulfilled && filterBy != "משפחה" && <Button unstyled label="סנן" icon={"pi pi-filter" + (showFilterByVolunteer ? "-slash" : "")} className={"icon-btn icon-btn-withLabel"} onClick={(e) => {
                         setShowFilterByVolunteer(!showFilterByVolunteer)
                     }} />}
                 </div>}
-            <div className='flex flex-row  justify-content-start align-items-center relative'>
+            <div className='flex flex-row justify-content-start align-items-center relative'>
                 <SelectButton
                     pt={{ root: { className: "select-button-container" } }}
                     unstyled
@@ -349,7 +379,7 @@ export function Stats({ userInfo, appServices }: StatsProps) {
 
             {/* {error && <small style={{ color: 'red' }}>{error}</small>} */}
 
-            {mode === Modes.Open || mode === Modes.Fulfilled || mode === Modes.HolidayTreats ?
+            {mode === Modes.Open || mode === Modes.Fulfilled || mode === Modes.HolidayTreats || mode === Modes.All ?
                 <DemandList setReload={setReload} setLoading={setLoading} data={data} mode={mode} appServices={appServices} userInfo={userInfo}
                     onSelectFamily={family => setSelectedFamily(family)}
                     showFilterByVolunteer={showFilterByVolunteer}
@@ -374,7 +404,9 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
     onCancellationPerformed, onSelectFamily, setLoading, setReload }) => {
 
     let demands = data.filter(mode == Modes.Open ? filterOnlyOpen :
-        (mode == Modes.Fulfilled ? filterOnlyFulfilled : filterOnlyOpenHolidayTreats));
+        (mode == Modes.All ? filterAllButHolidayTreats :
+            ((mode == Modes.Fulfilled ? filterOnlyFulfilled : filterOnlyOpenHolidayTreats))));
+
     const [showFamilyDetails, setShowFamilyDetails] = useState<GroupedFamily | undefined>();
     const [filterByVolunteer, setFilterByVolunteer] = useState<any | undefined>();
     const [cancelInProgress, setCancelInProgress] = useState<boolean>(false);
@@ -523,7 +555,10 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
                     }}
                     onChange={(e) => setFilterByVolunteer(e.value)} />}
             </div>
-            <strong>{mode != Modes.Fulfilled ? 'סה״כ חסרים:' : 'סה״כ משובצים:'}</strong><span className='m-2'>{demands.length}</span>
+            {mode == Modes.Fulfilled && <strong>{'סה״כ משובצים:'}</strong>}
+            {mode == Modes.Open && <strong>{'סה״כ חסרים:'}</strong>}
+            {mode == Modes.All && <strong>{'סה״כ:'}</strong>}
+            <span className='m-2'>{demands.length}</span>
             {
                 sortedCities.map((city, i) => {
                     const sortedFamilies = sortFamilies(groupedData[city]);
@@ -541,20 +576,23 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
                                                 if (onSelectFamily) onSelectFamily(family);
                                             }}> {family.familyLastName}{family.active ? "" : "-לא פעילה"}:</span>
                                         <div className='flex w-12 flex-wrap'>{
-                                            mode == Modes.Open ?
-                                                family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map(d => (<AvailableDate key={d.date} date={d} />)) :
-                                                (mode == Modes.HolidayTreats ?
-                                                    minMaxDates(family.dates.map(d => d.date)) :
-                                                    family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map((d, k) => (
-                                                        <span key={k}>
-                                                            <span className='clickable-span position-relative' onClick={(e) => handleDateClick(e, city, family.mainBaseFamilyId, d.date, d.type)}>{dayjs(d.date).format("DD.MM")}
-                                                                {d.type == VolunteerType.HolidayTreat && <GiPartyHat className='position-absolute ' style={{ color: "var(--born2win-button-color)", top: -5 }} />}</span>
-                                                            <span className='m-1'>|</span>
+                                            family.dates.sort((d1, d2) => sortByDate(d1.date, d2.date)).map((d, k) => {
+                                                if (d.volunteerId) {
+                                                    return <span key={k}>
+                                                        <span className='clickable-span position-relative'
+                                                            onClick={(e) => handleDateClick(e, city, family.mainBaseFamilyId, d.date, d.type)}>
+                                                            {dayjs(d.date).format("DD.MM")}
+                                                            {d.type == VolunteerType.HolidayTreat && <GiPartyHat className='position-absolute ' style={{ color: "var(--born2win-button-color)", top: -5 }} />}
                                                         </span>
-                                                    )))
+                                                        <span className='m-1'>|</span>
+                                                    </span>
+                                                } else {
+                                                    return <AvailableDate key={d.date} date={d} isHolidayTreat={d.type == VolunteerType.HolidayTreat} />
+                                                }
+                                            })
                                         }</div>
-                                    </div>
-                                ))
+                                    </div>))
+
                             }
                         </div>
                     )
@@ -854,10 +892,11 @@ const DAYS = {
     6: "ש",
 }
 
-function AvailableDate({ date }: { date: DateInfo }) {
+function AvailableDate({ date, isHolidayTreat }: { date: DateInfo, isHolidayTreat: boolean }) {
     const d = dayjs(date.date).locale("he");
     return <div className='available-date-host'>
         <div className='available-date'>{d.format("DD-MM")}</div>
+        {isHolidayTreat && <GiPartyHat className='position-absolute ' style={{ color: "var(--born2win-button-color)", top: -5 }} />}
         <div className="available-dates-weekdays">{date.expandDays.map(day => DAYS[d.add(day, "day").day()] + " ")}</div>
     </div>
 }

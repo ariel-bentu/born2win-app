@@ -151,7 +151,7 @@ export interface UserInfo {
     needToSignConfidentiality?: string;
     districts: District[],
     active: boolean;
-    missingIdentificationNumber?:boolean;
+    missingIdentificationNumber?: boolean;
 }
 
 export interface LoginInfo {
@@ -182,7 +182,7 @@ export interface UserRecord {
     gender: string;
     needToSignConfidentiality?: string | any;
     cityId: string;
-    missingIdentificationNumber?:boolean;
+    missingIdentificationNumber?: boolean;
 }
 
 
@@ -224,10 +224,11 @@ export interface StatsData {
 }
 
 export interface GetDemandsPayload {
-    districts: string[];
+    districts: string[] | undefined;
     from: string;
     to: string;
     type: VolunteerType;
+    familyId: string | undefined;
 }
 
 export interface SendMessagePayload {

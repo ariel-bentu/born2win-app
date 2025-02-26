@@ -356,6 +356,7 @@ export enum Status {
 export enum EventType {
     Holiday = "חג",
     Block = "חסימה/החלפת תאריך למשפחה",
+    AdditionalCookingDay = "הוספת יום בישול למשפחה",
     Add = "הוספת תאריך למשפחה",
     HolidayTreats = "פינוקי חג",
 }

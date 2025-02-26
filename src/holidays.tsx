@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { DataTable, DataTableRowGroupHeaderTemplateOptions } from 'primereact/datatable';
+import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { deleteHoliday, getRegisteredHolidays, handleSearchFamilies, upsertHoliday } from './api';
 import { AppServices, EventType, FamilyCompact, Holiday, IdName, UserInfo } from './types';
@@ -12,14 +12,13 @@ import { Button } from 'primereact/button';
 import { InProgress, WeekSelectorSlider } from './common-ui';
 import { Dialog } from 'primereact/dialog';
 import { InputText } from 'primereact/inputtext';
-import { Checkbox } from 'primereact/checkbox';
 import { SelectButton } from 'primereact/selectbutton';
 import { Calendar } from 'primereact/calendar';
 import { AutoComplete, AutoCompleteCompleteEvent } from 'primereact/autocomplete';
 import { confirmPopup } from 'primereact/confirmpopup';
 import { MultiSelect } from 'primereact/multiselect';
-import { SelectItem } from 'primereact/selectitem';
 import { Dropdown } from 'primereact/dropdown';
+
 export const getPotentialHolidays = ({ from, to }: { from: Dayjs, to: Dayjs }): Holiday[] => {
     const options: CalOptions = {
         start: from.toDate(),
@@ -64,14 +63,11 @@ export const HolidaysAdmin = ({ userInfo, appServices }: HolidaysAdminProps) => 
 
     const listOfDistricts = [noDistrict, ...(userInfo?.districts?.map(d => ({ label: d.name, value: d.id })) || [])];
 
-
     const [editingHoliday, setEditingHoliday] = useState<Holiday | undefined>();
 
     const getRange = (dates: [number, number]) => {
-
         const [from, to] = dates.map(d => dayjs().add(d, "week")) as [Dayjs, Dayjs];
         return { from, to };
-
     }
 
     useEffect(() => {
@@ -80,7 +76,6 @@ export const HolidaysAdmin = ({ userInfo, appServices }: HolidaysAdminProps) => 
             setPotentialHolidays(potentials);
         }
     }, [registeredHolidays, reload]);
-
 
     useEffect(() => {
         const { from, to } = getRange(selectedWeeks);
@@ -117,7 +112,6 @@ export const HolidaysAdmin = ({ userInfo, appServices }: HolidaysAdminProps) => 
                     .catch(err => appServices.showMessage("error", "מחיקה נכשלה", err.message));
             }
         });
-
     }
 
     const rowGroupHeaderTemplate = (data: Holiday) => {
@@ -132,114 +126,115 @@ export const HolidaysAdmin = ({ userInfo, appServices }: HolidaysAdminProps) => 
         );
     };
 
-    const today = dayjs()
+    const today = dayjs();
     const formatData = (date: string | undefined) => {
         if (!date) return "";
         const d = dayjs(date);
-        if (today.year() != d.year()) return d.format("DD/MM/YY")
+        if (today.year() != d.year()) return d.format("DD/MM/YY");
         return d.format("DD/MM");
     }
 
-    return (<div>
-        {editingHoliday && <EditHoliday userInfo={userInfo}
-            appServices={appServices}
-            holiday={editingHoliday}
-            visible={editingHoliday != undefined}
-            onCancel={() => setEditingHoliday(undefined)}
-            onSave={(holiday) => {
-                setLoading(true);
-                upsertHoliday(holiday)
-                    .then(() => {
-                        appServices.showMessage("success", "יום חג/חריג נשמר בהצלחה", "")
-                        setReload(prev => prev + 1);
-                        setEditingHoliday(undefined);
-                    })
-                    .catch(err => appServices.showMessage("error", "שמירה נכשלה", err.message))
-                    .finally(() => setLoading(false))
-            }} />}
-        <div className='flex flex-row  justify-content-center align-items-start' style={{ height: 75 }}>
-            <WeekSelectorSlider min={-1} max={8} setSelectedWeeks={setSelectedWeeks} selectedWeeks={selectedWeeks} />
-        </div>
-        {loading && <InProgress />}
+    return (
+        <div>
+            {editingHoliday && <EditHoliday userInfo={userInfo}
+                                            appServices={appServices}
+                                            holiday={editingHoliday}
+                                            visible={editingHoliday != undefined}
+                                            onCancel={() => setEditingHoliday(undefined)}
+                                            onSave={(holiday) => {
+                                                setLoading(true);
+                                                upsertHoliday(holiday)
+                                                    .then(() => {
+                                                        appServices.showMessage("success", "יום חג/חריג נשמר בהצלחה", "")
+                                                        setReload(prev => prev + 1);
+                                                        setEditingHoliday(undefined);
+                                                    })
+                                                    .catch(err => appServices.showMessage("error", "שמירה נכשלה", err.message))
+                                                    .finally(() => setLoading(false));
+                                            }} />}
+            <div className='flex flex-row  justify-content-center align-items-start' style={{ height: 75 }}>
+                <WeekSelectorSlider min={-1} max={8} setSelectedWeeks={setSelectedWeeks} selectedWeeks={selectedWeeks} />
+            </div>
+            {loading && <InProgress />}
 
-        <MultiSelect
-            value={selectedDistricts}
-            options={listOfDistricts}
-            onChange={e => setSelectedDistricts(e.value)}
-            placeholder="בחר מחוזות"
-            display="chip"
-            className="w-full md:w-20rem mt-3"
-        />
+            <MultiSelect
+                value={selectedDistricts}
+                options={listOfDistricts}
+                onChange={e => setSelectedDistricts(e.value)}
+                placeholder="בחר מחוזות"
+                display="chip"
+                className="w-full md:w-20rem mt-3"
+            />
 
-        <div className='holiday-table-title'>חגים וחריגים רשומים</div>
-        <DataTable
-            dir='rtl'
-            value={registeredHolidays?.filter(rh => selectedDistricts.length == 0 || selectedDistricts.some(sd => sd == rh.district))}
-            style={{ textAlign: 'right' }}
-            rowGroupMode="subheader"
-            groupRowsBy={'district'}
-            rowGroupHeaderTemplate={rowGroupHeaderTemplate}
-        >
-            <Column body={(h: Holiday) => formatData(h.date)} header="תאריך" style={{ textAlign: 'right' }} />
-            <Column field="type" header="סוג" style={{ textAlign: 'right' }} />
-            <Column field="name" header="תיאור" style={{ textAlign: 'right' }} />
-            <Column field="familyName" header="משפחה" style={{ textAlign: 'right' }} />
-            <Column body={(h: Holiday) => formatData(h.alternateDate)} header="תאריך חלופי" style={{ textAlign: 'right' }} />
-            <Column headerStyle={{ display: "flex", justifyContent: "flex-end" }}
-                header={() => (<Button
-                    icon="pi pi-plus"
-                    onClick={() => {
-                        setEditingHoliday({
-                            id: "",
-                            date: "",
-                            name: "",
-                            type: EventType.Block,
-                        });
-                    }}
-                />)}
-                body={(rowData) => (
-                    <>
-                        <Button
-                            icon="pi pi-pencil"
+            <div className='holiday-table-title'>חגים וחריגים רשומים</div>
+            <DataTable
+                dir='rtl'
+                value={registeredHolidays?.filter(rh => selectedDistricts.length == 0 || selectedDistricts.some(sd => sd == rh.district))}
+                style={{ textAlign: 'right' }}
+                rowGroupMode="subheader"
+                groupRowsBy={'district'}
+                rowGroupHeaderTemplate={rowGroupHeaderTemplate}
+            >
+                <Column body={(h: Holiday) => formatData(h.date)} header="תאריך" style={{ textAlign: 'right' }} />
+                <Column field="type" header="סוג" style={{ textAlign: 'right' }} />
+                <Column field="name" header="תיאור" style={{ textAlign: 'right' }} />
+                <Column field="familyName" header="משפחה" style={{ textAlign: 'right' }} />
+                <Column body={(h: Holiday) => formatData(h.alternateDate)} header="תאריך חלופי" style={{ textAlign: 'right' }} />
+                <Column headerStyle={{ display: "flex", justifyContent: "flex-end" }}
+                        header={() => (<Button
+                            icon="pi pi-plus"
                             onClick={() => {
-                                setEditingHoliday(rowData as Holiday);
-                            }}
-                        />
-                        <Button
-                            icon="pi pi-trash"
-                            onClick={(e) => handleDeleteHoliday(e, rowData)}
-                        />
-                    </>
-                )}
-            />
-        </DataTable>
-
-        {/* Potential Holidays Table */}
-        <div className='holiday-table-title mt-5'>חגי ישראל</div>
-        <DataTable value={potentialHolidays}>
-            <Column field="date" header="תאריך" style={{ textAlign: 'right' }} />
-            <Column field="name" header="תיאור" style={{ textAlign: 'right' }} />
-            <Column
-                body={(rowData: any) => (
-                    <>
-                        {rowData.isRegistered ? (
-                            <i>Already Registered</i>
-                        ) : (
-                            <Button
-                                icon="pi pi-plus"
-                                onClick={() => setEditingHoliday({
+                                setEditingHoliday({
                                     id: "",
-                                    name: rowData.name,
-                                    date: rowData.date,
-                                    type: EventType.Holiday,
-                                })}
-                            />
+                                    date: "",
+                                    name: "",
+                                    type: EventType.Block,
+                                });
+                            }}
+                        />)}
+                        body={(rowData) => (
+                            <>
+                                <Button
+                                    icon="pi pi-pencil"
+                                    onClick={() => {
+                                        setEditingHoliday(rowData as Holiday);
+                                    }}
+                                />
+                                <Button
+                                    icon="pi pi-trash"
+                                    onClick={(e) => handleDeleteHoliday(e, rowData)}
+                                />
+                            </>
                         )}
-                    </>
-                )}
-            />
-        </DataTable>
-    </div>
+                />
+            </DataTable>
+
+            {/* Potential Holidays Table */}
+            <div className='holiday-table-title mt-5'>חגי ישראל</div>
+            <DataTable value={potentialHolidays}>
+                <Column field="date" header="תאריך" style={{ textAlign: 'right' }} />
+                <Column field="name" header="תיאור" style={{ textAlign: 'right' }} />
+                <Column
+                    body={(rowData: any) => (
+                        <>
+                            {rowData.isRegistered ? (
+                                <i>Already Registered</i>
+                            ) : (
+                                <Button
+                                    icon="pi pi-plus"
+                                    onClick={() => setEditingHoliday({
+                                        id: "",
+                                        name: rowData.name,
+                                        date: rowData.date,
+                                        type: EventType.Holiday,
+                                    })}
+                                />
+                            )}
+                        </>
+                    )}
+                />
+            </DataTable>
+        </div>
     );
 };
 
@@ -254,11 +249,10 @@ interface EditHolidayProps {
 
 const typeArray = [
     { name: 'חג', value: EventType.Holiday },
-    // { name: 'הוספת תאריך למשפחה', value: EventType.Add },
     { name: 'חסימת תאריך למשפחה', value: EventType.Block },
     { name: 'פינוקי חג', value: EventType.HolidayTreats },
+    { name: 'הוספת יום בישול למשפחה', value: EventType.AdditionalCookingDay },
 ];
-
 
 function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices }: EditHolidayProps) {
     const [name, setName] = useState<string>(holiday.name);
@@ -270,10 +264,10 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
         name: holiday.familyName
     }) : undefined);
     const [district, setDistrict] = useState<string | undefined>(holiday.district);
+    const [additionalWeeks, setAdditionalWeeks] = useState<number>(1);
 
     const [filteredFamilies, setFilteredFamilies] = useState<any[]>([]);
-    console.log("Holiday in edit", holiday, name, family)
-
+    console.log("Holiday in edit", holiday, name, family);
 
     let labelDate = "";
     let labelAlternativeDate = "";
@@ -282,12 +276,17 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
     switch (type) {
         case EventType.Holiday:
             labelDate = "תאריך החג לחסום";
-            labelAlternativeDate = "עד תאריך (אם ריק אז רק יום אחד)"
+            labelAlternativeDate = "עד תאריך (אם ריק אז רק יום אחד)";
             alternativeVisible = true;
             break;
         case EventType.Block:
             labelDate = "תאריך לחסום";
-            labelAlternativeDate = "עד תאריך (אם ריק אז רק יום אחד)"
+            labelAlternativeDate = "עד תאריך (אם ריק אז רק יום אחד)";
+            alternativeVisible = true;
+            break;
+        case EventType.AdditionalCookingDay:
+            labelDate = "מתאריך";
+            labelAlternativeDate = "עד תאריך";
             alternativeVisible = true;
             break;
         case EventType.Add:
@@ -301,6 +300,12 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
             break;
     }
 
+    useEffect(() => {
+        if (type === EventType.AdditionalCookingDay && date) {
+            const newDate = dayjs(date).add(additionalWeeks, 'week');
+            setAlternateDate(newDate.format(DATE_AT));
+        }
+    }, [additionalWeeks, date, type]);
 
     return <Dialog style={{ direction: "rtl" }} visible={visible} onHide={onCancel} header="עריכת חג/יום חריג" >
         <div className="flex flex-row justify-content-start">
@@ -318,7 +323,6 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
         <div className="flex-auto">
             <label htmlFor="desc" className="font-bold block mt-5 mb-2">תיאור
             </label>
-
             <InputText id="desc" placeholder='תיאור' className='w-12' value={name} onChange={(e) => setName(e.target.value)} />
         </div>
 
@@ -332,6 +336,21 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
                 id="date" value={dayjs(date).toDate()}
                 onChange={(e) => setDate(dayjs(e.value).format(DATE_AT))} showIcon />
         </div>
+
+        {type === EventType.AdditionalCookingDay &&
+            <div className="flex-auto">
+                <label htmlFor="weeks" className="font-bold block mt-5 mb-2">
+                    מספר שבועות
+                </label>
+                <InputText
+                    id="weeks"
+                    value={additionalWeeks.toString()}
+                    onChange={(e) => setAdditionalWeeks(parseInt(e.target.value))}
+                    type="number"
+                    min={1}
+                />
+            </div>
+        }
 
         {type != EventType.Holiday && type != EventType.HolidayTreats &&
             <div className="flex-auto">
@@ -355,7 +374,7 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
             </div>
         }
 
-        {type == EventType.HolidayTreats && <div className="flex flex-column p-2 align-items-start">
+        {type === EventType.HolidayTreats && <div className="flex flex-column p-2 align-items-start">
             <label htmlFor="family" className="font-bold block mt-5 mb-2">מחוז (השאירו ריק לכל המחוזות)
             </label>
             <Dropdown
@@ -366,7 +385,6 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
                 className="w-18rem md:w-20rem mt-3"
             />
         </div>}
-
 
         {alternativeVisible &&
             <div className="flex-auto">
@@ -419,7 +437,6 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
                     holidayToSave.district = district;
                 }
 
-
                 holidayToSave.alternateDate = alternativeVisible ? alternateDate : undefined;
                 if (!isValid(holidayToSave.alternateDate)) {
                     holidayToSave.alternateDate = undefined;
@@ -446,8 +463,7 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
             <Button label='ביטול' onClick={onCancel}></Button>
         </div>
 
-    </Dialog >
+    </Dialog>
 }
-
 
 export default HolidaysAdmin;

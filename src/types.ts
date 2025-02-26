@@ -358,6 +358,7 @@ export enum EventType {
     Block = "חסימה/החלפת תאריך למשפחה",
     Add = "הוספת תאריך למשפחה",
     HolidayTreats = "פינוקי חג",
+    AdditionalCookingDay = "הוספת יום בישול למשפחה"
 }
 
 export interface Holiday {

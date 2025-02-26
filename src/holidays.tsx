@@ -257,6 +257,7 @@ const typeArray = [
     // { name: 'הוספת תאריך למשפחה', value: EventType.Add },
     { name: 'חסימת תאריך למשפחה', value: EventType.Block },
     { name: 'פינוקי חג', value: EventType.HolidayTreats },
+    { name: 'הוספת יום בישול למשפחה', value: EventType.AdditionalCookingDay },
 ];
 
 
@@ -270,6 +271,7 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
         name: holiday.familyName
     }) : undefined);
     const [district, setDistrict] = useState<string | undefined>(holiday.district);
+    const [additionalWeeks, setAdditionalWeeks] = useState<number>(1);
 
     const [filteredFamilies, setFilteredFamilies] = useState<any[]>([]);
     console.log("Holiday in edit", holiday, name, family)
@@ -282,12 +284,17 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
     switch (type) {
         case EventType.Holiday:
             labelDate = "תאריך החג לחסום";
-            labelAlternativeDate = "עד תאריך (אם ריק אז רק יום אחד)"
+            labelAlternativeDate = "עד תאריך (אם ריק אז רק יום אחד)";
             alternativeVisible = true;
             break;
         case EventType.Block:
             labelDate = "תאריך לחסום";
-            labelAlternativeDate = "עד תאריך (אם ריק אז רק יום אחד)"
+            labelAlternativeDate = "עד תאריך (אם ריק אז רק יום אחד)";
+            alternativeVisible = true;
+            break;
+        case EventType.AdditionalCookingDay:
+            labelDate = "מתאריך";
+            labelAlternativeDate = "עד תאריך";
             alternativeVisible = true;
             break;
         case EventType.Add:
@@ -301,6 +308,12 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
             break;
     }
 
+    useEffect(() => {
+        if (type === EventType.AdditionalCookingDay && date) {
+            const newDate = dayjs(date).add(additionalWeeks, 'week');
+            setAlternateDate(newDate.format(DATE_AT));
+        }
+    }, [additionalWeeks, date, type]);
 
     return <Dialog style={{ direction: "rtl" }} visible={visible} onHide={onCancel} header="עריכת חג/יום חריג" >
         <div className="flex flex-row justify-content-start">
@@ -332,6 +345,21 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
                 id="date" value={dayjs(date).toDate()}
                 onChange={(e) => setDate(dayjs(e.value).format(DATE_AT))} showIcon />
         </div>
+
+        {type === EventType.AdditionalCookingDay &&
+            <div className="flex-auto">
+                <label htmlFor="weeks" className="font-bold block mt-5 mb-2">
+                    מספר שבועות
+                </label>
+                <InputText
+                    id="weeks"
+                    value={additionalWeeks.toString()}
+                    onChange={(e) => setAdditionalWeeks(parseInt(e.target.value))}
+                    type="number"
+                    min={1}
+                />
+            </div>
+        }
 
         {type != EventType.Holiday && type != EventType.HolidayTreats &&
             <div className="flex-auto">

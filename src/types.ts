@@ -195,6 +195,7 @@ export interface AirTableRecord {
 export interface FamilyDemand {
     id: string;
     date: string;
+    modifiedDate:string
     familyCityName: string;
     district: string;
     status: string;

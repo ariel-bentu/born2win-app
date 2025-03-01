@@ -29,6 +29,7 @@ function mealAirtable2FamilyDemand(demand: AirTableRecord, familyCityName: strin
         transpotingVolunteerId: getSafeFirstArrayElement(demand.fields["מתנדב משנע"], undefined),
         type: demand.fields["סוג"] || VolunteerType.Meal,
         expandDays: [0],
+        modifiedDate: dayjs(demand.createdTime).format(DATE_AT),
     };
 }
 
@@ -247,6 +248,7 @@ function addMeal2(demandsArray: FamilyDemand[], meals: FamilyDemand[], families:
             isFamilyActive: family.active,
             type,
             expandDays: filteredExpandDays,
+            modifiedDate: "",
         });
     }
 }

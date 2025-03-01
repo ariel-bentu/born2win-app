@@ -70,6 +70,14 @@ const Modes = {
         { name: 'גרף', value: 4 },
     ]
 }
+const ChartModes = {
+    DemandSupply:1,
+    Registration:2,
+    array: [
+        { name: 'היצע/ביקוש', value: 1 },
+        { name: 'שיבוץ', value: 2 }
+    ]
+}
 
 interface StatsProps {
     userInfo: UserInfo,
@@ -707,6 +715,7 @@ export const DemandChart: React.FC<DemandChartProps> = ({ data, startDate, endDa
     const labels: string[] = [];
     const fulfilledDemands: number[] = [];
     const totalDemands: number[] = [];
+    const [chartMode, setChartMode] = useState<number>(ChartModes.DemandSupply);
     const weekdayCounts: { [key: string]: number[] } = {
         ראשון: [],
         שני: [],
@@ -714,14 +723,17 @@ export const DemandChart: React.FC<DemandChartProps> = ({ data, startDate, endDa
         רביעי: [],
         חמישי: [],
         שישי: [],
+        שבת: [],
     };
 
     const today = dayjs().startOf("day");
 
     data.forEach(demand => {
-        if (!dateInRange(demand.date, startDate, endDate)) return;
+        const dDate = chartMode == ChartModes.DemandSupply ? demand.date : demand.modifiedDate;
 
-        const recordDate = dayjs(demand.date).startOf("day");
+        if (!dateInRange(dDate, startDate, endDate)) return;
+
+        const recordDate = dayjs(dDate).startOf("day");
         const daysDiff = recordDate.diff(today, "days");
         const daysRound2Week = Math.floor(daysDiff / 7);
         const weekLabel =
@@ -777,7 +789,7 @@ export const DemandChart: React.FC<DemandChartProps> = ({ data, startDate, endDa
                 label: day,
                 data: weekdayCounts[day],
                 backgroundColor: getColorForDay(day), // Assign a unique color to each weekday
-            })),
+            })).filter(d=>chartMode != ChartModes.DemandSupply || d.label != "שבת"), // filter Sat if mode is demand/supply
         ],
     };
 
@@ -809,7 +821,19 @@ export const DemandChart: React.FC<DemandChartProps> = ({ data, startDate, endDa
         },
     };
 
-    return <Chart type="bar" data={chartData} options={options} />;
+    return <div>
+        <SelectButton
+            pt={{ root: { className: "select-button-container" } }}
+            unstyled
+            value={chartMode} onChange={(e) => setChartMode(e.value)} optionLabel="name" options={ChartModes.array}
+            itemTemplate={(option) => (
+                <div className={`select-button-item ${chartMode === option.value ? 'p-highlight' : ''}`}>
+                    {option.name}
+                </div>
+            )}
+        />
+        <Chart type="bar" data={chartData} options={options} />
+    </div>
 };
 
 // Utility function to assign colors to weekdays

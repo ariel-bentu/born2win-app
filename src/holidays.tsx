@@ -295,7 +295,7 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
         case EventType.AdditionalCookingDay:
             labelDate = "מתאריך";
             labelAlternativeDate = "עד תאריך";
-            alternativeVisible = true;
+            alternativeVisible = false;
             break;
         case EventType.Add:
             labelDate = "תאריך להוסיף";
@@ -349,7 +349,7 @@ function EditHoliday({ holiday, visible, userInfo, onCancel, onSave, appServices
         {type === EventType.AdditionalCookingDay &&
             <div className="flex-auto">
                 <label htmlFor="weeks" className="font-bold block mt-5 mb-2">
-                    מספר שבועות
+                    למשך מספר שבועות
                 </label>
                 <InputText
                     id="weeks"

@@ -128,7 +128,7 @@ export async function getDemands2(
                         return !inSpecialDays(expandDate, family, otherHolidays);
                     });
 
-                    addMeal2(addedOpenDemands, meals, families, family.id || "", holidayTreat.date, getCityName, VolunteerType.HolidayTreat, filteredExpandDays);
+                    addMeal2(addedOpenDemands, meals, families, [], family.id || "", holidayTreat.date, getCityName, VolunteerType.HolidayTreat, filteredExpandDays);
                 }
             }
         });
@@ -143,6 +143,7 @@ export async function getDemands2(
     }
 
     holidaysInDateRange = holidaysInDateRange.filter(rh => rh.type != EventType.HolidayTreats);
+    const blockingHolidays = holidaysInDateRange.filter(rh => rh.type != EventType.AdditionalCookingDay);
 
     const dateEndJs = dayjs(dateEnd);
     const dateStartJs = toSunday(dateStart);
@@ -156,12 +157,12 @@ export async function getDemands2(
             for (let weekDay = 0; weekDay <= 5; weekDay++) {
                 const expandDay = -day + weekDay;
                 const expandDate = date.add(expandDay, "day");
-                if (dateInRange(expandDate, dateStart, dateEnd) && !inSpecialDays(expandDate, family, holidaysInDateRange)) {
+                if (dateInRange(expandDate, dateStart, dateEnd) && !inSpecialDays(expandDate, family, blockingHolidays)) {
                     expandDays.push(expandDay);
                 }
             }
 
-            addMeal2(addedOpenDemands, meals, families, family.id || "", date.format(DATE_AT), getCityName, VolunteerType.Meal, expandDays);
+            addMeal2(addedOpenDemands, meals, families, holidaysInDateRange, family.id || "", date.format(DATE_AT), getCityName, VolunteerType.Meal, expandDays);
         }
     }
 
@@ -186,7 +187,7 @@ function inSpecialDays(date: dayjs.Dayjs, family: Family, holidays: Holiday[]): 
     return false;
 }
 
-function addMeal2(demandsArray: FamilyDemand[], meals: FamilyDemand[], families: Family[], familyId: string, date: string, getCityName: (id: string) => string,
+function addMeal2(demandsArray: FamilyDemand[], meals: FamilyDemand[], families: Family[], holidaysInRange: Holiday[], familyId: string, date: string, getCityName: (id: string) => string,
     type: VolunteerType, expandDays: number[]) {
     const family = families.find(f => f.id == familyId);
     if (!family || expandDays.length == 0) return;
@@ -196,8 +197,17 @@ function addMeal2(demandsArray: FamilyDemand[], meals: FamilyDemand[], families:
 
 
     const familyRelevantMeals = meals.filter(m => m.status == Status.Occupied && m.mainBaseFamilyId == family.id && type == m.type);
+    const familyMealsInRange = familyRelevantMeals.filter(m => dateInRange(m.date, checkRangeStart, checkRangeEnd));
+    const twoCookingDays = familyMealsInRange.length != 1 ? false :
+        // check if the family has another cooking day in that week:
+        holidaysInRange.find(h => h.familyId == familyId &&
+            h.type == EventType.AdditionalCookingDay &&
+            (dayjs(h.date).isBefore(date) || dayjs(h.date).isSame(date)) &&
+            (dayjs(h.alternateDate).isAfter(date) || dayjs(h.alternateDate).isSame(date)) != undefined);
 
-    if (!familyRelevantMeals.find(m => dateInRange(m.date, checkRangeStart, checkRangeEnd))) {
+    const allowAdd = familyMealsInRange.length == 0 || (familyMealsInRange.length == 1 && twoCookingDays);
+
+    if (allowAdd) {
         let filteredExpandDays = expandDays;
         // filters out a sunday or a friday if another week's cooking is adjacent
         const minDay = Math.min(...expandDays);
@@ -213,6 +223,14 @@ function addMeal2(demandsArray: FamilyDemand[], meals: FamilyDemand[], families:
         if (maxDate.day() == 5 && familyRelevantMeals.find(m => minDate.add(2, "day").isSame(m.date, "day"))) {
             // Friday
             filteredExpandDays = filteredExpandDays.filter(d => d != maxDay);
+        }
+
+        if (twoCookingDays) {
+            // exclude the date and day before and day after the existing cooking day
+            const existingMeal = familyMealsInRange[0];
+            // 1. calculate the diff in days
+            const diffDays = dayjs(existingMeal.date).diff(date, "day");
+            filteredExpandDays = filteredExpandDays.filter(d => d != diffDays && d != diffDays + 1 && d != diffDays - 1);
         }
 
         demandsArray.push({

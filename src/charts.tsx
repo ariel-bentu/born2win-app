@@ -736,8 +736,8 @@ export const DemandChart: React.FC<DemandChartProps> = ({ data, startDate, endDa
             )}
         />
         {chartMode == ChartModes.DemandSupply ?
-            <Chart type="bar" data={chartData} options={options} /> :
-            <Chart type="bar" data={chartData} options={options} />}
+            <Chart type="bar" data={chartData} options={options} height="350px" width={(window.innerWidth*.95) +"px"} /> :
+            <Chart type="bar" data={chartData} options={options} height="350px" width={(window.innerWidth*.95) +"px"} />}
 
     </div>
 };

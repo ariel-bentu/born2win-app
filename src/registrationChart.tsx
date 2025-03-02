@@ -230,7 +230,6 @@ export function getRegistrationChart(data: FamilyDemand[], startDate: Dayjs, end
     };
 
     const options = {
-        responsive: true,
         plugins: {
             legend: {
                 position: "top",

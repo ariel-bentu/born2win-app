@@ -1,4 +1,4 @@
-import { addNotificationToQueue, DATE_AT, db, getCities } from ".";
+import { addNotificationToQueue, DATE_AT, DATE_TIME, db, getCities } from ".";
 import dayjs = require("dayjs");
 
 import {
@@ -29,7 +29,7 @@ function mealAirtable2FamilyDemand(demand: AirTableRecord, familyCityName: strin
         transpotingVolunteerId: getSafeFirstArrayElement(demand.fields["מתנדב משנע"], undefined),
         type: demand.fields["סוג"] || VolunteerType.Meal,
         expandDays: [0],
-        modifiedDate: dayjs(demand.createdTime).format(DATE_AT),
+        modifiedDate: dayjs(demand.createdTime).format(DATE_TIME),
     };
 }
 

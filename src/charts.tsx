@@ -3,6 +3,10 @@ import { Chart } from 'primereact/chart';
 import { MultiSelect } from 'primereact/multiselect';
 import dayjs, { Dayjs } from 'dayjs';
 import minMax from 'dayjs/plugin/minMax'; // Plugin to find min and max dates
+import { Chart as ChartJS, registerables } from 'chart.js';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
+
+// Register all default Chart.js components plus the data labels plugin.
 
 import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails, IdName, Status, UserInfo, VolunteerInfo, VolunteerType } from './types';
 import {
@@ -32,8 +36,9 @@ import { Dialog } from "primereact/dialog";
 import { GiPartyHat } from 'react-icons/gi';
 import { RadioButton } from 'primereact/radiobutton';
 import { FamilyList } from './families-mgmt';
+import { getDemandSupplyChart, getRegistrationChart } from './registrationChart';
 
-
+ChartJS.register(...registerables, ChartDataLabels);
 dayjs.extend(minMax);
 
 interface DemandChartProps {
@@ -71,8 +76,8 @@ const Modes = {
     ]
 }
 const ChartModes = {
-    DemandSupply:1,
-    Registration:2,
+    DemandSupply: 1,
+    Registration: 2,
     array: [
         { name: 'היצע/ביקוש', value: 1 },
         { name: 'שיבוץ', value: 2 }
@@ -712,114 +717,12 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
 };
 
 export const DemandChart: React.FC<DemandChartProps> = ({ data, startDate, endDate }) => {
-    const labels: string[] = [];
-    const fulfilledDemands: number[] = [];
-    const totalDemands: number[] = [];
     const [chartMode, setChartMode] = useState<number>(ChartModes.DemandSupply);
-    const weekdayCounts: { [key: string]: number[] } = {
-        ראשון: [],
-        שני: [],
-        שלישי: [],
-        רביעי: [],
-        חמישי: [],
-        שישי: [],
-        שבת: [],
-    };
 
-    const today = dayjs().startOf("day");
+    const { chartData, options } = chartMode == ChartModes.DemandSupply ?
+        getDemandSupplyChart(data, startDate, endDate) :
+        getRegistrationChart(data, startDate, endDate);
 
-    data.forEach(demand => {
-        const dDate = chartMode == ChartModes.DemandSupply ? demand.date : demand.modifiedDate;
-
-        if (!dateInRange(dDate, startDate, endDate)) return;
-
-        const recordDate = dayjs(dDate).startOf("day");
-        const daysDiff = recordDate.diff(today, "days");
-        const daysRound2Week = Math.floor(daysDiff / 7);
-        const weekLabel =
-            daysDiff >= 0 && daysDiff <= 6
-                ? "היום"
-                : today.add(daysRound2Week * 7, "days").format("DD-MM");
-
-        let index = labels.findIndex(l => l === weekLabel);
-        if (index < 0) {
-            labels.push(weekLabel);
-            fulfilledDemands.push(0);
-            totalDemands.push(0);
-            index = labels.length - 1;
-
-            // Initialize weekday counts for this week
-            Object.keys(weekdayCounts).forEach(day => {
-                weekdayCounts[day].push(0);
-            });
-        }
-
-        totalDemands[index]++;
-        if (demand.status === "תפוס") {
-            fulfilledDemands[index]++;
-        }
-
-        // Increment weekday count
-        const weekday = recordDate.format("dddd"); // Get the weekday name
-        weekdayCounts[weekday][index]++;
-    });
-
-    const chartData = {
-        labels: labels,
-        datasets: [
-            {
-                type: "line",
-                label: "סה״כ",
-                data: totalDemands,
-                fill: false,
-                borderColor: "#42A5F5",
-                tension: 0.1,
-            },
-            {
-                type: "line",
-                label: "שובצו",
-                data: fulfilledDemands,
-                fill: false,
-                borderColor: "#66BB6A",
-                tension: 0.1,
-            },
-            // Add datasets for weekdays
-            ...Object.keys(weekdayCounts).map(day => ({
-                type: "bar",
-                label: day,
-                data: weekdayCounts[day],
-                backgroundColor: getColorForDay(day), // Assign a unique color to each weekday
-            })).filter(d=>chartMode != ChartModes.DemandSupply || d.label != "שבת"), // filter Sat if mode is demand/supply
-        ],
-    };
-
-    const options = {
-        responsive: true,
-        plugins: {
-            legend: {
-                position: "top",
-            },
-            tooltip: {
-                mode: "index",
-                intersect: false,
-            },
-        },
-        scales: {
-            x: {
-                stacked: false, // Disable stacking to display bars side by side
-            },
-            y: {
-                stacked: false, // Ensure side-by-side behavior for y-axis as well
-                beginAtZero: true,
-                ticks: {
-                    stepSize: 1,
-                    callback: function (value: number) {
-                        return Number.isInteger(value) ? value : null;
-                    },
-                },
-            },
-        },
-    };
 
     return <div>
         <SelectButton
@@ -832,12 +735,15 @@ export const DemandChart: React.FC<DemandChartProps> = ({ data, startDate, endDa
                 </div>
             )}
         />
-        <Chart type="bar" data={chartData} options={options} />
+        {chartMode == ChartModes.DemandSupply ?
+            <Chart type="bar" data={chartData} options={options} /> :
+            <Chart type="bar" data={chartData} options={options} />}
+
     </div>
 };
 
 // Utility function to assign colors to weekdays
-function getColorForDay(day: string): string {
+export function getColorForDay(day: string): string {
     const colors: { [key: string]: string } = {
         ראשון: "#FF6384",
         שני: "#36A2EB",

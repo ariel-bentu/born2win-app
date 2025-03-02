@@ -75,7 +75,7 @@ dayjs.extend(localeData);
 dayjs.locale("he");
 
 const JERUSALEM = "Asia/Jerusalem";
-const DATE_TIME = "YYYY-MM-DD HH:mm";
+export const DATE_TIME = "YYYY-MM-DD HH:mm";
 export const DATE_AT = "YYYY-MM-DD";
 const DATE_BIRTHDAY = "DD-MM";
 export const db = getFirestore();

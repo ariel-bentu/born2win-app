@@ -12,6 +12,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "chart.js": "^4.4.3",
+    "chartjs-plugin-datalabels": "^2.2.0",
     "clientjs": "^0.2.1",
     "dayjs": "^1.11.12",
     "dotenv": "^16.4.5",

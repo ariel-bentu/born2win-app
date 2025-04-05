@@ -310,7 +310,7 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                     <li><strong>העדפות דגים:</strong> {familyDetails.fishPreferences}</li>
                     <li><strong>לא אוכלים:</strong> {isNotEmpty(familyDetails.avoidDishes) ? familyDetails.avoidDishes : "אין העדפה"}</li>
                     <li><strong>תוספות:</strong> {familyDetails.sideDishes}</li>
-                    <li><strong>יום מומלץ (לא חובה) לבישול:</strong>{familyDetails.cookingDays?.join(", ") || ""}</li>
+                    {/* <li><strong>יום מומלץ (לא חובה) לבישול:</strong>{familyDetails.cookingDays?.join(", ") || ""}</li> */}
                     {includeContacts && <>
                         <li><strong>כתובת:</strong>{getAddress(familyDetails)}</li>
                         {isNotEmpty(familyDetails.contactName) && (

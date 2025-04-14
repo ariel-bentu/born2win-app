@@ -332,6 +332,12 @@ exports.UpdateUserLogin = onCall({ cors: true }, async (request) => {
             throw new HttpsError("not-found", "User with given phone is not known");
         }
         const docData = doc.data() || {};
+
+        if (docData.active == false) {
+            logger.warn("User with given phone is not active", uulp);
+            throw new HttpsError("unauthenticated", "User with given phone is not active");
+        }
+
         if (!uulp.otp) {
             // Phone - Phase 1 (no otp)
             // Generate OTP:

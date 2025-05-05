@@ -423,7 +423,6 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
     const [showFamilyDetails, setShowFamilyDetails] = useState<GroupedFamily | undefined>();
     const [filterByVolunteer, setFilterByVolunteer] = useState<any | undefined>();
     const [cancelInProgress, setCancelInProgress] = useState<boolean>(false);
-
     const overlayPanelRef = useRef<any>(null);
 
     const [selectedMeal, setSelectedMeal] = useState<{ city: string, familyId: string, date: string, type: VolunteerType } | undefined>();
@@ -435,6 +434,16 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
     const [transportingVolunteer, setTransportingVolunteer] = useState<VolunteerInfo | undefined>(undefined);
     const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
     const [error, setError] = useState<any>(undefined);
+    const [showCookModal, setShowCookModal] = useState(false);
+    const [selectedCook, setSelectedCook] = useState<VolunteerInfo | null>(null);
+    const [selectedCookDate, setSelectedCookDate] = useState<DateInfo | null>(null);
+    const [saving, setSaving] = useState(false);
+
+    const closeCookModal = () => {
+        setShowCookModal(false);
+        setSelectedCook(null);
+        setSelectedCookDate(null);
+    };
 
 
     const openRecipientModal = () => {
@@ -600,12 +609,36 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
                                                         <span className='m-1'>|</span>
                                                     </span>
                                                 } else {
-                                                    return <AvailableDate key={d.date} date={d} isHolidayTreat={d.type == VolunteerType.HolidayTreat} />
+                                                    return (
+                                                        <span key={d.date}>
+                                                            <span
+                                                                className="clickable-span position-relative"
+                                                                onClick={() => {
+                                                                    setSelectedCookDate(d);
+                                                                    setFamilyDetails({
+                                                                        id: family.mainBaseFamilyId,
+                                                                        familyLastName: family.familyLastName,
+                                                                        cityId: family.city,
+                                                                        district: family.district,
+                                                                    } as FamilyDetails);
+                                                                    setShowCookModal(true);
+                                                                }}
+                                                            >
+                                                                {dayjs(d.date).format("DD.MM")}
+                                                                {d.type === VolunteerType.HolidayTreat && (
+                                                                    <GiPartyHat
+                                                                        className="position-absolute"
+                                                                        style={{ color: "var(--born2win-button-color)", top: -5 }}
+                                                                    />
+                                                                )}
+                                                            </span>
+                                                            <span className="m-1">|</span>
+                                                        </span>
+                                                    );
                                                 }
                                             })
                                         }</div>
                                     </div>))
-
                             }
                         </div>
                     )
@@ -613,6 +646,69 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
             }
 
             {/* OverlayPanel for displaying additional info */}
+            <Dialog
+                header={<div style={{ textAlign: 'right', width: '100%' }}>בחר מבשל</div>}
+                visible={showCookModal}
+                onHide={closeCookModal}
+                style={{ width: '300px', position: 'absolute', right: '10%', top: '20%' }}
+            >
+                <div className="flex justify-content-end">
+                    <AutoComplete
+                        inputClassName="w-17rem md:w-15rem"
+                        placeholder={!selectedCook ? "חיפוש לפי שם פרטי, משפחה או טלפון" : undefined}
+                        delay={500}
+                        value={selectedCook}
+                        field="name"
+                        optionGroupLabel="districtName"
+                        optionGroupChildren="users"
+                        suggestions={filteredUsers}
+                        completeMethod={async (event: AutoCompleteCompleteEvent) => {
+                            const newFilter = await handleSearchUsers(userInfo, event.query);
+                            setFilteredUsers(newFilter);
+                        }}
+                        onChange={(e) => setSelectedCook(e.value)}
+                        inputStyle={{ textAlign: 'right' }}
+                        itemTemplate={(item) => (
+                            <div style={{ textAlign: 'right' }}>{item.name}</div>
+                        )}
+                    />
+                </div>
+                <div className="flex justify-content-end mt-2">
+                    <Button label="ביטול" onClick={closeCookModal} className="p-button-secondary ml-2" />
+                    <Button
+                        label="אשר"
+                        disabled={!selectedCook}
+                        onClick={async () => {
+                            if (!selectedCookDate || !selectedCook) return;
+                            setSaving(true);
+                            try {
+                                await updateFamilyDemand(
+                                    selectedCookDate.demandId,
+                                    selectedCookDate.date,
+                                    selectedCookDate.mainBaseFamilyId,
+                                    familyDetails?.cityId || "cityId(unknown)",
+                                    true,
+                                    selectedCookDate.type,
+                                    `שובץ ע״י מנהל`,
+                                    selectedCookDate.district,
+                                    selectedCook.id
+                                );
+                                appServices.showMessage("success", "שיבוץ בוצע", "");
+                                setShowCookModal(false);
+                                setSelectedCook(null);
+                                setSelectedCookDate(null);
+                                setReload(prev => prev + 1);
+                            } catch (err) {
+                                // @ts-ignore
+                                appServices.showMessage("error", "שגיאה בשיבוץ", err.message);
+                            } finally {
+                                setSaving(false);
+                            }
+                        }}
+                    />
+                </div>
+            </Dialog>
+
             <OverlayPanel ref={overlayPanelRef} showCloseIcon closeOnEscape
                 dismissable={true} >
                 <div dir="rtl" style={{

@@ -197,7 +197,7 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                         {loading && <ProgressSpinner style={{ height: 20, width: 20 }} />}
                         {familyDetails && <>
                             <li><strong>עיר:</strong>{family.city}</li>
-                            <li>המשפחה בת <strong> {familyDetails.adultsCount}</strong> נפשות, יום מומלץ (לא חובה) לבישול: <strong>{familyDetails.cookingDays}</strong></li>
+                            <li>המשפחה בת <strong>{familyDetails.adultsCount}</strong> נפשות</li>
                             <li>
                                 {isNotEmpty(alergies) ? <label className="alergies">נא לשים לב לאלרגיה! {alergies}</label> :
                                     <label><strong>אלרגיות:</strong> אין</label>}

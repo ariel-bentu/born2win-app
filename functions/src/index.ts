@@ -1167,6 +1167,12 @@ exports.UpdateFamilyDemand_v3 = onCall({ cors: true }, async (request) => {
 
     const demandDistrictId = (fdup.district);
     const volunteerId = (fdup.volunteerId || userInfo.id);
+    if (fdup.volunteerId) {
+        // this is restricted only to admins:
+        if (!userInfo.isAdmin) {
+            throw new HttpsError("permission-denied", "Unauthorized to register another volunteer");
+        }
+    }
     const registrationDate = fdup.date;
 
     const demandDistrict = userInfo.districts.find(d => d.id == demandDistrictId);

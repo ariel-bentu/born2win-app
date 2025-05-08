@@ -6,6 +6,7 @@ export const DATE_AT = "YYYY-MM-DD";
 const DATE_TIME = "YYYY-MM-DD HH:mm";
 
 import { getFirestore, FieldValue, QueryDocumentSnapshot, DocumentSnapshot, FieldPath } from "firebase-admin/firestore";
+
 import { getStorage } from "firebase-admin/storage";
 var admin = require("firebase-admin");
 
@@ -891,6 +892,7 @@ function generateSignConfidentialityURL(firstName: string, identificationId: str
 //syncAllBorn2WinUsers()
 import { HebrewCalendar, HDate, Location, Event, CalOptions } from '@hebcal/core';
 import { only } from "node:test";
+import { createManyChatSubscriber } from "./manychat";
 
 
 function getHolidays() {
@@ -1076,7 +1078,12 @@ async function migrateUsers() {
     db.collection(Collections.Users).get().then(async (res) => {
         let i = 1
         let sum = "לא נרשמו להודעות\n"
+        let installed = 0
         for (const doc of res.docs) {
+            if (doc.data().active && doc.data().loginInfo) {
+                installed++
+            }
+
             if (doc.data().loginInfo && (!doc.data().notificationTokens || doc.data().notificationTokens.length == 0) && !!doc.data().active) {
                 sum += i + ". " + doc.data().firstName + " " + doc.data().lastName + "\n"; //+(doc.data().loginInfo[0].isIOS?" IOS":" Android" )+"\n"
                 i++
@@ -1092,6 +1099,7 @@ async function migrateUsers() {
             // })
         }
         console.log(sum)
+        console.log("installed", installed)
     })
 }
 //migrateUsers()
@@ -1276,6 +1284,7 @@ function mealAirtable2FamilyDemand(demand: AirTableRecord, familyCityName: strin
     return {
         id: demand.id,
         date: demand.fields["DATE"],
+        modifiedDate: demand.fields["modifiedDate"],
         familyCityName,
         familyLastName: demand.fields.Name,
         district: getSafeFirstArrayElement(demand.fields["מחוז"], ""),
@@ -1510,6 +1519,7 @@ function addMeal2(demandsArray: FamilyDemand[], meals: FamilyDemand[], families:
             isFamilyActive: family.active,
             type,
             expandDays: filteredExpandDays,
+            modifiedDate: dayjs().format(DATE_TIME),
         });
     }
 }
@@ -1535,13 +1545,13 @@ export function getDatesBetween(startDateIn: string, endDateIn: string) {
 }
 
 
-getDemands2("recP17rsfOseG3Frx", "rec1N6tWumuiTTOMQ", Status.Available, VolunteerType.Meal,
-//    dayjs().add(1, "day").format(DATE_AT),
-//    dayjs().add(45, "days").format(DATE_AT),
-       "2025-03-20", "2025-03-30"
-).then(demands => {
-    console.log(demands.map(m => m.familyLastName + ":" + dayjs(m.date).format("DD-MM") + ":" + m.expandDays?.map(d => `"${d}"`)).join("\n"))
-})
+// getDemands2("recP17rsfOseG3Frx", "rec1N6tWumuiTTOMQ", Status.Available, VolunteerType.Meal,
+// //    dayjs().add(1, "day").format(DATE_AT),
+// //    dayjs().add(45, "days").format(DATE_AT),
+//        "2025-03-20", "2025-03-30"
+// ).then(demands => {
+//     console.log(demands.map(m => m.familyLastName + ":" + dayjs(m.date).format("DD-MM") + ":" + m.expandDays?.map(d => `"${d}"`)).join("\n"))
+// })
 const getElapsedTime = (start: [number, number]): string => {
     const elapsed = process.hrtime(start);
     const elapsedMs = elapsed[0] * 1000 + elapsed[1] / 1e6;
@@ -1560,3 +1570,10 @@ function testGetCities() {
 // testGetCities().then(() => testGetCities().then(() => {
 //     cities.evict().then(() => testGetCities())
 // }));
+
+async function updateManyChatUser() {
+    await createManyChatSubscriber("אסתי", "הרשקו", "972507582567", "female")
+}
+
+//updateManyChatUser()
+

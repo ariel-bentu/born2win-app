@@ -23,7 +23,7 @@ import { generateDetailsForWhatapp } from './family-registration-details';
 
 import { InProgress, PhoneNumber, WeekSelectorSlider, WhatsAppButton } from './common-ui';
 import { SelectButton } from 'primereact/selectbutton';
-import { dateInRange, simplifyFamilyName, sortByDate, toSunday } from './utils';
+import { DATE_AT, dateInRange, simplifyFamilyName, sortByDate, toSunday } from './utils';
 import { Button } from 'primereact/button';
 import "./charts.css"
 import { FamilyDetailsComponent } from './family-registration-details';
@@ -40,6 +40,16 @@ import { getDemandSupplyChart, getRegistrationChart } from './registrationChart'
 
 ChartJS.register(...registerables, ChartDataLabels);
 dayjs.extend(minMax);
+const DAYS: { [key: number]: string } = {
+    0: "א",
+    1: "ב",
+    2: "ג",
+    3: "ד",
+    4: "ה",
+    5: "ו",
+    6: "ש",
+}
+
 
 interface DemandChartProps {
     data: FamilyDemand[];
@@ -112,6 +122,22 @@ interface GroupedData {
         [mainBaseFamilyId: string]: GroupedFamily;
     };
 }
+
+export default function SelectDays({ dateInfo, OnSelectDate, dateSelected }:
+    { dateInfo: DateInfo, OnSelectDate: (date: string) => void, dateSelected: string | null }) {
+    if (!dateInfo) return null;
+
+    const date = dayjs(dateInfo.date);
+
+    const items: { name: string, value: string }[] = dateInfo.expandDays.map((d) => ({ name: `יום ${DAYS[date.add(d, "day").day()]}, ${date.add(d, "day").format("DD/MM")} `, value: date.add(d, "day").format(DATE_AT) }))
+
+    return (
+        <div className="card flex justify-content-center">
+            <SelectButton value={dateSelected} onChange={(e) => OnSelectDate(e.value)} optionLabel="name" options={items} multiple />
+        </div>
+    );
+}
+
 
 
 const filterOnlyOpen = (f: FamilyDemand) => f.status === Status.Available && f.isFamilyActive === true && f.type == VolunteerType.Meal;
@@ -436,6 +462,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
     const [error, setError] = useState<any>(undefined);
     const [showCookModal, setShowCookModal] = useState(false);
     const [selectedCook, setSelectedCook] = useState<VolunteerInfo | null>(null);
+    const [selectedCookDay, setSelectedCookDay] = useState<string | null>(null);
     const [selectedCookDate, setSelectedCookDate] = useState<DateInfo | null>(null);
     const [saving, setSaving] = useState(false);
 
@@ -443,6 +470,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
         setShowCookModal(false);
         setSelectedCook(null);
         setSelectedCookDate(null);
+        setSelectedCookDay(null);
     };
 
 
@@ -612,7 +640,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
                                                     return (
                                                         <span key={d.date}>
                                                             <span
-                                                                className="clickable-span position-relative"
+                                                                className="clickable-span clickable-span-red position-relative"
                                                                 onClick={() => {
                                                                     setSelectedCookDate(d);
                                                                     setFamilyDetails({
@@ -673,18 +701,21 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
                         )}
                     />
                 </div>
+                <div className="flex justify-content-center mt-2">
+                    <SelectDays dateInfo={selectedCookDate!} OnSelectDate={(date) => setSelectedCookDay(date)} dateSelected={selectedCookDay} />
+                </div>
                 <div className="flex justify-content-end mt-2">
                     <Button label="ביטול" onClick={closeCookModal} className="p-button-secondary ml-2" />
                     <Button
                         label="אשר"
-                        disabled={!selectedCook}
+                        disabled={!selectedCook || !selectedCookDay}
                         onClick={async () => {
-                            if (!selectedCookDate || !selectedCook) return;
+                            if (!selectedCookDate || !selectedCook || !selectedCookDay) return;
                             setSaving(true);
                             try {
                                 await updateFamilyDemand(
                                     selectedCookDate.demandId,
-                                    selectedCookDate.date,
+                                    selectedCookDay,
                                     selectedCookDate.mainBaseFamilyId,
                                     familyDetails?.cityId || "cityId(unknown)",
                                     true,
@@ -694,9 +725,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
                                     selectedCook.id
                                 );
                                 appServices.showMessage("success", "שיבוץ בוצע", "");
-                                setShowCookModal(false);
-                                setSelectedCook(null);
-                                setSelectedCookDate(null);
+                                closeCookModal();
                                 setReload(prev => prev + 1);
                             } catch (err) {
                                 // @ts-ignore
@@ -832,8 +861,8 @@ export const DemandChart: React.FC<DemandChartProps> = ({ data, startDate, endDa
             )}
         />
         {chartMode == ChartModes.DemandSupply ?
-            <Chart type="bar" data={chartData} options={options} height="350px" width={(window.innerWidth*.95) +"px"} /> :
-            <Chart type="bar" data={chartData} options={options} height="350px" width={(window.innerWidth*.95) +"px"} />}
+            <Chart type="bar" data={chartData} options={options} height="350px" width={(window.innerWidth * .95) + "px"} /> :
+            <Chart type="bar" data={chartData} options={options} height="350px" width={(window.innerWidth * .95) + "px"} />}
 
     </div>
 };
@@ -907,15 +936,6 @@ function sortFamilies(familiesMap: { [mainBaseFamilyId: string]: GroupedFamily }
             }
             return 0;
         });
-}
-const DAYS = {
-    0: "א",
-    1: "ב",
-    2: "ג",
-    3: "ד",
-    4: "ה",
-    5: "ו",
-    6: "ש",
 }
 
 function AvailableDate({ date, isHolidayTreat }: { date: DateInfo, isHolidayTreat: boolean }) {

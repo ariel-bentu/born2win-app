@@ -92,7 +92,7 @@
 .one-line-cancelled {
   position: absolute;
   top: 50px;
-  right:150px;
+  right: 150px;
   color: red;
   font-size: x-large;
   font-weight: bold;
@@ -141,6 +141,10 @@
   /* Add underline like links */
   cursor: pointer;
   /* Change cursor to pointer */
+}
+
+.clickable-span-red {
+  color: red;
 }
 
 .clickable-span:hover {

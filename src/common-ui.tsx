@@ -132,8 +132,6 @@ export function WeekSelectorSlider({ selectedWeeks, setSelectedWeeks, min, max }
 };
 
 
-
-
 interface ChannelHeaderProps {
     name: string;
     onBack?: () => void;

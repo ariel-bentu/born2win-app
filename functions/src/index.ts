@@ -1125,11 +1125,13 @@ exports.GetUserRegistrations_v3 = onCall({ cors: true }, async (request): Promis
 
     const godp = request.data as GetUserRegistrationsPayload;
     const type = godp?.type || VolunteerType.Meal;
-
+    const startDate = (request.data?.impersonateUser) ?
+        dayjs().subtract(6, "months").format(DATE_AT) : // admin who works on behalf sees all history
+        dayjs().startOf("month").format(DATE_AT); // users see only history from start of Month
 
     const districts = doc.data().districts;
     const volunteerId = doc.id;
-    return getDemands2(districts, undefined, Status.OccupiedOrCancelled, type, dayjs().startOf("month").format(DATE_AT), dayjs().add(45, "days").format(DATE_AT), volunteerId);
+    return getDemands2(districts, undefined, Status.OccupiedOrCancelled, type, startDate, dayjs().add(45, "days").format(DATE_AT), volunteerId);
 });
 
 

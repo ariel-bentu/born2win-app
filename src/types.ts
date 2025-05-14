@@ -75,7 +75,9 @@ export interface FamilyDeleteContactPayload {
 
 
 export interface VolunteerInfoPayload {
-    volunteerId: string;
+    // one is required
+    volunteerId?: string; 
+    volunteerList?: string[];
 }
 
 export interface VolunteerInfo {
@@ -229,6 +231,7 @@ export interface GetDemandsPayload {
     from: string;
     to: string;
     type: VolunteerType;
+    status: Status.Occupied | Status.Available | Status.OccupiedOrCancelled | undefined;
     familyId: string | undefined;
 }
 
@@ -411,4 +414,32 @@ export interface Contact {
 export interface SuitabilityCheck {
     id: string;
     // Other fields
+}
+
+export interface DateInfo {
+    date: string;
+    expandDays: number[];
+    volunteerId: string;
+    demandId: string;
+    mainBaseFamilyId: string;
+    districtBaseFamilyId: string;
+    transportingVolunteerId?: string;
+    district: string;
+    parentFamily: GroupedFamily;
+    type: VolunteerType;
+}
+
+
+export interface GroupedFamily extends FamilyCompact {
+    dates: DateInfo[];
+}
+
+export const DAYS: { [key: number]: string } = {
+    0: "א",
+    1: "ב",
+    2: "ג",
+    3: "ד",
+    4: "ה",
+    5: "ו",
+    6: "ש",
 }

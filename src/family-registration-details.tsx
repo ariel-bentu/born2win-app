@@ -120,15 +120,15 @@ export function FamilyDetailsComponent({ mainBaseFamilyId, family, familyDemandI
                 .finally(() => setLoading(false));
             const demand = demands.find(d => d.id === familyDemandId);
             if (demand && demand.transpotingVolunteerId) {
-                getVolunteerInfo(demand.transpotingVolunteerId).then(v => {
-                    setTranspotingVolunteer(v);
+                getVolunteerInfo([demand.transpotingVolunteerId]).then(v => {
+                    setTranspotingVolunteer(v[0]);
                 })
             } else {
                 setTranspotingVolunteer(undefined);
             }
             if (demand && demand.volunteerId) {
-                getVolunteerInfo(demand.volunteerId).then(info => {
-                    setVolunteerInfo(info);
+                getVolunteerInfo([demand.volunteerId]).then(info => {
+                    setVolunteerInfo(info[0]);
                 });
             } else {
                 setVolunteerInfo(undefined);

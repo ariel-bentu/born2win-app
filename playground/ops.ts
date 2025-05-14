@@ -523,9 +523,8 @@ async function GetFamilyDetails2(familyId: string, includeContacts: boolean): Pr
 // צפון recLbwpPC80SdRmPO
 // שרון recmLo9MWRxmrLEsM
 // מרכז recP17rsfOseG3Frx
-// getDemands2(["recP17rsfOseG3Frx", "recmLo9MWRxmrLEsM"], Status.Occupied, "2024-10-11", "2024-12-14", "rec2YAetKYmqRwO2k").then(demands => {
+// getDemands2(undefined, "recwVL742srgkzO0u", Status.Occupied, VolunteerType.Meal, "2025-03-14", "2025-05-14").then(demands => {
 //     demands.forEach(d => console.log(d.date, d.status))
-
 // });
 
 

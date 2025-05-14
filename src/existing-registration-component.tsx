@@ -80,8 +80,8 @@ export function ExistingRegistrationsComponent({ appServices, navigationRequest,
             }
             // Fetch volunteer info if a valid registration is selected
             if (regs.length > 0 && regs[0].volunteerId) {
-                getVolunteerInfo(regs[0].volunteerId).then(info => {
-                    setVolunteerInfo(info);
+                getVolunteerInfo([regs[0].volunteerId]).then(info => {
+                    setVolunteerInfo(info[0]);
                 }).catch(err => {
                     console.error("Failed to fetch volunteer info:", err);
                 });

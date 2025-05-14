@@ -1115,7 +1115,7 @@ exports.GetDemands_v4 = onCall({ cors: true }, async (request): Promise<FamilyDe
     const userInfo = await getUserInfo(request);
     if (userInfo.isAdmin) {
         const gdp = request.data as GetDemandsPayload;
-        return await getDemands2(gdp.districts, gdp.familyId, undefined, gdp.type || VolunteerType.Meal, gdp.from, gdp.to);
+        return await getDemands2(gdp.districts, gdp.familyId, gdp.status, gdp.type || VolunteerType.Meal, gdp.from, gdp.to);
     }
     throw new HttpsError("permission-denied", "Unauthorized user to read all demands");
 });
@@ -1281,29 +1281,44 @@ exports.DeleteHoliday = onCall({ cors: true }, async (request) => {
 });
 
 
-exports.GetVolunteerInfo = onCall({ cors: true }, async (request): Promise<VolunteerInfo | undefined> => {
+exports.GetVolunteerInfo = onCall({ cors: true }, async (request): Promise<VolunteerInfo[] | undefined> => {
     await getUserInfo(request);
 
-    // todo consider if every user can call this
     const cities = await getCities();
+    const allDistricts = await getDestricts();
     const vip = request.data as VolunteerInfoPayload;
-    const volunteerDoc = await db.collection(Collections.Users).doc(vip.volunteerId).get();
-    if (volunteerDoc && volunteerDoc.exists) {
-        const data = volunteerDoc.data();
-        if (data) {
-            const allDistricts = await getDestricts();
-            const volunteerDistricts = data.districts.flatMap((id: string) => allDistricts.find(dist => dist.id === id));
-            return {
-                id: volunteerDoc.id,
-                firstName: data.firstName,
-                lastName: data.lastName,
-                city: cities.find(c => c.id == data.cityId)?.name || "N/A",
-                districts: volunteerDistricts,
-                phone: data.phone,
-                active: data.active,
-            };
+
+    const buildVolunteerInfo = (doc: FirebaseFirestore.DocumentSnapshot) => {
+        const data = doc.data();
+        if (!data) return undefined;
+        const volunteerDistricts = data.districts?.flatMap((id: string) => allDistricts.find(dist => dist.id === id)) || [];
+        return {
+            id: doc.id,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            city: cities.find(c => c.id === data.cityId)?.name || "N/A",
+            districts: volunteerDistricts,
+            phone: data.phone,
+            active: data.active,
+        };
+    };
+
+
+    // Handle multiple volunteerList
+    if (vip.volunteerList && vip.volunteerList.length > 0) {
+        const batches = [];
+        for (let i = 0; i < vip.volunteerList.length; i += 10) {
+            const chunk = vip.volunteerList.slice(i, i + 10);
+            const query = db.collection(Collections.Users)
+                .where("volId", "in", chunk);
+            batches.push(query.get());
         }
+
+        const snapshots = await Promise.all(batches);
+        const allDocs = snapshots.flatMap(snap => snap.docs);
+        return allDocs.map(doc => buildVolunteerInfo(doc)).filter(Boolean) as VolunteerInfo[];
     }
+
     return;
 });
 

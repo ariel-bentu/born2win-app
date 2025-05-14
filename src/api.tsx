@@ -24,7 +24,8 @@ import {
     VolunteerType,
     GetOpenDemandPayload,
     GetUserRegistrationsPayload,
-    UpdateIdentificationNumberPayload
+    UpdateIdentificationNumberPayload,
+    Status
 } from "./types";
 import { readAllNotifications } from "./notifications";
 import { getDB } from "./db";
@@ -330,25 +331,15 @@ export function getUserRegistrations(): Promise<FamilyDemand[]> {
         .then((res: any) => res.data);
 }
 
-export async function getVolunteerInfo(volunteerId: string): Promise<VolunteerInfo> {
+export async function getVolunteerInfo(volunteerList:  string[]): Promise<VolunteerInfo[]> {
     const getVolunteerInfoFunc = httpsCallable(functions, 'GetVolunteerInfo');
-    if (isNotEmpty(volunteerId)) {
-        const vip = { volunteerId } as VolunteerInfoPayload;
-
-        return getVolunteerInfoFunc(vip).then(res => res.data as VolunteerInfo);
-    }
-    return ({
-        id: "",
-        firstName: "אין",
-        lastName: "",
-        districts: [{ id: "", name: "אין" }],
-        phone: "",
-        active: false,
-    } as VolunteerInfo)
+    return getVolunteerInfoFunc({volunteerList}).then(res => res.data as VolunteerInfo[]);
 }
 
 
-export async function getDemands(dateRange: [string, string], districts: string[] | undefined, familyId: string | undefined, type = VolunteerType.Meal): Promise<FamilyDemand[]> {
+export async function getDemands(dateRange: [string, string], districts: string[] | undefined, familyId: string | undefined, type = VolunteerType.Meal,
+    status: Status.Occupied | Status.Available | Status.OccupiedOrCancelled | undefined = undefined
+): Promise<FamilyDemand[]> {
     if (!dateRange[0] || !dateRange[1]) return [];
 
     // No impersonation
@@ -359,6 +350,7 @@ export async function getDemands(dateRange: [string, string], districts: string[
         districts,
         familyId,
         type,
+        status
     } as GetDemandsPayload;
     return getDemandsFunc(payload).then(res => res.data as FamilyDemand[]);
 }

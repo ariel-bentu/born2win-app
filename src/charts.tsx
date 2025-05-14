@@ -8,7 +8,7 @@ import ChartDataLabels from 'chartjs-plugin-datalabels';
 
 // Register all default Chart.js components plus the data labels plugin.
 
-import { AppServices, FamilyCompact, FamilyDemand, FamilyDetails, IdName, Status, UserInfo, VolunteerInfo, VolunteerType } from './types';
+import { AppServices, DateInfo, FamilyCompact, FamilyDemand, FamilyDetails, GroupedFamily, IdName, Status, UserInfo, VolunteerInfo, VolunteerType } from './types';
 import {
     getDemands,
     getFamilyDetails,
@@ -37,18 +37,11 @@ import { GiPartyHat } from 'react-icons/gi';
 import { RadioButton } from 'primereact/radiobutton';
 import { FamilyList } from './families-mgmt';
 import { getDemandSupplyChart, getRegistrationChart } from './registrationChart';
+import { FamilyOpenDemandDialog } from './admin-uis';
 
 ChartJS.register(...registerables, ChartDataLabels);
 dayjs.extend(minMax);
-const DAYS: { [key: number]: string } = {
-    0: "א",
-    1: "ב",
-    2: "ג",
-    3: "ד",
-    4: "ה",
-    5: "ו",
-    6: "ש",
-}
+
 
 
 interface DemandChartProps {
@@ -100,22 +93,8 @@ interface StatsProps {
 
 }
 
-interface DateInfo {
-    date: string;
-    expandDays: number[];
-    volunteerId: string;
-    demandId: string;
-    mainBaseFamilyId: string;
-    districtBaseFamilyId: string;
-    transportingVolunteerId?: string;
-    district: string;
-    parentFamily: GroupedFamily;
-    type: VolunteerType;
-}
 
-interface GroupedFamily extends FamilyCompact {
-    dates: DateInfo[];
-}
+
 
 interface GroupedData {
     [city: string]: {
@@ -123,20 +102,6 @@ interface GroupedData {
     };
 }
 
-export default function SelectDays({ dateInfo, OnSelectDate, dateSelected }:
-    { dateInfo: DateInfo, OnSelectDate: (date: string) => void, dateSelected: string | null }) {
-    if (!dateInfo) return null;
-
-    const date = dayjs(dateInfo.date);
-
-    const items: { name: string, value: string }[] = dateInfo.expandDays.map((d) => ({ name: `יום ${DAYS[date.add(d, "day").day()]}, ${date.add(d, "day").format("DD/MM")} `, value: date.add(d, "day").format(DATE_AT) }))
-
-    return (
-        <div className="card flex justify-content-center">
-            <SelectButton value={dateSelected} onChange={(e) => OnSelectDate(e.value)} optionLabel="name" options={items} multiple />
-        </div>
-    );
-}
 
 
 
@@ -461,18 +426,7 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
     const [familyDetails, setFamilyDetails] = useState<FamilyDetails | undefined>(undefined)
     const [error, setError] = useState<any>(undefined);
     const [showCookModal, setShowCookModal] = useState(false);
-    const [selectedCook, setSelectedCook] = useState<VolunteerInfo | null>(null);
-    const [selectedCookDay, setSelectedCookDay] = useState<string | null>(null);
     const [selectedCookDate, setSelectedCookDate] = useState<DateInfo | null>(null);
-    const [saving, setSaving] = useState(false);
-
-    const closeCookModal = () => {
-        setShowCookModal(false);
-        setSelectedCook(null);
-        setSelectedCookDate(null);
-        setSelectedCookDay(null);
-    };
-
 
     const openRecipientModal = () => {
         setShowRecipientModal(true);
@@ -530,8 +484,9 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
             // find demand
             const demand = data.find(d => d.date == selectedMeal.date && d.mainBaseFamilyId == selectedMeal.familyId && d.type == selectedMeal.type)
             if (demand) {
-                getVolunteerInfo(demand.volunteerId).then(info => {
-                    setVolunteerInfo(info);
+                // todo optimize to one call with array
+                getVolunteerInfo([demand.volunteerId]).then(infoList => {
+                    setVolunteerInfo(infoList[0]);
                 });
                 getFamilyDetails(demand.districtBaseFamilyId, demand.district, demand?.id, demand?.mainBaseFamilyId, true)
                     .then(res => setFamilyDetails(res))
@@ -539,8 +494,8 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
                     .finally(() => setLoading(false));
 
                 if (demand.transpotingVolunteerId) {
-                    getVolunteerInfo(demand.transpotingVolunteerId).then(v => {
-                        setTransportingVolunteer(v);
+                    getVolunteerInfo([demand.transpotingVolunteerId]).then(v => {
+                        setTransportingVolunteer(v[0]);
                     })
                 }
             }
@@ -674,69 +629,16 @@ export const DemandList: React.FC<DemandChartProps> = ({ data, mode, appServices
             }
 
             {/* OverlayPanel for displaying additional info */}
-            <Dialog
-                header={<div style={{ textAlign: 'right', width: '100%' }}>בחר מבשל</div>}
-                visible={showCookModal}
-                onHide={closeCookModal}
-                style={{ width: '300px', position: 'absolute', right: '10%', top: '20%' }}
-            >
-                <div className="flex justify-content-end">
-                    <AutoComplete
-                        inputClassName="w-17rem md:w-15rem"
-                        placeholder={!selectedCook ? "חיפוש לפי שם פרטי, משפחה או טלפון" : undefined}
-                        delay={500}
-                        value={selectedCook}
-                        field="name"
-                        optionGroupLabel="districtName"
-                        optionGroupChildren="users"
-                        suggestions={filteredUsers}
-                        completeMethod={async (event: AutoCompleteCompleteEvent) => {
-                            const newFilter = await handleSearchUsers(userInfo, event.query);
-                            setFilteredUsers(newFilter);
-                        }}
-                        onChange={(e) => setSelectedCook(e.value)}
-                        inputStyle={{ textAlign: 'right' }}
-                        itemTemplate={(item) => (
-                            <div style={{ textAlign: 'right' }}>{item.name}</div>
-                        )}
-                    />
-                </div>
-                <div className="flex justify-content-center mt-2">
-                    <SelectDays dateInfo={selectedCookDate!} OnSelectDate={(date) => setSelectedCookDay(date)} dateSelected={selectedCookDay} />
-                </div>
-                <div className="flex justify-content-end mt-2">
-                    <Button label="ביטול" onClick={closeCookModal} className="p-button-secondary ml-2" />
-                    <Button
-                        label="אשר"
-                        disabled={!selectedCook || !selectedCookDay}
-                        onClick={async () => {
-                            if (!selectedCookDate || !selectedCook || !selectedCookDay) return;
-                            setSaving(true);
-                            try {
-                                await updateFamilyDemand(
-                                    selectedCookDate.demandId,
-                                    selectedCookDay,
-                                    selectedCookDate.mainBaseFamilyId,
-                                    familyDetails?.cityId || "cityId(unknown)",
-                                    true,
-                                    selectedCookDate.type,
-                                    `שובץ ע״י מנהל`,
-                                    selectedCookDate.district,
-                                    selectedCook.id
-                                );
-                                appServices.showMessage("success", "שיבוץ בוצע", "");
-                                closeCookModal();
-                                setReload(prev => prev + 1);
-                            } catch (err) {
-                                // @ts-ignore
-                                appServices.showMessage("error", "שגיאה בשיבוץ", err.message);
-                            } finally {
-                                setSaving(false);
-                            }
-                        }}
-                    />
-                </div>
-            </Dialog>
+            <FamilyOpenDemandDialog
+                selectedDateInfo={selectedCookDate} userInfo={userInfo} visible={showCookModal}
+                onClose={(changed) => {
+                    if (changed) setReload(prev => prev + 1);
+                    setShowCookModal(false);
+                }}
+                appServices={appServices}
+                familyDetails={familyDetails}
+                allDemands={data}
+            />
 
             <OverlayPanel ref={overlayPanelRef} showCloseIcon closeOnEscape
                 dismissable={true} >
@@ -938,11 +840,11 @@ function sortFamilies(familiesMap: { [mainBaseFamilyId: string]: GroupedFamily }
         });
 }
 
-function AvailableDate({ date, isHolidayTreat }: { date: DateInfo, isHolidayTreat: boolean }) {
-    const d = dayjs(date.date).locale("he");
-    return <div className='available-date-host'>
-        <div className='available-date'>{d.format("DD-MM")}</div>
-        {isHolidayTreat && <GiPartyHat className='position-absolute ' style={{ color: "var(--born2win-button-color)", top: -5 }} />}
-        <div className="available-dates-weekdays">{date.expandDays.map(day => DAYS[d.add(day, "day").day()] + " ")}</div>
-    </div>
-}
+// function AvailableDate({ date, isHolidayTreat }: { date: DateInfo, isHolidayTreat: boolean }) {
+//     const d = dayjs(date.date).locale("he");
+//     return <div className='available-date-host'>
+//         <div className='available-date'>{d.format("DD-MM")}</div>
+//         {isHolidayTreat && <GiPartyHat className='position-absolute ' style={{ color: "var(--born2win-button-color)", top: -5 }} />}
+//         <div className="available-dates-weekdays">{date.expandDays.map(day => DAYS[d.add(day, "day").day()] + " ")}</div>
+//     </div>
+// }
